@@ -14,3 +14,6 @@ node_modules
 .next/
 .DS_Store
 .env
+.agents
+.codex
+.next
