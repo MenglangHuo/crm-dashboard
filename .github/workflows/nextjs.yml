@@ -2,7 +2,7 @@
 #
 # To get started with Next.js see: https://nextjs.org/docs/getting-started
 #
-name: Menglang Personal Portfolio Web
+name: CRM Dashboard
 
 on:
   # Runs on pushes targeting the default branch
