@@ -26,7 +26,13 @@ export async function proxyToBackend(req: NextRequest) {
 		backendBase = process.env.NEXT_PUBLIC_API_BACKEND_URL || "http://localhost:8091";
 	}
 
-	const cleanBackendBase = backendBase.trim().replace(/\/+$/, "");
+	let cleanBackendBase = backendBase.trim().replace(/\/+$/, "");
+	cleanBackendBase = cleanBackendBase.replace(/\/+(api(\/v1)?)?\/?$/, "");
+	if (!cleanBackendBase.startsWith("http://") && !cleanBackendBase.startsWith("https://")) {
+		cleanBackendBase = cleanBackendBase.includes("localhost")
+			? `http://${cleanBackendBase}`
+			: `https://${cleanBackendBase}`;
+	}
 	const targetUrl = `${cleanBackendBase}${url.pathname}${url.search}`;
 
 	const headers = new Headers(req.headers);

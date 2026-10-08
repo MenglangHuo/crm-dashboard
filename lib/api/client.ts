@@ -25,36 +25,46 @@ export class ApiError extends Error {
 }
 
 function getBaseUrl(): string {
-	const customEndpoint =
-		(process.env.NEXT_PUBLIC_API_ENDPOINT &&
-			process.env.NEXT_PUBLIC_API_ENDPOINT.trim()) ||
-		(process.env.NEXT_PUBLIC_API_ENPOINT &&
-			process.env.NEXT_PUBLIC_API_ENPOINT.trim()) ||
-		"";
 	const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
+	const cleanBaseUrl = apiBaseUrl.startsWith("/") ? apiBaseUrl : `/${apiBaseUrl}`;
 
 	if (typeof window !== "undefined") {
-		// In the browser, use relative path (/api/v1) by default so requests are same-origin
-		// and Next.js rewrites proxy them to the backend server without browser CORS / strict-origin errors.
-		if (customEndpoint) {
-			return customEndpoint.startsWith("http")
-				? `${customEndpoint}${apiBaseUrl}`
-				: `http://${customEndpoint}${apiBaseUrl}`;
+		// In the browser, ALWAYS use relative path (/api/v1) so requests are same-origin.
+		// Next.js rewrites and route handlers proxy them to the backend server without browser CORS or mixed-content errors.
+		if (process.env.NEXT_PUBLIC_USE_DIRECT_API === "true") {
+			const directEndpoint =
+				process.env.NEXT_PUBLIC_API_BACKEND_URL ||
+				process.env.NEXT_PUBLIC_API_ENDPOINT ||
+				process.env.NEXT_PUBLIC_API_ENPOINT ||
+				"";
+			if (directEndpoint) {
+				let origin = directEndpoint.trim().replace(/\/+$/, "");
+				origin = origin.replace(/\/+(api(\/v1)?)?\/?$/, "");
+				if (!origin.startsWith("http://") && !origin.startsWith("https://")) {
+					origin = origin.includes("localhost") ? `http://${origin}` : `https://${origin}`;
+				}
+				return `${origin}${cleanBaseUrl}`;
+			}
 		}
-		return apiBaseUrl;
+		return cleanBaseUrl;
 	}
 
 	// On the server side (SSR / Node.js runtime), absolute URL is required
-	if (customEndpoint) {
-		return customEndpoint.startsWith("http")
-			? `${customEndpoint}${apiBaseUrl}`
-			: `http://${customEndpoint}${apiBaseUrl}`;
-	}
 	const backendUrl =
-		process.env.NEXT_PUBLIC_API_BACKEND_URL || "http://localhost:8091";
-	return backendUrl.startsWith("http")
-		? `${backendUrl}${apiBaseUrl}`
-		: `http://${backendUrl}${apiBaseUrl}`;
+		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
+		process.env.NEXT_PUBLIC_API_ENDPOINT ||
+		process.env.NEXT_PUBLIC_API_ENPOINT ||
+		process.env.CRM_URL ||
+		"http://localhost:8091";
+
+	let cleanBackend = backendUrl.trim().replace(/\/+$/, "");
+	cleanBackend = cleanBackend.replace(/\/+(api(\/v1)?)?\/?$/, "");
+	if (!cleanBackend.startsWith("http://") && !cleanBackend.startsWith("https://")) {
+		cleanBackend = cleanBackend.includes("localhost")
+			? `http://${cleanBackend}`
+			: `https://${cleanBackend}`;
+	}
+	return `${cleanBackend}${cleanBaseUrl}`;
 }
 
 const constructedBaseUrl = getBaseUrl();

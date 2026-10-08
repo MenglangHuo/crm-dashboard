@@ -24,7 +24,7 @@ const nextConfig = {
 	},
 	async rewrites() {
 		const apiBackend = resolveBackendUrl();
-		return [
+		const rules = [
 			{
 				// Proxy all /api/v1/* calls to the Spring Boot backend
 				source: "/api/v1/:path*",
@@ -41,6 +41,11 @@ const nextConfig = {
 				destination: `${apiBackend}/api/public/:path*`,
 			},
 		];
+		return {
+			beforeFiles: rules,
+			afterFiles: rules,
+			fallback: rules,
+		};
 	},
 };
 

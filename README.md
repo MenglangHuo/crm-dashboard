@@ -184,30 +184,34 @@ However, running locally (`pnpm dev`) works normally without errors.
    - Vercel does **not** have your local `.env` file. It solely relies on the Environment Variables configured in the Vercel Dashboard.
 
 2. **Missing `NEXT_PUBLIC_API_BACKEND_URL` on Vercel**:
-   - Next.js uses `next.config.mjs` to rewrite API calls:
-     ```javascript
-     {
-       source: "/api/v1/:path*",
-       destination: `${apiBackend}/api/v1/:path*`
-     }
-     ```
-   - If `NEXT_PUBLIC_API_BACKEND_URL` is not defined in Vercel, `apiBackend` defaults to `http://localhost:8091`.
-   - When requests hit `/api/v1/*` on Vercel, Vercel tries to proxy to `http://localhost:8091/api/v1/*`.
-   - Since port 8091 does not exist in Vercel's serverless environment, Vercel fails to reach the destination and returns its standard Edge 404 response:
-     `{"error": {"code": "404", "message": "The page could not be found"}}`.
+   - Next.js rewrites proxy `/api/v1/*` calls to the backend. Without `NEXT_PUBLIC_API_BACKEND_URL` in Vercel settings, it falls back to `http://localhost:8091`.
+   - In Vercel's cloud environment, `localhost:8091` does not exist, causing Vercel's Edge Router to return `404: The page could not be found`.
 
-3. **Rewrites are evaluated at Build Time**:
-   - In Next.js, `next.config.mjs` rewrites are evaluated and compiled during the **build step** (`next build`).
-   - If you set or change environment variables in Vercel **after** the build, the old build still points to `http://localhost:8091` until you **redeploy**.
+3. **App Router Route Precedence (Filesystem Shadowing)**:
+   - In Next.js App Router, if the `app/api/v1/` folder exists with specific route handlers, Next.js checks the filesystem first.
+   - Any subpath without an explicit `route.ts` file (e.g. `/api/v1/auth/login`, `/api/v1/customers`, etc.) was intercepted by the App Router and returned a 404 before reaching rewrites.
+   - **Solution implemented**: We added a catch-all route handler (`app/api/v1/[...path]/route.ts`) and configured rewrites across `beforeFiles`, `afterFiles`, and `fallback`.
+
+4. **Direct Endpoint Misconfiguration in Client**:
+   - If `NEXT_PUBLIC_API_ENPOINT` was configured to `localhost:8091` or backend directly, the client attempted direct cross-origin calls.
+   - **Solution implemented**: `lib/api/client.ts` now enforces same-origin relative URLs (`/api/v1`) in the browser.
 
 ---
 
 ### Step-by-Step Fix
 
-#### Step 1: Add Environment Variables in Vercel
+#### Step 1: Commit and Push the Code to GitHub
+Ensure all new route handlers and configurations are pushed to your remote repository:
+```bash
+git add .
+git commit -m "fix(api): add catch-all route handlers and robust backend proxying"
+git push origin main
+```
+
+#### Step 2: Configure Environment Variables in Vercel
 1. Open your project on the [Vercel Dashboard](https://vercel.com).
 2. Go to **Settings** → **Environment Variables**.
-3. Add the following keys (ensure all environments: **Production**, **Preview**, **Development** are checked):
+3. Add the following keys (check **Production**, **Preview**, **Development**):
    - **Key**: `NEXT_PUBLIC_API_BACKEND_URL`  
      **Value**: `https://crmapi.bronxtechnology.site`  
      *(Do NOT include trailing slash `/` or suffix `/api/v1`)*
@@ -215,9 +219,10 @@ However, running locally (`pnpm dev`) works normally without errors.
      **Value**: `/api/v1`
    - **Key**: `NEXT_PUBLIC_API_TIMEOUT`  
      **Value**: `15000`
-4. Click **Save**.
+4. If you had `NEXT_PUBLIC_API_ENPOINT` set to `localhost:8091`, **delete or update it**.
+5. Click **Save**.
 
-#### Step 2: Trigger a Clean Redeploy (Crucial!)
+#### Step 3: Trigger a Clean Redeploy (Crucial!)
 Because Next.js compiles `next.config.mjs` rewrites during the build phase:
 1. In Vercel, go to the **Deployments** tab.
 2. Find your latest deployment, click the **three dots (`...`)** on the right side.
