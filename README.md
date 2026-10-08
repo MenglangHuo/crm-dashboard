@@ -18,6 +18,7 @@ Modern, full-featured Customer Relationship Management (CRM) web dashboard built
 - [Project Structure](#-project-structure)
 - [Available Scripts](#-available-scripts)
 
+
 ---
 
 ## 🏗️ Overview & Architecture
@@ -306,4 +307,4 @@ In the project directory, you can run:
 
 ## 📄 License
 
-Internal proprietary software. All rights reserved by Bronx Technology.
+Internal proprietary software. All rights reserved by Bronx Technology 
