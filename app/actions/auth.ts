@@ -19,21 +19,18 @@ type RefreshResponse = {
 };
 
 function getApiBaseUrl() {
-	const apiEndpoint = process.env.NEXT_PUBLIC_API_ENPOINT;
 	const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
-	const backendUrl =
-		process.env.NEXT_PUBLIC_API_BACKEND_URL || "http://localhost:8091";
+	const raw =
+		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
+		process.env.NEXT_PUBLIC_API_ENDPOINT ||
+		process.env.NEXT_PUBLIC_API_ENPOINT ||
+		"http://localhost:8091";
 
-	if (apiEndpoint) {
-		const origin = apiEndpoint.startsWith("http")
-			? apiEndpoint
-			: `http://${apiEndpoint}`;
-		return `${origin}${apiBaseUrl}`;
+	let origin = raw.trim();
+	if (!origin.startsWith("http://") && !origin.startsWith("https://")) {
+		origin = origin.includes("localhost") ? `http://${origin}` : `https://${origin}`;
 	}
-
-	const origin = backendUrl.startsWith("http")
-		? backendUrl
-		: `http://${backendUrl}`;
+	origin = origin.replace(/\/+(api(\/v1)?)?\/?$/, "");
 	return `${origin}${apiBaseUrl}`;
 }
 

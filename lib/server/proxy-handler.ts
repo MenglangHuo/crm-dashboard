@@ -26,7 +26,8 @@ export async function proxyToBackend(req: NextRequest) {
 		backendBase = process.env.NEXT_PUBLIC_API_BACKEND_URL || "http://localhost:8091";
 	}
 
-	const targetUrl = `${backendBase}${url.pathname}${url.search}`;
+	const cleanBackendBase = backendBase.trim().replace(/\/+$/, "");
+	const targetUrl = `${cleanBackendBase}${url.pathname}${url.search}`;
 
 	const headers = new Headers(req.headers);
 	headers.delete("host");

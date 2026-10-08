@@ -13,11 +13,13 @@ function getBackendRefreshUrls(): string[] {
 	const cleanBackend = backendUrl.endsWith("/")
 		? backendUrl.slice(0, -1)
 		: backendUrl;
-	const apiEndpoint = process.env.NEXT_PUBLIC_API_ENPOINT;
+	const apiEndpoint =
+		process.env.NEXT_PUBLIC_API_ENDPOINT ||
+		process.env.NEXT_PUBLIC_API_ENPOINT;
 	const cleanEndpoint = apiEndpoint
 		? apiEndpoint.startsWith("http")
-			? apiEndpoint
-			: `http://${apiEndpoint}`
+			? apiEndpoint.replace(/\/+$/, "")
+			: `http://${apiEndpoint.replace(/\/+$/, "")}`
 		: null;
 
 	const roots = [cleanBackend, ...(cleanEndpoint ? [cleanEndpoint] : [])];
