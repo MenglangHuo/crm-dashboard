@@ -17,13 +17,15 @@ export async function proxyToBackend(req: NextRequest) {
 				? process.env.NEXT_PUBLIC_API_ENPOINT.startsWith("http")
 					? process.env.NEXT_PUBLIC_API_ENPOINT
 					: `http://${process.env.NEXT_PUBLIC_API_ENPOINT}`
-				: "http://localhost:8091");
+				: "https://crmapi.bronxtechnology.site");
 
 	const url = new URL(req.url);
 
 	// Guard against self-proxying: if backendBase is configured to the same host & port as this Next.js server
 	if (backendBase.includes(`:${url.port}`) || backendBase === url.origin) {
-		backendBase = process.env.NEXT_PUBLIC_API_BACKEND_URL || "http://localhost:8091";
+		backendBase =
+			process.env.NEXT_PUBLIC_API_BACKEND_URL ||
+			"https://crmapi.bronxtechnology.site";
 	}
 
 	let cleanBackendBase = backendBase.trim().replace(/\/+$/, "");
@@ -32,6 +34,9 @@ export async function proxyToBackend(req: NextRequest) {
 		cleanBackendBase = cleanBackendBase.includes("localhost")
 			? `http://${cleanBackendBase}`
 			: `https://${cleanBackendBase}`;
+	}
+	if ((process.env.NODE_ENV === "production" || process.env.VERCEL) && cleanBackendBase.includes("localhost")) {
+		cleanBackendBase = "https://crmapi.bronxtechnology.site";
 	}
 	const targetUrl = `${cleanBackendBase}${url.pathname}${url.search}`;
 

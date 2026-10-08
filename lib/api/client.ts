@@ -25,18 +25,27 @@ export class ApiError extends Error {
 }
 
 function getBaseUrl(): string {
-	const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
-	const cleanBaseUrl = apiBaseUrl.startsWith("/") ? apiBaseUrl : `/${apiBaseUrl}`;
+	const rawBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
+	const isAbsoluteBase =
+		rawBaseUrl.startsWith("http://") || rawBaseUrl.startsWith("https://");
+
+	if (isAbsoluteBase) {
+		return rawBaseUrl.replace(/\/+$/, "");
+	}
+
+	const cleanBaseUrl = rawBaseUrl.startsWith("/")
+		? rawBaseUrl
+		: `/${rawBaseUrl}`;
 
 	if (typeof window !== "undefined") {
-		// In the browser, ALWAYS use relative path (/api/v1) so requests are same-origin.
+		// In the browser, use relative path (/api/v1) by default so requests are same-origin.
 		// Next.js rewrites and route handlers proxy them to the backend server without browser CORS or mixed-content errors.
 		if (process.env.NEXT_PUBLIC_USE_DIRECT_API === "true") {
 			const directEndpoint =
 				process.env.NEXT_PUBLIC_API_BACKEND_URL ||
 				process.env.NEXT_PUBLIC_API_ENDPOINT ||
 				process.env.NEXT_PUBLIC_API_ENPOINT ||
-				"";
+				"https://crmapi.bronxtechnology.site";
 			if (directEndpoint) {
 				let origin = directEndpoint.trim().replace(/\/+$/, "");
 				origin = origin.replace(/\/+(api(\/v1)?)?\/?$/, "");
@@ -55,7 +64,7 @@ function getBaseUrl(): string {
 		process.env.NEXT_PUBLIC_API_ENDPOINT ||
 		process.env.NEXT_PUBLIC_API_ENPOINT ||
 		process.env.CRM_URL ||
-		"http://localhost:8091";
+		"https://crmapi.bronxtechnology.site";
 
 	let cleanBackend = backendUrl.trim().replace(/\/+$/, "");
 	cleanBackend = cleanBackend.replace(/\/+(api(\/v1)?)?\/?$/, "");
@@ -63,6 +72,9 @@ function getBaseUrl(): string {
 		cleanBackend = cleanBackend.includes("localhost")
 			? `http://${cleanBackend}`
 			: `https://${cleanBackend}`;
+	}
+	if ((process.env.NODE_ENV === "production" || process.env.VERCEL) && cleanBackend.includes("localhost")) {
+		cleanBackend = "https://crmapi.bronxtechnology.site";
 	}
 	return `${cleanBackend}${cleanBaseUrl}`;
 }
@@ -129,7 +141,11 @@ async function performRefreshToken(): Promise<boolean> {
 	}
 
 	// 1. Call candidate API endpoints
-	const endpoints = ["/api/auth/refresh-token", "/api/v1/auth/refresh-token"];
+	const endpoints = [
+		`${constructedBaseUrl}/auth/refresh-token`,
+		"/api/v1/auth/refresh-token",
+		"/api/auth/refresh-token",
+	];
 
 	for (const ep of endpoints) {
 		try {

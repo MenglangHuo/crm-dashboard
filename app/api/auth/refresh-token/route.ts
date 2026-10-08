@@ -9,10 +9,15 @@ const ACCESS_TTL = 1000 * 60 * 60; // 1 hour
 
 function getBackendRefreshUrls(): string[] {
 	const backendUrl =
-		process.env.NEXT_PUBLIC_API_BACKEND_URL || "http://localhost:8091";
-	const cleanBackend = backendUrl.endsWith("/")
+		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
+		process.env.CRM_URL ||
+		"https://crmapi.bronxtechnology.site";
+	let cleanBackend = backendUrl.endsWith("/")
 		? backendUrl.slice(0, -1)
 		: backendUrl;
+	if ((process.env.NODE_ENV === "production" || process.env.VERCEL) && cleanBackend.includes("localhost")) {
+		cleanBackend = "https://crmapi.bronxtechnology.site";
+	}
 	const apiEndpoint =
 		process.env.NEXT_PUBLIC_API_ENDPOINT ||
 		process.env.NEXT_PUBLIC_API_ENPOINT;

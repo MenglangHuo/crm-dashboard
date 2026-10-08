@@ -19,19 +19,27 @@ type RefreshResponse = {
 };
 
 function getApiBaseUrl() {
-	const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
+	const rawBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
+	if (rawBaseUrl.startsWith("http://") || rawBaseUrl.startsWith("https://")) {
+		return rawBaseUrl.replace(/\/+$/, "");
+	}
 	const raw =
 		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
 		process.env.NEXT_PUBLIC_API_ENDPOINT ||
 		process.env.NEXT_PUBLIC_API_ENPOINT ||
-		"http://localhost:8091";
+		process.env.CRM_URL ||
+		"https://crmapi.bronxtechnology.site";
 
-	let origin = raw.trim();
+	let origin = (raw || "https://crmapi.bronxtechnology.site").trim();
 	if (!origin.startsWith("http://") && !origin.startsWith("https://")) {
 		origin = origin.includes("localhost") ? `http://${origin}` : `https://${origin}`;
 	}
+	if ((process.env.NODE_ENV === "production" || process.env.VERCEL) && origin.includes("localhost")) {
+		origin = "https://crmapi.bronxtechnology.site";
+	}
 	origin = origin.replace(/\/+(api(\/v1)?)?\/?$/, "");
-	return `${origin}${apiBaseUrl}`;
+	const cleanBaseUrl = rawBaseUrl.startsWith("/") ? rawBaseUrl : `/${rawBaseUrl}`;
+	return `${origin}${cleanBaseUrl}`;
 }
 
 function unwrapRefreshResponse(
