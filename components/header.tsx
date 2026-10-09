@@ -23,8 +23,9 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { useCustomTheme } from "@/components/custom-theme-provider";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { profileApi, fileUrl } from "@/lib/api/endpoints";
+import { clearClientSession } from "@/lib/api/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,45 +61,26 @@ function getTimeGreetingType(): "morning" | "afternoon" | "evening" | "night" {
 	return "night";
 }
 
-export function Header() {
-	const router = useRouter();
-	const { setTheme, theme } = useTheme();
-	const { setIsCustomizerOpen } = useCustomTheme();
+function subscribeMinute(callback: () => void) {
+	const id = setInterval(callback, 60000);
+	return () => clearInterval(id);
+}
+
+function getGreetingTypeClient(): "morning" | "afternoon" | "evening" | "night" {
+	return getTimeGreetingType();
+}
+
+function getGreetingTypeServer(): "morning" | "afternoon" | "evening" | "night" {
+	return "morning";
+}
+
+function HeaderGreeting() {
 	const { t } = useTranslation();
-
-	const [mounted, setMounted] = useState(false);
-	const [greetingType, setGreetingType] = useState<
-		"morning" | "afternoon" | "evening" | "night"
-	>("morning");
-
-	React.useEffect(() => {
-		setMounted(true);
-		setGreetingType(getTimeGreetingType());
-		const interval = setInterval(() => {
-			setGreetingType(getTimeGreetingType());
-		}, 60000);
-		return () => clearInterval(interval);
-	}, []);
-
-	const { data: userProfile, isLoading: isLoadingProfile } = useQuery({
-		queryKey: ["profile"],
-		queryFn: profileApi.me,
-		staleTime: 5 * 60 * 1000,
-	});
-
-	const isSystemAdmin = isUserSystemAdmin(userProfile);
-	const userName = userProfile?.firstName
-		? `${userProfile.firstName} ${userProfile.lastName || ""}`.trim()
-		: userProfile?.displayName || userProfile?.username || "";
-	const companyName =
-		userProfile?.company?.name || userProfile?.companyName || "";
-	const userRole = userProfile?.username
-		? `@${userProfile.username}`
-		: isSystemAdmin
-			? "@system_admin"
-			: userProfile?.roles?.[0]?.name
-				? `@${userProfile.roles[0].name.toLowerCase()}`
-				: "";
+	const greetingType = React.useSyncExternalStore(
+		subscribeMinute,
+		getGreetingTypeClient,
+		getGreetingTypeServer,
+	);
 
 	const greetingText = React.useMemo(() => {
 		switch (greetingType) {
@@ -115,34 +97,8 @@ export function Header() {
 		}
 	}, [greetingType, t]);
 
-	const handleLogout = async () => {
-		try {
-			document.cookie =
-				"rumluos_access_token=; path=/; max-age=0; SameSite=Lax";
-			document.cookie =
-				"rumluos_refresh_token=; path=/; max-age=0; SameSite=Lax";
-			document.cookie = "rumluos_company_id=; path=/; max-age=0; SameSite=Lax";
-			localStorage.removeItem("rumluos_access_token");
-			localStorage.removeItem("rumluos_refresh_token");
-			localStorage.removeItem("rumluos_company_id");
-			localStorage.removeItem("rumluos_user_profile");
-			await clearAuthCookies();
-			toast.success(t("header.signedOutSuccess"));
-			router.push("/sign-in");
-		} catch {
-			router.push("/sign-in");
-		}
-	};
-
-	const avatarSrc =
-		userProfile?.avatarUrl ||
-		userProfile?.imageUrl ||
-		fileUrl(userProfile?.avatarKey) ||
-		"";
-
-	const renderGreetingIcon = () => {
-		const currentType = mounted ? greetingType : "morning";
-		switch (currentType) {
+	const renderIcon = () => {
+		switch (greetingType) {
 			case "morning":
 				return (
 					<div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500 dark:bg-amber-400/15 dark:text-amber-400 shrink-0 shadow-2xs">
@@ -177,35 +133,82 @@ export function Header() {
 	};
 
 	return (
+		<>
+			{renderIcon()}
+			<span suppressHydrationWarning>{greetingText}</span>
+		</>
+	);
+}
+
+export function Header() {
+	const router = useRouter();
+	const { setTheme, theme } = useTheme();
+	const { setIsCustomizerOpen } = useCustomTheme();
+	const { t } = useTranslation();
+
+	const { data: userProfile, isLoading: isLoadingProfile } = useQuery({
+		queryKey: ["profile"],
+		queryFn: profileApi.me,
+		staleTime: 5 * 60 * 1000,
+	});
+
+	const isSystemAdmin = isUserSystemAdmin(userProfile);
+	const userName = userProfile?.firstName
+		? `${userProfile.firstName} ${userProfile.lastName || ""}`.trim()
+		: userProfile?.displayName || userProfile?.username || "";
+	const companyName =
+		userProfile?.company?.name || userProfile?.companyName || "";
+	const userRole = userProfile?.username
+		? `@${userProfile.username}`
+		: isSystemAdmin
+			? "@system_admin"
+			: userProfile?.roles?.[0]?.name
+				? `@${userProfile.roles[0].name.toLowerCase()}`
+				: "";
+
+	const queryClient = useQueryClient();
+
+	const handleLogout = async () => {
+		try {
+			clearClientSession();
+			queryClient.clear();
+			await clearAuthCookies();
+			toast.success(t("header.signedOutSuccess"));
+			router.push("/sign-in");
+		} catch {
+			clearClientSession();
+			queryClient.clear();
+			router.push("/sign-in");
+		}
+	};
+
+	const avatarSrc =
+		userProfile?.avatarUrl ||
+		userProfile?.imageUrl ||
+		fileUrl(userProfile?.avatarKey) ||
+		"";
+
+	return (
 		<header className="sticky top-0 z-20 flex h-20 shrink-0 items-center justify-between border-b border-slate-200/70 bg-white/82 px-4 shadow-sm shadow-slate-200/40 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/82 dark:shadow-black/20 md:px-8">
 			<div className="flex items-center gap-4">
 				<SidebarTrigger className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100" />
 
 				{/* Welcome Greeting */}
 				<div className="hidden sm:block">
-					<h2
-						suppressHydrationWarning
-						className="text-base font-bold leading-snug tracking-tight text-slate-950 dark:text-white flex items-center gap-2"
-					>
-						{renderGreetingIcon()}
-						<span suppressHydrationWarning className="inline-flex items-center gap-1">
-							<span>{mounted ? greetingText : "Good Day"}</span>
-							{mounted && userName ? (
+					<h2 className="text-base font-bold leading-snug tracking-tight text-slate-950 dark:text-white flex items-center gap-2">
+						<HeaderGreeting />
+						<span className="inline-flex items-center gap-1">
+							{userName ? (
 								<span>, {userName}</span>
-							) : mounted && userProfile?.username ? (
+							) : userProfile?.username ? (
 								<span>, {userProfile.username}</span>
-							) : !mounted || (isLoadingProfile && !userProfile) ? (
+							) : isLoadingProfile && !userProfile ? (
 								<Skeleton className="h-4 w-28 ml-1 inline-block align-middle" />
-							) : (
-								""
-							)}
+							) : null}
 						</span>
 					</h2>
-					<div
-						suppressHydrationWarning
-						className="text-xs font-medium text-slate-400 dark:text-slate-500 pl-8 min-h-[18px] flex items-center"
-					>
-						{!mounted || (isLoadingProfile && !userProfile) ? (
+					<div className="text-xs font-medium text-slate-400 dark:text-slate-500 pl-8 min-h-[18px] flex items-center">
+						{isLoadingProfile && !userProfile ? (
 							<Skeleton className="h-3 w-40 my-0.5" />
 						) : companyName ? (
 							<span>{companyName} • {t("common.operationalPortal", "Operational Portal")}</span>
@@ -267,12 +270,10 @@ export function Header() {
 								<Avatar className="h-9 w-9 rounded-xl border border-primary/20 ring-2 ring-primary/10 shadow-2xs">
 									<AvatarImage src={avatarSrc} alt={userName} />
 									<AvatarFallback
-										suppressHydrationWarning
 										className="rounded-xl bg-primary/10 text-xs font-bold text-primary"
 									>
-										{mounted &&
-										(userProfile?.firstName?.[0] ||
-											userProfile?.username?.[0]) ? (
+										{userProfile?.firstName?.[0] ||
+										userProfile?.username?.[0] ? (
 											(
 												userProfile.firstName?.[0] ||
 												userProfile.username?.[0]
@@ -286,11 +287,8 @@ export function Header() {
 							</div>
 
 							<div className="hidden sm:flex flex-col text-left">
-								<span
-									suppressHydrationWarning
-									className="text-xs font-bold leading-tight text-slate-900 dark:text-white max-w-[130px] truncate"
-								>
-									{!mounted || (isLoadingProfile && !userProfile) ? (
+								<span className="text-xs font-bold leading-tight text-slate-950 dark:text-white max-w-[130px] truncate">
+									{isLoadingProfile && !userProfile ? (
 										<Skeleton className="h-3 w-16 my-0.5" />
 									) : (
 										companyName ||
@@ -299,11 +297,8 @@ export function Header() {
 										t("header.myAccount")
 									)}
 								</span>
-								<span
-									suppressHydrationWarning
-									className="text-[10px] font-medium text-slate-400 dark:text-slate-500 flex items-center gap-1"
-								>
-									{!mounted || (isLoadingProfile && !userProfile) ? (
+								<span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 flex items-center gap-1">
+									{isLoadingProfile && !userProfile ? (
 										<Skeleton className="h-2 w-12" />
 									) : (
 										userRole || ""
@@ -325,12 +320,10 @@ export function Header() {
 									<Avatar className="h-10 w-10 rounded-xl ring-2 ring-primary/20 shadow-xs">
 										<AvatarImage src={avatarSrc} alt={userName} />
 										<AvatarFallback
-											suppressHydrationWarning
 											className="rounded-xl bg-primary/10 text-sm font-bold text-primary"
 										>
-											{mounted &&
-											(userProfile?.firstName?.[0] ||
-												userProfile?.username?.[0]) ? (
+											{userProfile?.firstName?.[0] ||
+											userProfile?.username?.[0] ? (
 												(
 													userProfile.firstName?.[0] ||
 													userProfile.username?.[0]

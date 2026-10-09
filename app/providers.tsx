@@ -7,14 +7,46 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 
+import dynamic from "next/dynamic";
 import { QuickActionProvider } from "@/components/quick-action-modal-context";
 import { CustomThemeProvider } from "@/components/custom-theme-provider";
-import { ThemeCustomizerModal } from "@/components/theme-customizer-modal";
-import { CommandPalette } from "@/components/command-palette";
-import { UnifiedLoanWizardModal } from "@/components/unified-loan-wizard-modal";
-import { QuickPaymentModal } from "@/components/quick-payment-modal";
-import { AbaKhqrModal } from "@/components/aba-khqr-modal";
-import { PrintReceiptModal } from "@/components/print-receipt-modal";
+
+const CommandPalette = dynamic(
+	() => import("@/components/command-palette").then((m) => m.CommandPalette),
+	{ ssr: false },
+);
+const UnifiedLoanWizardModal = dynamic(
+	() =>
+		import("@/components/unified-loan-wizard-modal").then(
+			(m) => m.UnifiedLoanWizardModal,
+		),
+	{ ssr: false },
+);
+const QuickPaymentModal = dynamic(
+	() =>
+		import("@/components/quick-payment-modal").then(
+			(m) => m.QuickPaymentModal,
+		),
+	{ ssr: false },
+);
+const AbaKhqrModal = dynamic(
+	() => import("@/components/aba-khqr-modal").then((m) => m.AbaKhqrModal),
+	{ ssr: false },
+);
+const PrintReceiptModal = dynamic(
+	() =>
+		import("@/components/print-receipt-modal").then(
+			(m) => m.PrintReceiptModal,
+		),
+	{ ssr: false },
+);
+const ThemeCustomizerModal = dynamic(
+	() =>
+		import("@/components/theme-customizer-modal").then(
+			(m) => m.ThemeCustomizerModal,
+		),
+	{ ssr: false },
+);
 import { OneSignalProvider } from "@/components/providers/onesignal-provider";
 import { I18nProvider } from "@/lib/i18n/context";
 import type { Locale } from "@/types/i18n";

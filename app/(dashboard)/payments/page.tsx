@@ -3,7 +3,7 @@
 import { MultiInvoicePaymentModal } from "@/components/invoices/multi-invoice-payment-modal";
 import { BulkReconciliationModal } from "@/components/payments/bulk-reconciliation-modal";
 import { PaymentDetailsModal } from "@/components/payments/payment-details-modal";
-import { useQuickActions } from "@/components/quick-action-modal-context";
+import { useQuickActionDispatch } from "@/components/quick-action-modal-context";
 import {
 	ColumnDef,
 	DataTable,
@@ -16,11 +16,9 @@ import {
 	buildSearchFilterPayload,
 } from "@/components/ui-custom/data-table/search-filter-types";
 import {
-	ModernTabs,
-	ModernTabsContent,
-	ModernTabsList,
-	ModernTabsTrigger,
-} from "@/components/ui-custom/modern-tabs";
+	StatusFilterDropdown,
+	StatusFilterOption,
+} from "@/components/ui-custom/status-filter-dropdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { paymentsApi } from "@/lib/api/endpoints";
@@ -40,14 +38,18 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
+import { useCompanyContext } from "@/components/providers/company-context";
+import { useDebounce } from "@/hooks/use-debounce";
 
 function PaymentsPageContent() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
-	const { openQuickPay, openReceipt } = useQuickActions();
+	const { openQuickPay, openReceipt } = useQuickActionDispatch();
+	const { selectedCompanyId } = useCompanyContext();
 
 	// State
 	const [search, setSearch] = useState("");
+	const debouncedSearch = useDebounce(search, 300);
 	const [activeTab, setActiveTab] = useState<string>("ALL");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
@@ -64,7 +66,7 @@ function PaymentsPageContent() {
 	// Construct dynamic search payload for POST /api/v1/payments/search
 	const searchPayload = useMemo(() => {
 		const payload = buildSearchFilterPayload({
-			searchValue: search,
+			searchValue: debouncedSearch,
 			searchField: "paymentNumber",
 			activeFilters: activeFilters,
 			sortState: sortState
@@ -125,36 +127,32 @@ function PaymentsPageContent() {
 		}
 
 		return payload;
-	}, [search, activeFilters, activeTab, sortState, page, pageSize]);
+	}, [debouncedSearch, activeFilters, activeTab, sortState, page, pageSize]);
 
 	// Payments Query
 	const {
 		data: searchResponse,
 		isLoading,
 		isFetching,
+		isError,
+		error,
 		refetch,
 	} = useQuery({
 		queryKey: [
 			"payments-search",
+			selectedCompanyId,
 			searchPayload,
 			activeTab,
 			sortState,
 			page,
 			pageSize,
-			search,
+			debouncedSearch,
 		],
 		queryFn: () => paymentsApi.search(searchPayload),
 	});
 
-	// Global query for tab badge counters
-	const { data: allPaymentsSummary } = useQuery({
-		queryKey: ["payments-all-kpis"],
-		queryFn: () => paymentsApi.list({ limit: 500 }),
-		staleTime: 1000 * 30,
-	});
-
 	const paymentsList: Payment[] = searchResponse?.items || [];
-	const allPaymentsList: Payment[] = allPaymentsSummary?.items || paymentsList;
+	const allPaymentsList: Payment[] = paymentsList;
 
 	// Tab badge counters
 	const pendingReconcileCount = useMemo(
@@ -371,6 +369,49 @@ function PaymentsPageContent() {
 		[],
 	);
 
+	const paymentStatusOptions: StatusFilterOption[] = useMemo(
+		() => [
+			{
+				id: "ALL",
+				label: "All Payments",
+				icon: Layers,
+				badge: allPaymentsList.length,
+				badgeColor: "purple",
+			},
+			{
+				id: "PENDING",
+				label: "Pending Reconcile",
+				icon: Clock,
+				badge: pendingReconcileCount,
+				badgeColor: "amber",
+				dotColor: "bg-amber-500",
+			},
+			{
+				id: "RECONCILED",
+				label: "Reconciled",
+				icon: CheckCircle2,
+				badge: reconciledCount,
+				badgeColor: "emerald",
+				dotColor: "bg-emerald-500",
+			},
+			{
+				id: "EXCEPTION",
+				label: "Exceptions",
+				icon: AlertTriangle,
+				badge: exceptionCount,
+				badgeColor: "rose",
+				dotColor: "bg-rose-500",
+			},
+			{
+				id: "COMPLETED",
+				label: "Completed",
+				icon: Check,
+				dotColor: "bg-blue-500",
+			},
+		],
+		[allPaymentsList.length, pendingReconcileCount, reconciledCount, exceptionCount],
+	);
+
 	return (
 		<div className="space-y-6">
 			{/* Page Header */}
@@ -384,130 +425,92 @@ function PaymentsPageContent() {
 						Track customer collections, verify bank settlements, and perform bulk multi-reconciliation.
 					</p>
 				</div>
-
 			</div>
 
-			{/* Main Modern Tabs Navigation */}
-			<ModernTabs
-				value={activeTab}
-				onValueChange={(val) => {
-					setActiveTab(val);
+			{/* Selection Banner when items are selected */}
+			{selectedPayments.length > 0 && (
+				<div className="flex items-center justify-between p-3.5 rounded-2xl bg-primary/10 border border-primary/20 text-xs">
+					<div className="flex items-center gap-3">
+						<Badge className="bg-primary text-primary-foreground font-bold px-2 py-0.5">
+							{selectedPayments.length} Selected
+						</Badge>
+						<span className="font-semibold text-slate-900 dark:text-slate-100">
+							Total: ${totalSelectedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+						</span>
+					</div>
+
+					<div className="flex items-center gap-2">
+						<Button
+							size="sm"
+							onClick={() => setIsBulkReconcileOpen(true)}
+							className="h-8 gap-1.5 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm cursor-pointer"
+						>
+							<ShieldCheck className="size-3.5" />
+							<span>Reconcile Selected</span>
+						</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setSelectedIds([])}
+							className="h-8 text-xs text-muted-foreground hover:text-slate-900 cursor-pointer"
+						>
+							Clear Selection
+						</Button>
+					</div>
+				</div>
+			)}
+
+			{/* Data Table with Checkbox Selection, Filters & Sort */}
+			<DataTable<Payment>
+				data={paymentsList}
+				columns={columns}
+				actions={rowActions}
+				isLoading={isLoading}
+				isError={isError}
+				error={error}
+				onRetry={() => refetch()}
+				selectable={true}
+				selectedIds={selectedIds}
+				onSelectionChange={setSelectedIds}
+				hideHeader={true}
+				hideImportExport={true}
+				searchPlaceholder={t("common.search", "Search...")}
+				searchValue={search}
+				onSearchChange={(val) => {
+					setSearch(val);
 					setPage(1);
 				}}
-			>
-				<ModernTabsList variant="glass" size="md">
-					<ModernTabsTrigger
-						value="ALL"
-						icon={<Layers className="size-4" />}
-						badge={allPaymentsList.length}
-						badgeColor="purple"
-					>
-						All Payments
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="PENDING"
-						icon={<Clock className="size-4" />}
-						badge={pendingReconcileCount}
-						badgeColor="amber"
-					>
-						Pending Reconcile
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="RECONCILED"
-						icon={<CheckCircle2 className="size-4" />}
-						badge={reconciledCount}
-						badgeColor="emerald"
-					>
-						Reconciled
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="EXCEPTION"
-						icon={<AlertTriangle className="size-4" />}
-						badge={exceptionCount}
-						badgeColor="rose"
-					>
-						Exceptions
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="COMPLETED"
-						icon={<Check className="size-4" />}
-					>
-						Completed
-					</ModernTabsTrigger>
-				</ModernTabsList>
-
-				<ModernTabsContent value={activeTab} className="pt-3 space-y-4">
-					{/* Selection Banner when items are selected */}
-					{selectedPayments.length > 0 && (
-						<div className="flex items-center justify-between p-3.5 rounded-2xl bg-primary/10 border border-primary/20 text-xs">
-							<div className="flex items-center gap-3">
-								<Badge className="bg-primary text-primary-foreground font-bold px-2 py-0.5">
-									{selectedPayments.length} Selected
-								</Badge>
-								<span className="font-semibold text-slate-900 dark:text-slate-100">
-									Total: ${totalSelectedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-								</span>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<Button
-									size="sm"
-									onClick={() => setIsBulkReconcileOpen(true)}
-									className="h-8 gap-1.5 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-								>
-									<ShieldCheck className="size-3.5" />
-									<span>Reconcile Selected</span>
-								</Button>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => setSelectedIds([])}
-									className="h-8 text-xs text-muted-foreground hover:text-slate-900"
-								>
-									Clear Selection
-								</Button>
-							</div>
-						</div>
-					)}
-
-					{/* Data Table with Checkbox Selection, Filters & Sort */}
-					<DataTable<Payment>
-						data={paymentsList}
-						columns={columns}
-						actions={rowActions}
-						isLoading={isLoading}
-						selectable={true}
-						selectedIds={selectedIds}
-						onSelectionChange={setSelectedIds}
-						hideHeader={true}
-						searchPlaceholder={t("common.search", "Search...")}
-						searchValue={search}
-						onSearchChange={(val) => {
-							setSearch(val);
+				toolbarSearchSuffix={
+					<StatusFilterDropdown
+						value={activeTab}
+						onChange={(val) => {
+							setActiveTab(val);
 							setPage(1);
 						}}
-						sortState={sortState}
-						onSortChange={setSortState}
-						domainFilterFields={PAYMENT_DOMAIN_FILTERS}
-						activeDomainFilters={activeFilters}
-						domainTitle="Payment Filter Studio"
-						filterButtonLabel={t("common.filters", "Filters")}
-						onDomainFilterChange={(filters) => {
-							setActiveFilters(filters);
-							setPage(1);
-						}}
-						manualPagination={true}
-						page={page}
-						pageSize={pageSize}
-						totalCount={searchResponse?.total || 0}
-						onPageChange={setPage}
-						onPageSizeChange={(newSize: number) => {
-							setPageSize(newSize);
-							setPage(1);
-						}}
+						options={paymentStatusOptions}
+						label="Status"
 					/>
-				</ModernTabsContent>
-			</ModernTabs>
+				}
+				sortState={sortState}
+				onSortChange={setSortState}
+				domainFilterFields={PAYMENT_DOMAIN_FILTERS}
+				activeDomainFilters={activeFilters}
+				domainTitle="Payment Filter Studio"
+				filterButtonLabel={t("common.filters", "Filters")}
+				onDomainFilterChange={(filters) => {
+					setActiveFilters(filters);
+					setPage(1);
+				}}
+				manualPagination={true}
+				page={page}
+				pageSize={pageSize}
+				totalCount={searchResponse?.total || 0}
+				onPageChange={setPage}
+				onPageSizeChange={(newSize: number) => {
+					setPageSize(newSize);
+					setPage(1);
+				}}
+			/>
 
 			{/* Bulk Reconciliation Modal */}
 			<BulkReconciliationModal

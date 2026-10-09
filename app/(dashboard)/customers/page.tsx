@@ -36,8 +36,13 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { ModernButton } from "@/components/ui-custom/button";
-import { ModernSwitch } from "@/components/ui-custom/form-controls";
+import {
+	ModernSwitch,
+	ModernSearchSelect,
+	SearchSelectOption,
+} from "@/components/ui-custom/form-controls";
 import {
 	DataTable,
 	ColumnDef,
@@ -60,16 +65,20 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useTranslation } from "@/lib/i18n/context";
+import { useCompanyContext } from "@/components/providers/company-context";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export default function CustomersPage() {
 	const { t } = useTranslation();
 	const router = useRouter();
 	const queryClient = useQueryClient();
+	const { selectedCompanyId } = useCompanyContext();
 
 	const [viewMode, setViewMode] = useState<"list" | "nearby">("list");
 	const [selectedProvinceCode, setSelectedProvinceCode] =
 		useState<string>("ALL");
 	const [search, setSearch] = useState("");
+	const debouncedSearch = useDebounce(search, 300);
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
 	const [domainFilterGroup, setDomainFilterGroup] = useState<any>(null);
@@ -168,13 +177,17 @@ export default function CustomersPage() {
 	}, [selectedProvinceCode, domainFilterGroup]);
 
 	// 3. Fetch Customers List
-	const { data, isLoading, isFetching } = useQuery({
-		queryKey: ["customers", { page, pageSize, search, filterGroup }],
+	const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
+		queryKey: [
+			"customers",
+			selectedCompanyId,
+			{ page, pageSize, search: debouncedSearch, filterGroup },
+		],
 		queryFn: () =>
 			customersApi.list({
 				page,
 				limit: pageSize,
-				search: search.trim() || undefined,
+				search: debouncedSearch.trim() || undefined,
 				filterGroup,
 			}),
 	});
@@ -526,7 +539,7 @@ export default function CustomersPage() {
 		},
 	];
 
-	// Mode Switcher Tabs (Placed next to Add Customer button)
+	// Mode Switcher Tabs (Placed next to Province Select & Add Customer button)
 	const modeSwitcherTabs = (
 		<div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
 			<button
@@ -554,13 +567,51 @@ export default function CustomersPage() {
 		</div>
 	);
 
+	// Cambodia Provinces Searchable Options List
+	const provinceFilterOptions: SearchSelectOption[] = useMemo(() => {
+		const opts: SearchSelectOption[] = [
+			{
+				value: "ALL",
+				label: t("customers.allProvinces", "All Provinces"),
+				badge: "ALL",
+			},
+		];
+		activeProvinces.forEach((p) => {
+			opts.push({
+				value: p.provinceCode,
+				label: p.provinceEn,
+				subtitle: p.provinceKh,
+				badge: p.provinceCode,
+				icon: <MapPin className="h-3.5 w-3.5 text-rose-500" />,
+			});
+		});
+		return opts;
+	}, [activeProvinces, t]);
+
+	// Clean ModernSearchSelect Dropdown placed right beside Customer List Tab
+	const provinceSelectWidget = (
+		<div className="w-48 sm:w-56 shrink-0">
+			<ModernSearchSelect
+				placeholder={t("customers.allProvinces", "All Provinces")}
+				searchPlaceholder="Filter province..."
+				selectSize="sm"
+				options={provinceFilterOptions}
+				value={selectedProvinceCode}
+				onChange={(val) => {
+					setSelectedProvinceCode(val || "ALL");
+					setPage(1);
+				}}
+			/>
+		</div>
+	);
+
 	return (
 		<div className="space-y-4 pb-12">
 			{/* Main View Mode Body */}
 			{viewMode === "nearby" ? (
 				<div className="space-y-4">
-					{/* Header Action Strip with Tabs next to Add Customer */}
-					<div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-950 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+					{/* Header Action Strip with Tabs and Province Select next to Add Customer */}
+					<div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
 						<div className="flex items-center gap-2.5">
 							<h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">
 								{t("customers.title")}
@@ -573,17 +624,17 @@ export default function CustomersPage() {
 							</Badge>
 						</div>
 
-						<div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+						<div className="flex items-center gap-2 shrink-0 flex-wrap">
 							{modeSwitcherTabs}
+							{provinceSelectWidget}
 
-							<ModernButton
-								variant="primary"
-								size="sm"
+							<Button
 								onClick={openCreateModal}
-								leftIcon={<Plus className="h-4 w-4" />}
+								className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
 							>
-								{t("customers.addNewCustomer")}
-							</ModernButton>
+								<Plus className="h-3.5 w-3.5" />
+								<span>{t("customers.addNewCustomer", "Add Customer")}</span>
+							</Button>
 						</div>
 					</div>
 
@@ -591,52 +642,17 @@ export default function CustomersPage() {
 				</div>
 			) : (
 				<div className="space-y-4">
-					{/* Province Filter Tabs Strip (/api/v1/customers/active-provinces) */}
-					<div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-						<button
-							type="button"
-							onClick={() => {
-								setSelectedProvinceCode("ALL");
-								setPage(1);
-							}}
-							className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold shrink-0 transition-all border ${
-								selectedProvinceCode === "ALL"
-									? "bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white shadow-xs"
-									: "bg-white dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
-							}`}
-						>
-							{t("customers.allProvinces")}
-						</button>
-
-						{activeProvinces.map((p) => {
-							const isSelected = selectedProvinceCode === p.provinceCode;
-							return (
-								<button
-									key={p.provinceCode}
-									type="button"
-									onClick={() => {
-										setSelectedProvinceCode(p.provinceCode);
-										setPage(1);
-									}}
-									className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold shrink-0 transition-all border ${
-										isSelected
-											? "bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white shadow-xs"
-											: "bg-white dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
-									}`}
-								>
-									📍 {p.provinceEn}
-								</button>
-							);
-						})}
-					</div>
-
-					{/* Custom Modern DataTable with Tabs next to Add Customer */}
+					{/* Custom Modern DataTable with Integrated Toolbar */}
 					<DataTable<Customer>
-						title={t("customers.title")}
+						hideHeader={true}
+						hideImportExport={true}
 						data={customersList}
 						columns={columns}
 						getRowId={(row) => String(row.id)}
 						isLoading={isLoading}
+						isError={isError}
+						error={error}
+						onRetry={() => refetch()}
 						searchable={true}
 						searchField="text"
 						searchPlaceholder={t("customers.searchPlaceholder")}
@@ -645,9 +661,19 @@ export default function CustomersPage() {
 							setSearch(val);
 							setPage(1);
 						}}
-						headerActions={modeSwitcherTabs}
-						onCreateNew={openCreateModal}
-						createButtonLabel={t("customers.addNewCustomer")}
+						primaryAction={
+							<div className="flex items-center gap-2 flex-wrap">
+								{modeSwitcherTabs}
+								{provinceSelectWidget}
+								<Button
+									onClick={openCreateModal}
+									className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+								>
+									<Plus className="h-3.5 w-3.5" />
+									<span>{t("customers.addNewCustomer", "Add Customer")}</span>
+								</Button>
+							</div>
+						}
 						onEditRow={(row) => openEditModal(row)}
 						onDeleteRow={(row) => setDeletingId(row.id)}
 						onViewRow={(row) => setViewingCustomer(row)}

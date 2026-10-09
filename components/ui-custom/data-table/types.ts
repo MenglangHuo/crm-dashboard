@@ -103,17 +103,22 @@ export interface DataTableProps<T> {
 	searchValue?: string;
 	searchField?: string;
 	onSearchChange?: (value: string) => void;
+	/** Custom element rendered beside search bar (e.g. status filter dropdown) */
+	toolbarSearchSuffix?: React.ReactNode;
 
 	/** Actions top right */
 	onCreateNew?: () => void;
 	createButtonLabel?: string;
 	createButtonIcon?: React.ReactNode;
 	headerActions?: React.ReactNode;
+	/** Primary action button positioned immediately next to the Filter button */
+	primaryAction?: React.ReactNode;
 	toolbarActions?: React.ReactNode;
 	extraHeaderContent?: React.ReactNode;
 	onImport?: (data: any[]) => void;
 	onExport?: (selectedOnly: boolean) => void;
 	exportFilename?: string;
+	hideImportExport?: boolean;
 	hideHeader?: boolean;
 	showHeader?: boolean;
 	hideToolbar?: boolean;
@@ -155,6 +160,9 @@ export interface DataTableProps<T> {
 
 	/** Styling and State */
 	isLoading?: boolean;
+	isError?: boolean;
+	error?: unknown;
+	onRetry?: () => void;
 	density?: "compact" | "normal" | "spacious";
 	emptyState?: React.ReactNode;
 	emptyStateTitle?: string;

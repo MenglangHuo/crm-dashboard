@@ -153,6 +153,7 @@ export interface ListParams {
 	search?: string;
 	status?: string;
 	includeDeleted?: boolean;
+	signal?: AbortSignal;
 	[key: string]: any;
 }
 
@@ -263,8 +264,11 @@ export async function fetchSearchList<T>(
 	searchFields: string[] = ["name"],
 ): Promise<Paged<T>> {
 	const body = searchBody(params, searchFields);
+	const signal = params.signal;
 	try {
-		const res = await api.post<Paged<T>>(`${endpoint}/search`, body);
+		const res = await api.post<Paged<T>>(`${endpoint}/search`, body, {
+			signal,
+		});
 		return normalizePaged<T>(res.data);
 	} catch (err: any) {
 		if (
@@ -275,6 +279,7 @@ export async function fetchSearchList<T>(
 		) {
 			const res = await api.get<Paged<T>>(endpoint, {
 				params: listQuery(params),
+				signal,
 			});
 			return normalizePaged<T>(res.data);
 		}
@@ -2754,12 +2759,19 @@ export const productsApi = {
 				const data = (r.data as any)?.data ?? r.data;
 				return Array.isArray(data) ? data : [];
 			}),
-	search: (searchRequest: ProductSearchRequest | any) =>
-		api.post<any>("/products/search", searchRequest).then((r) => {
-			const paged = normalizePaged<Product>(r.data);
-			paged.items = paged.items.map(mapProductFromBackend);
-			return paged;
-		}),
+	search: (
+		searchRequest: ProductSearchRequest | any,
+		options?: { signal?: AbortSignal },
+	) =>
+		api
+			.post<any>("/products/search", searchRequest, {
+				signal: options?.signal,
+			})
+			.then((r) => {
+				const paged = normalizePaged<Product>(r.data);
+				paged.items = paged.items.map(mapProductFromBackend);
+				return paged;
+			}),
 };
 
 // ---- Loans (tenant) ------------------------------------------
@@ -3458,9 +3470,11 @@ export const ordersApi = {
 			const data = (r.data as any)?.data || r.data;
 			return Array.isArray(data) ? data : [];
 		}),
-	search: (payload: any) =>
+	search: (payload: any, options?: { signal?: AbortSignal }) =>
 		api
-			.post<Paged<Order>>("/orders/search", payload)
+			.post<Paged<Order>>("/orders/search", payload, {
+				signal: options?.signal,
+			})
 			.then((r) => normalizePaged<Order>(r.data)),
 	getByNumber: async (orderNumber: string): Promise<Order | null> => {
 		try {
@@ -3580,9 +3594,11 @@ export const invoicesApi = {
 	},
 	createFromOrder: (body: CreateInvoiceFromOrderRequest) =>
 		api.post<Invoice>("/invoices/from-order", body).then((r) => r.data),
-	search: (payload: any) =>
+	search: (payload: any, options?: { signal?: AbortSignal }) =>
 		api
-			.post<Paged<Invoice>>("/invoices/search", payload)
+			.post<Paged<Invoice>>("/invoices/search", payload, {
+				signal: options?.signal,
+			})
 			.then((r) => normalizePaged<Invoice>(r.data)),
 	updateStatus: (id: string | number, status: string) =>
 		api
@@ -3786,9 +3802,11 @@ export const paymentsApi = {
 		api
 			.patch<any>(`/payments/${id}/reconciliation`, body)
 			.then((r) => r.data?.data ?? r.data),
-	search: (payload: any) =>
+	search: (payload: any, options?: { signal?: AbortSignal }) =>
 		api
-			.post<Paged<Payment>>("/payments/search", payload)
+			.post<Paged<Payment>>("/payments/search", payload, {
+				signal: options?.signal,
+			})
 			.then((r) => normalizePaged<Payment>(r.data)),
 	updateStatus: (id: string | number, status: string) =>
 		api

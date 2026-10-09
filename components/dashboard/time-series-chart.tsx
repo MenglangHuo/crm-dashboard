@@ -40,7 +40,7 @@ function formatMoney(val: number) {
 	return `${isNeg ? "-" : ""}$${abs.toFixed(2)}`;
 }
 
-export function TimeSeriesChart({ data, isLoading }: TimeSeriesChartProps) {
+function TimeSeriesChartComponent({ data, isLoading }: TimeSeriesChartProps) {
 	const { t } = useTranslation();
 	const { resolvedTheme } = useTheme();
 	const isDark = resolvedTheme === "dark";
@@ -84,312 +84,340 @@ export function TimeSeriesChart({ data, isLoading }: TimeSeriesChartProps) {
 	}, [data]);
 
 	// Aggregate stats for tab badges
-	const totalRevenue = revenueData.reduce((acc, p) => acc + (p.value || 0), 0);
-	const totalProfit = revenueData.reduce((acc, p) => acc + (p.profit || 0), 0);
-	const totalOrdersCount = ordersData.reduce(
-		(acc, p) => acc + (p.count || 0),
-		0,
+	const totalRevenue = React.useMemo(
+		() => revenueData.reduce((acc, p) => acc + (p.value || 0), 0),
+		[revenueData],
 	);
-	const totalInvoicesCount = invoicesData.reduce(
-		(acc, p) => acc + (p.count || 0),
-		0,
+	const totalProfit = React.useMemo(
+		() => revenueData.reduce((acc, p) => acc + (p.profit || 0), 0),
+		[revenueData],
 	);
-	const totalPayments = paymentsData.reduce(
-		(acc, p) => acc + (p.value || 0),
-		0,
+	const totalOrdersCount = React.useMemo(
+		() => ordersData.reduce((acc, p) => acc + (p.count || 0), 0),
+		[ordersData],
+	);
+	const totalInvoicesCount = React.useMemo(
+		() => invoicesData.reduce((acc, p) => acc + (p.count || 0), 0),
+		[invoicesData],
+	);
+	const totalPayments = React.useMemo(
+		() => paymentsData.reduce((acc, p) => acc + (p.value || 0), 0),
+		[paymentsData],
 	);
 
 	// 1. REVENUE & PROFIT CHART OPTIONS
 	const isRevenueSingle = revenueData.length === 1;
 	const revenueChartType = isRevenueSingle ? "bar" : "area";
 
-	const revenueChartOptions: ApexOptions = {
-		chart: {
-			type: revenueChartType,
-			background: "transparent",
-			toolbar: { show: false },
-			animations: { enabled: true, speed: 400 },
-		},
-		...(isRevenueSingle
-			? {
-					plotOptions: {
-						bar: {
-							horizontal: false,
-							columnWidth: "40%",
-							borderRadius: 6,
+	const revenueChartOptions = React.useMemo<ApexOptions>(
+		() => ({
+			chart: {
+				type: revenueChartType,
+				background: "transparent",
+				toolbar: { show: false },
+				animations: { enabled: true, speed: 400 },
+			},
+			...(isRevenueSingle
+				? {
+						plotOptions: {
+							bar: {
+								horizontal: false,
+								columnWidth: "40%",
+								borderRadius: 6,
+							},
 						},
-					},
-				}
-			: {
-					stroke: {
-						curve: "smooth",
-						width: [2.5, 2.5],
-					},
-					fill: {
-						type: "gradient",
-						gradient: {
-							shadeIntensity: 1,
-							opacityFrom: 0.35,
-							opacityTo: 0.05,
-							stops: [0, 95, 100],
+					}
+				: {
+						stroke: {
+							curve: "smooth",
+							width: [2.5, 2.5],
 						},
+						fill: {
+							type: "gradient",
+							gradient: {
+								shadeIntensity: 1,
+								opacityFrom: 0.35,
+								opacityTo: 0.05,
+								stops: [0, 95, 100],
+							},
+						},
+					}),
+			colors: [chartTheme.revenueColor, chartTheme.profitColor],
+			xaxis: {
+				categories: revenueData.map((d) => d.date),
+				labels: {
+					style: {
+						colors: chartTheme.mutedColor,
+						fontSize: "11px",
+						fontWeight: 500,
 					},
-				}),
-		colors: [chartTheme.revenueColor, chartTheme.profitColor],
-		xaxis: {
-			categories: revenueData.map((d) => d.date),
-			labels: {
-				style: {
-					colors: chartTheme.mutedColor,
-					fontSize: "11px",
-					fontWeight: 500,
+				},
+				axisBorder: { color: chartTheme.borderColor },
+				axisTicks: { color: chartTheme.borderColor },
+			},
+			yaxis: {
+				labels: {
+					style: {
+						colors: chartTheme.mutedColor,
+						fontSize: "11px",
+						fontWeight: 500,
+					},
+					formatter: (val) => formatMoney(val),
 				},
 			},
-			axisBorder: { color: chartTheme.borderColor },
-			axisTicks: { color: chartTheme.borderColor },
-		},
-		yaxis: {
-			labels: {
-				style: {
-					colors: chartTheme.mutedColor,
-					fontSize: "11px",
-					fontWeight: 500,
-				},
-				formatter: (val) => formatMoney(val),
+			grid: {
+				borderColor: chartTheme.borderColor,
+				strokeDashArray: 3,
+				padding: { top: 0, right: 10, bottom: 0, left: 10 },
 			},
-		},
-		grid: {
-			borderColor: chartTheme.borderColor,
-			strokeDashArray: 3,
-			padding: { top: 0, right: 10, bottom: 0, left: 10 },
-		},
-		dataLabels: { enabled: false },
-		legend: {
-			position: "top",
-			horizontalAlign: "right",
-			fontSize: "11px",
-			fontWeight: 600,
-			labels: { colors: chartTheme.textColor },
-			markers: { shape: "circle", size: 5 },
-		},
-		tooltip: {
-			theme: chartTheme.tooltipTheme,
-			y: {
-				formatter: (val) => {
-					if (typeof val !== "number" || isNaN(val)) return "$0.00";
-					const isNeg = val < 0;
-					return `${isNeg ? "-" : ""}$${Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+			dataLabels: { enabled: false },
+			legend: {
+				position: "top",
+				horizontalAlign: "right",
+				fontSize: "11px",
+				fontWeight: 600,
+				labels: { colors: chartTheme.textColor },
+				markers: { shape: "circle", size: 5 },
+			},
+			tooltip: {
+				theme: chartTheme.tooltipTheme,
+				y: {
+					formatter: (val) => {
+						if (typeof val !== "number" || isNaN(val)) return "$0.00";
+						const isNeg = val < 0;
+						return `${isNeg ? "-" : ""}$${Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+					},
 				},
 			},
-		},
-	};
+		}),
+		[isRevenueSingle, revenueChartType, revenueData, chartTheme],
+	);
 
-	const revenueSeries = [
-		{
-			name: t("dashboard.netRevenue"),
-			data: revenueData.map((d) => d.value ?? 0),
-		},
-		{
-			name: t("dashboard.grossProfitLoss"),
-			data: revenueData.map((d) => d.profit ?? 0),
-		},
-	];
+	const revenueSeries = React.useMemo(
+		() => [
+			{
+				name: t("dashboard.netRevenue"),
+				data: revenueData.map((d) => d.value ?? 0),
+			},
+			{
+				name: t("dashboard.grossProfitLoss"),
+				data: revenueData.map((d) => d.profit ?? 0),
+			},
+		],
+		[revenueData, t],
+	);
 
 	// 2. OPERATIONS (ORDERS & INVOICES) CHART OPTIONS
-	const opDates = Array.from(
-		new Set([
-			...ordersData.map((d) => d.date),
-			...invoicesData.map((d) => d.date),
-		]),
-	).sort();
+	const opDates = React.useMemo(
+		() =>
+			Array.from(
+				new Set([
+					...ordersData.map((d) => d.date),
+					...invoicesData.map((d) => d.date),
+				]),
+			).sort(),
+		[ordersData, invoicesData],
+	);
 	const isOpSingle = opDates.length === 1;
 	const operationsChartType = isOpSingle ? "bar" : "line";
 
-	const operationsChartOptions: ApexOptions = {
-		chart: {
-			type: operationsChartType,
-			background: "transparent",
-			toolbar: { show: false },
-			animations: { enabled: true, speed: 400 },
-		},
-		...(isOpSingle
-			? {
-					plotOptions: {
-						bar: {
-							horizontal: false,
-							columnWidth: "40%",
-							borderRadius: 6,
+	const operationsChartOptions = React.useMemo<ApexOptions>(
+		() => ({
+			chart: {
+				type: operationsChartType,
+				background: "transparent",
+				toolbar: { show: false },
+				animations: { enabled: true, speed: 400 },
+			},
+			...(isOpSingle
+				? {
+						plotOptions: {
+							bar: {
+								horizontal: false,
+								columnWidth: "40%",
+								borderRadius: 6,
+							},
 						},
+					}
+				: {
+						stroke: {
+							curve: "smooth",
+							width: [3, 3],
+						},
+						markers: {
+							size: 4,
+							strokeWidth: 2,
+							hover: { size: 6 },
+						},
+					}),
+			colors: [chartTheme.ordersColor, chartTheme.invoicesColor],
+			xaxis: {
+				categories: opDates,
+				labels: {
+					style: {
+						colors: chartTheme.mutedColor,
+						fontSize: "11px",
+						fontWeight: 500,
 					},
-				}
-			: {
-					stroke: {
-						curve: "smooth",
-						width: [3, 3],
+				},
+				axisBorder: { color: chartTheme.borderColor },
+				axisTicks: { color: chartTheme.borderColor },
+			},
+			yaxis: {
+				labels: {
+					style: {
+						colors: chartTheme.mutedColor,
+						fontSize: "11px",
+						fontWeight: 500,
 					},
-					markers: {
-						size: 4,
-						strokeWidth: 2,
-						hover: { size: 6 },
-					},
-				}),
-		colors: [chartTheme.ordersColor, chartTheme.invoicesColor],
-		xaxis: {
-			categories: opDates,
-			labels: {
-				style: {
-					colors: chartTheme.mutedColor,
-					fontSize: "11px",
-					fontWeight: 500,
+					formatter: (val) =>
+						typeof val === "number" && !isNaN(val)
+							? `${Math.round(val)}`
+							: "0",
 				},
 			},
-			axisBorder: { color: chartTheme.borderColor },
-			axisTicks: { color: chartTheme.borderColor },
-		},
-		yaxis: {
-			labels: {
-				style: {
-					colors: chartTheme.mutedColor,
-					fontSize: "11px",
-					fontWeight: 500,
+			grid: {
+				borderColor: chartTheme.borderColor,
+				strokeDashArray: 3,
+				padding: { top: 0, right: 10, bottom: 0, left: 10 },
+			},
+			dataLabels: { enabled: false },
+			legend: {
+				position: "top",
+				horizontalAlign: "right",
+				fontSize: "11px",
+				fontWeight: 600,
+				labels: { colors: chartTheme.textColor },
+				markers: { shape: "circle", size: 5 },
+			},
+			tooltip: {
+				theme: chartTheme.tooltipTheme,
+				y: {
+					formatter: (val) =>
+						`${typeof val === "number" && !isNaN(val) ? val : 0} ${t("common.entries")}`,
 				},
-				formatter: (val) =>
-					typeof val === "number" && !isNaN(val)
-						? `${Math.round(val)}`
-						: "0",
 			},
-		},
-		grid: {
-			borderColor: chartTheme.borderColor,
-			strokeDashArray: 3,
-			padding: { top: 0, right: 10, bottom: 0, left: 10 },
-		},
-		dataLabels: { enabled: false },
-		legend: {
-			position: "top",
-			horizontalAlign: "right",
-			fontSize: "11px",
-			fontWeight: 600,
-			labels: { colors: chartTheme.textColor },
-			markers: { shape: "circle", size: 5 },
-		},
-		tooltip: {
-			theme: chartTheme.tooltipTheme,
-			y: {
-				formatter: (val) =>
-					`${typeof val === "number" && !isNaN(val) ? val : 0} ${t("common.entries")}`,
-			},
-		},
-	};
+		}),
+		[isOpSingle, operationsChartType, opDates, chartTheme, t],
+	);
 
-	const operationsSeries = [
-		{
-			name: t("dashboard.kpiOrders"),
-			data: opDates.map((date) => {
-				const item = ordersData.find((d) => d.date === date);
-				return item?.count ?? 0;
-			}),
-		},
-		{
-			name: t("dashboard.kpiInvoices"),
-			data: opDates.map((date) => {
-				const item = invoicesData.find((d) => d.date === date);
-				return item?.count ?? 0;
-			}),
-		},
-	];
+	const operationsSeries = React.useMemo(
+		() => [
+			{
+				name: t("dashboard.kpiOrders"),
+				data: opDates.map((date) => {
+					const item = ordersData.find((d) => d.date === date);
+					return item?.count ?? 0;
+				}),
+			},
+			{
+				name: t("dashboard.kpiInvoices"),
+				data: opDates.map((date) => {
+					const item = invoicesData.find((d) => d.date === date);
+					return item?.count ?? 0;
+				}),
+			},
+		],
+		[opDates, ordersData, invoicesData, t],
+	);
 
 	// 3. CASH FLOW & PAYMENTS INFLOW CHART OPTIONS
 	const isPaySingle = paymentsData.length === 1;
 	const paymentsChartType = isPaySingle ? "bar" : "area";
 
-	const paymentsChartOptions: ApexOptions = {
-		chart: {
-			type: paymentsChartType,
-			background: "transparent",
-			toolbar: { show: false },
-			animations: { enabled: true, speed: 400 },
-		},
-		...(isPaySingle
-			? {
-					plotOptions: {
-						bar: {
-							horizontal: false,
-							columnWidth: "40%",
-							borderRadius: 6,
+	const paymentsChartOptions = React.useMemo<ApexOptions>(
+		() => ({
+			chart: {
+				type: paymentsChartType,
+				background: "transparent",
+				toolbar: { show: false },
+				animations: { enabled: true, speed: 400 },
+			},
+			...(isPaySingle
+				? {
+						plotOptions: {
+							bar: {
+								horizontal: false,
+								columnWidth: "40%",
+								borderRadius: 6,
+							},
 						},
-					},
-				}
-			: {
-					stroke: {
-						curve: "smooth",
-						width: 2.5,
-					},
-					fill: {
-						type: "gradient",
-						gradient: {
-							shadeIntensity: 1,
-							opacityFrom: 0.35,
-							opacityTo: 0.05,
-							stops: [0, 95, 100],
+					}
+				: {
+						stroke: {
+							curve: "smooth",
+							width: 2.5,
 						},
+						fill: {
+							type: "gradient",
+							gradient: {
+								shadeIntensity: 1,
+								opacityFrom: 0.35,
+								opacityTo: 0.05,
+								stops: [0, 95, 100],
+							},
+						},
+					}),
+			colors: [chartTheme.paymentsColor],
+			xaxis: {
+				categories: paymentsData.map((d) => d.date),
+				labels: {
+					style: {
+						colors: chartTheme.mutedColor,
+						fontSize: "11px",
+						fontWeight: 500,
 					},
-				}),
-		colors: [chartTheme.paymentsColor],
-		xaxis: {
-			categories: paymentsData.map((d) => d.date),
-			labels: {
-				style: {
-					colors: chartTheme.mutedColor,
-					fontSize: "11px",
-					fontWeight: 500,
+				},
+				axisBorder: { color: chartTheme.borderColor },
+				axisTicks: { color: chartTheme.borderColor },
+			},
+			yaxis: {
+				labels: {
+					style: {
+						colors: chartTheme.mutedColor,
+						fontSize: "11px",
+						fontWeight: 500,
+					},
+					formatter: (val) => formatMoney(val),
 				},
 			},
-			axisBorder: { color: chartTheme.borderColor },
-			axisTicks: { color: chartTheme.borderColor },
-		},
-		yaxis: {
-			labels: {
-				style: {
-					colors: chartTheme.mutedColor,
-					fontSize: "11px",
-					fontWeight: 500,
-				},
-				formatter: (val) => formatMoney(val),
+			grid: {
+				borderColor: chartTheme.borderColor,
+				strokeDashArray: 3,
+				padding: { top: 0, right: 10, bottom: 0, left: 10 },
 			},
-		},
-		grid: {
-			borderColor: chartTheme.borderColor,
-			strokeDashArray: 3,
-			padding: { top: 0, right: 10, bottom: 0, left: 10 },
-		},
-		dataLabels: { enabled: false },
-		legend: {
-			position: "top",
-			horizontalAlign: "right",
-			fontSize: "11px",
-			fontWeight: 600,
-			labels: { colors: chartTheme.textColor },
-			markers: { shape: "circle", size: 5 },
-		},
-		tooltip: {
-			theme: chartTheme.tooltipTheme,
-			y: {
-				formatter: (val) => {
-					if (typeof val !== "number" || isNaN(val)) return "$0.00";
-					const isNeg = val < 0;
-					return `${isNeg ? "-" : ""}$${Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+			dataLabels: { enabled: false },
+			legend: {
+				position: "top",
+				horizontalAlign: "right",
+				fontSize: "11px",
+				fontWeight: 600,
+				labels: { colors: chartTheme.textColor },
+				markers: { shape: "circle", size: 5 },
+			},
+			tooltip: {
+				theme: chartTheme.tooltipTheme,
+				y: {
+					formatter: (val) => {
+						if (typeof val !== "number" || isNaN(val)) return "$0.00";
+						const isNeg = val < 0;
+						return `${isNeg ? "-" : ""}$${Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+					},
 				},
 			},
-		},
-	};
+		}),
+		[isPaySingle, paymentsChartType, paymentsData, chartTheme],
+	);
 
-	const paymentsSeries = [
-		{
-			name: t("dashboard.tabPayments"),
-			data: paymentsData.map((d) => d.value ?? 0),
-		},
-	];
+	const paymentsSeries = React.useMemo(
+		() => [
+			{
+				name: t("dashboard.tabPayments"),
+				data: paymentsData.map((d) => d.value ?? 0),
+			},
+		],
+		[paymentsData, t],
+	);
 
 	if (isLoading) {
 		return (
@@ -655,3 +683,6 @@ export function TimeSeriesChart({ data, isLoading }: TimeSeriesChartProps) {
 		</div>
 	);
 }
+
+export const TimeSeriesChart = React.memo(TimeSeriesChartComponent);
+

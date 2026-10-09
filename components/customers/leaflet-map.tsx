@@ -50,6 +50,16 @@ interface LeafletMapProps {
 	className?: string;
 }
 
+function escapeHtml(str?: string | null): string {
+	if (!str) return "";
+	return String(str)
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#039;");
+}
+
 function formatLastVisitedInfo(
 	lastVisitedAt?: string | null,
 	daysSinceVisit?: number | null,
@@ -289,6 +299,16 @@ export function LeafletMap({
 	const pickerMarkerRef = useRef<any>(null);
 	const currentTileLayerRef = useRef<any>(null);
 
+	const onSelectPositionRef = useRef(onSelectPosition);
+	useEffect(() => {
+		onSelectPositionRef.current = onSelectPosition;
+	}, [onSelectPosition]);
+
+	const selectableRef = useRef(selectable);
+	useEffect(() => {
+		selectableRef.current = selectable;
+	}, [selectable]);
+
 	const [isLoaded, setIsLoaded] = useState(false);
 	const [activeLayer, setActiveLayer] = useState<"streets" | "satellite">(
 		"streets",
@@ -368,14 +388,12 @@ export function LeafletMap({
 		markerGroupRef.current = markerGroup;
 
 		// Map click for coordinate picking
-		if (selectable) {
-			map.on("click", (e: any) => {
+		map.on("click", (e: any) => {
+			if (selectableRef.current && onSelectPositionRef.current) {
 				const { lat, lng } = e.latlng;
-				if (onSelectPosition) {
-					onSelectPosition({ lat, lng });
-				}
-			});
-		}
+				onSelectPositionRef.current({ lat, lng });
+			}
+		});
 
 		return () => {
 			if (mapInstanceRef.current) {
@@ -534,19 +552,25 @@ export function LeafletMap({
 
 				// 2. Safe Photo HTML with automatic fallback to default customer image on error
 				const photoSrc = m.photoUrl || "/images/default-customer.png";
+				const safePhotoSrc = escapeHtml(photoSrc);
+				const safeTitle = escapeHtml(m.title);
+				const safeSubtitle = escapeHtml(m.subtitle);
+				const safePhone = escapeHtml(m.phone);
+				const safeDistance = escapeHtml(m.distance);
+
 				const photoHtml = `
           <div style="width: 100%; height: 95px; border-radius: 12px; overflow: hidden; margin-bottom: 8px; background-color: #f1f5f9; position: relative;">
             <img
-              src="${photoSrc}"
-              alt="${m.title}"
+              src="${safePhotoSrc}"
+              alt="${safeTitle}"
               onerror="this.onerror=null; this.src='/images/default-customer.png';"
               style="width: 100%; height: 100%; object-fit: cover; display: block;"
             />
           </div>
         `;
 
-				const distanceBadge = m.distance
-					? `<span style="background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 10px; padding: 2px 8px; border-radius: 9999px; white-space: nowrap;">⚡ ${m.distance}</span>`
+				const distanceBadge = safeDistance
+					? `<span style="background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 10px; padding: 2px 8px; border-radius: 9999px; white-space: nowrap;">⚡ ${safeDistance}</span>`
 					: "";
 
 				const visitStatusBadge = `
@@ -584,16 +608,18 @@ export function LeafletMap({
 				popupContent.style.minWidth = "230px";
 				popupContent.style.maxWidth = "280px";
 				popupContent.style.fontFamily = "inherit";
+				const safeId = encodeURIComponent(String(m.id));
+
 				popupContent.innerHTML = `
           ${photoHtml}
           <div style="display: flex; justify-content: space-between; align-items: start; gap: 6px; margin-bottom: 3px;">
-            <div style="font-weight: 800; font-size: 13px; color: #0f172a; line-height: 1.3;">${m.title}</div>
+            <div style="font-weight: 800; font-size: 13px; color: #0f172a; line-height: 1.3;">${safeTitle}</div>
             ${distanceBadge}
           </div>
-          ${m.subtitle ? `<div style="font-size: 11px; color: #64748b; margin-bottom: 6px; line-height: 1.2;">${m.subtitle}</div>` : ""}
+          ${safeSubtitle ? `<div style="font-size: 11px; color: #64748b; margin-bottom: 6px; line-height: 1.2;">${safeSubtitle}</div>` : ""}
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 7px;">
             ${visitStatusBadge}
-            ${m.phone ? `<a href="tel:${m.phone}" style="font-size: 11px; color: #2563eb; font-weight: 700; text-decoration: none;">📞 ${m.phone}</a>` : ""}
+            ${safePhone ? `<a href="tel:${safePhone}" style="font-size: 11px; color: #2563eb; font-weight: 700; text-decoration: none;">📞 ${safePhone}</a>` : ""}
           </div>
           <div style="
             background: #f8fafc;
@@ -616,7 +642,7 @@ export function LeafletMap({
             </div>
           </div>
           <div style="display: flex; gap: 6px; margin-top: 6px;">
-            <a href="/customers/${m.id}" style="
+            <a href="/customers/${safeId}" style="
               flex: 1;
               text-align: center;
               background: #f1f5f9;
@@ -631,7 +657,7 @@ export function LeafletMap({
               align-items: center;
               justify-content: center;
             ">360 View</a>
-            <button id="btn-visit-${m.id}" style="
+            <button id="btn-visit-${safeId}" style="
               flex: 1;
               background: #f59e0b;
               color: #0f172a;
@@ -652,7 +678,7 @@ export function LeafletMap({
 				// Add event listener to popup button
 				marker.bindPopup(popupContent);
 				marker.on("popupopen", () => {
-					const btn = document.getElementById(`btn-visit-${m.id}`);
+					const btn = document.getElementById(`btn-visit-${safeId}`);
 					if (btn && onMarkerAction) {
 						btn.onclick = () => onMarkerAction({ id: m.id, name: m.title });
 					}
@@ -725,7 +751,7 @@ export function LeafletMap({
 
 	return (
 		<div
-			className={`relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xs ${className}`}
+			className={`relative isolate z-0 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xs ${className}`}
 		>
 			{/* Map Element */}
 			<div ref={mapContainerRef} style={{ height, width: "100%" }} />

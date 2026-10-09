@@ -900,22 +900,15 @@ export default function InventoryImportsPage() {
 					data={rawImports}
 					columns={shipmentColumns}
 					getRowId={(item) => String(item.id)}
-					title={t(
-						"stocks.importStockTitle",
-						"Import Stock / Inbound Shipments",
-					)}
-					titleIcon={
-						<div className="h-7 w-7 rounded-lg bg-purple-500/10 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400 flex items-center justify-center shrink-0 shadow-2xs">
-							<Truck className="h-4 w-4" />
-						</div>
-					}
+					hideHeader={true}
+					hideImportExport={true}
 					searchPlaceholder="Search reference #, supplier..."
 					searchValue={shipmentSearch}
 					onSearchChange={(val) => {
 						setShipmentSearch(val);
 						setShipmentPage(1);
 					}}
-					headerActions={
+					primaryAction={
 						<div className="flex items-center gap-2">
 							<Button
 								onClick={() => {
@@ -923,7 +916,7 @@ export default function InventoryImportsPage() {
 									setIsStudioOpen(true);
 								}}
 								size="sm"
-								className="h-9 px-3 rounded-lg text-xs font-bold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs cursor-pointer"
+								className="h-9 px-3.5 rounded-lg text-xs font-semibold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs cursor-pointer"
 							>
 								<Plus className="h-3.5 w-3.5" />
 								<span>New Import</span>
@@ -953,7 +946,8 @@ export default function InventoryImportsPage() {
 								size="sm"
 								onClick={() => refetchShipments()}
 								disabled={isShipmentsRefetching}
-								className="h-9 px-3 rounded-lg text-xs font-semibold gap-1.5 border-border hover:bg-muted cursor-pointer"
+								className="h-9 px-2.5 rounded-lg text-xs font-semibold gap-1.5 border-border hover:bg-muted cursor-pointer"
+								title="Refresh Shipments"
 							>
 								<RefreshCw
 									className={`h-3.5 w-3.5 ${
@@ -962,7 +956,6 @@ export default function InventoryImportsPage() {
 											: "text-muted-foreground"
 									}`}
 								/>
-								<span>{t("common.actions", "Actions")}</span>
 							</Button>
 						</div>
 					}
@@ -988,19 +981,15 @@ export default function InventoryImportsPage() {
 					data={rawReturns}
 					columns={supplierReturnColumns}
 					getRowId={(item) => String(item.id)}
-					title="Supplier Returns / Stock Return Records"
-					titleIcon={
-						<div className="h-7 w-7 rounded-lg bg-rose-500/10 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400 flex items-center justify-center shrink-0 shadow-2xs">
-							<RotateCcw className="h-4 w-4" />
-						</div>
-					}
+					hideHeader={true}
+					hideImportExport={true}
 					searchPlaceholder="Search return #, import #, supplier..."
 					searchValue={returnSearch}
 					onSearchChange={(val) => {
 						setReturnSearch(val);
 						setReturnPage(1);
 					}}
-					headerActions={
+					primaryAction={
 						<div className="flex items-center gap-2">
 							<Button
 								variant="outline"
@@ -1026,7 +1015,8 @@ export default function InventoryImportsPage() {
 								size="sm"
 								onClick={() => refetchReturns()}
 								disabled={isReturnsRefetching}
-								className="h-9 px-3 rounded-lg text-xs font-semibold gap-1.5 border-border hover:bg-muted cursor-pointer"
+								className="h-9 px-2.5 rounded-lg text-xs font-semibold gap-1.5 border-border hover:bg-muted cursor-pointer"
+								title="Refresh Returns"
 							>
 								<RefreshCw
 									className={`h-3.5 w-3.5 ${
@@ -1035,7 +1025,6 @@ export default function InventoryImportsPage() {
 											: "text-muted-foreground"
 									}`}
 								/>
-								<span>{t("common.actions", "Actions")}</span>
 							</Button>
 						</div>
 					}

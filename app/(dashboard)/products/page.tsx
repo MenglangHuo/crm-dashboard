@@ -32,7 +32,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { cn } from "@/lib/utils";
-import { useQuickActions } from "@/components/quick-action-modal-context";
+import { useQuickActionDispatch } from "@/components/quick-action-modal-context";
 import {
 	RowAction,
 	PRODUCT_DOMAIN_FILTERS,
@@ -47,6 +47,8 @@ import {
 	buildUnitTree,
 } from "@/components/unit-hierarchy-tree";
 import { useTranslation } from "@/lib/i18n/context";
+import { useCompanyContext } from "@/components/providers/company-context";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
 	Loader2,
 	Package,
@@ -275,7 +277,9 @@ export default function ProductsPage() {
 function ProductsTab() {
 	const queryClient = useQueryClient();
 	const { t } = useTranslation();
+	const { selectedCompanyId } = useCompanyContext();
 	const [search, setSearch] = useState("");
+	const debouncedSearch = useDebounce(search, 300);
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
 	const [viewMode, setViewMode] = useState<"table" | "grid">("table");
@@ -532,13 +536,20 @@ function ProductsTab() {
 	>([]);
 
 	// Fetch lists using POST /v1/products/search with fallback
-	const { data: productsData, isLoading } = useQuery({
+	const {
+		data: productsData,
+		isLoading,
+		isError,
+		error,
+		refetch,
+	} = useQuery({
 		queryKey: [
 			"products-search",
+			selectedCompanyId,
 			{
 				page,
 				pageSize,
-				search,
+				search: debouncedSearch,
 				activeDomainFilters,
 				filterCategory,
 				filterBrand,
@@ -554,7 +565,7 @@ function ProductsTab() {
 		queryFn: async () => {
 			try {
 				const payload = buildSearchFilterPayload({
-					searchValue: search,
+					searchValue: debouncedSearch,
 					activeFilters: activeDomainFilters,
 					sortState: [
 						{ field: sortField, direction: sortDirection as "ASC" | "DESC" },
@@ -660,7 +671,7 @@ function ProductsTab() {
 			} catch (e) {
 				console.warn("Search endpoint fallback to standard list", e);
 			}
-			return productsApi.list({ page, limit: pageSize, search });
+			return productsApi.list({ page, limit: pageSize, search: debouncedSearch });
 		},
 	});
 
@@ -1825,7 +1836,7 @@ function ProductsTab() {
 		},
 	];
 
-	const { openLoanWizard } = useQuickActions();
+	const { openLoanWizard } = useQuickActionDispatch();
 
 	const productActions: RowAction<Product>[] = [
 		{
@@ -1867,46 +1878,6 @@ function ProductsTab() {
 
 			{/* Overview Banner and Actions */}
 
-			<div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-200 dark:border-slate-800">
-				<div className="flex items-center gap-2.5">
-					<div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600">
-						<Package className="h-5 w-5" />
-					</div>
-					<div>
-						<h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-100">
-							Asset Catalog & Items
-						</h4>
-						<p className="text-[11px] text-slate-500">
-							Manage products, units, price history, and variants.
-						</p>
-					</div>
-				</div>
-
-				<div className="flex flex-wrap items-center gap-2">
-					{/* View switcher */}
-					<div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-						<Button
-							type="button"
-							variant={viewMode === "table" ? "secondary" : "ghost"}
-							size="sm"
-							onClick={() => setViewMode("table")}
-							className="h-7 px-2 text-xs"
-						>
-							<LayoutList className="h-4 w-4 mr-1" /> Table
-						</Button>
-						<Button
-							type="button"
-							variant={viewMode === "grid" ? "secondary" : "ghost"}
-							size="sm"
-							onClick={() => setViewMode("grid")}
-							className="h-7 px-2 text-xs"
-						>
-							<LayoutGrid className="h-4 w-4 mr-1" /> Grid
-						</Button>
-					</div>
-				</div>
-			</div>
-
 			{viewMode === "table" ? (
 				<DataTable<Product>
 					data={(productsData?.items || []).map((p: any) => ({
@@ -1915,6 +1886,8 @@ function ProductsTab() {
 					}))}
 					columns={columns}
 					getRowId={(p) => String(p.id)}
+					hideHeader={true}
+					hideImportExport={true}
 					expandedRowIds={expandedProductIds}
 					onToggleExpandRow={(rowId) =>
 						setExpandedProductIds((prev) =>
@@ -1923,12 +1896,40 @@ function ProductsTab() {
 								: [...prev, rowId],
 						)
 					}
-					title={t("sidebar.allProducts")}
 					searchPlaceholder={t("common.search")}
 					searchValue={search}
 					onSearchChange={handleSearchChange}
-					createButtonLabel={t("products.addNewProduct")}
-					onCreateNew={openCreate}
+					primaryAction={
+						<div className="flex items-center gap-2">
+							<div className="flex items-center p-0.5 rounded-lg border border-border bg-muted/40">
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onClick={() => setViewMode("table")}
+									className="h-7 px-2 text-xs cursor-pointer"
+								>
+									<LayoutList className="h-3.5 w-3.5 mr-1" /> Table
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									onClick={() => setViewMode("grid")}
+									className="h-7 px-2 text-xs cursor-pointer"
+								>
+									<LayoutGrid className="h-3.5 w-3.5 mr-1" /> Grid
+								</Button>
+							</div>
+							<Button
+								onClick={openCreate}
+								className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+							>
+								<Plus className="h-3.5 w-3.5" />
+								<span>{t("products.addNewProduct", "New Product")}</span>
+							</Button>
+						</div>
+					}
 					manualPagination={true}
 					manualFiltering={true}
 					manualSorting={true}
@@ -1958,6 +1959,9 @@ function ProductsTab() {
 					onPageChange={setPage}
 					onPageSizeChange={setPageSize}
 					isLoading={isLoading}
+					isError={isError}
+					error={error}
+					onRetry={() => refetch()}
 					onEditRow={openEdit}
 					onDeleteRow={(p) => deleteMutation.mutate(p.id)}
 					customRowActions={productActions}
@@ -2011,19 +2015,39 @@ function ProductsTab() {
 								)}
 							</div>
 
-							<div className="flex items-center gap-2 justify-between sm:justify-end">
-								<span className="text-xs text-slate-500 font-medium">
+							<div className="flex items-center gap-2 justify-between sm:justify-end flex-wrap">
+								<span className="text-xs text-muted-foreground font-medium hidden sm:inline">
 									Showing {productsData?.items?.length || 0} of{" "}
 									{productsData?.total || 0} items
 								</span>
+								<div className="flex items-center p-0.5 rounded-lg border border-border bg-muted/40">
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										onClick={() => setViewMode("table")}
+										className="h-7 px-2 text-xs cursor-pointer"
+									>
+										<LayoutList className="h-3.5 w-3.5 mr-1" /> Table
+									</Button>
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										onClick={() => setViewMode("grid")}
+										className="h-7 px-2 text-xs cursor-pointer"
+									>
+										<LayoutGrid className="h-3.5 w-3.5 mr-1" /> Grid
+									</Button>
+								</div>
 								<Button
 									type="button"
 									variant={isFilterExpanded ? "secondary" : "outline"}
 									size="sm"
 									onClick={() => setIsFilterExpanded(!isFilterExpanded)}
-									className="h-9 px-3 text-xs font-bold gap-1.5 rounded-xl border"
+									className="h-9 px-3 text-xs font-semibold gap-1.5 rounded-lg border cursor-pointer"
 								>
-									<SlidersHorizontal className="h-3.5 w-3.5" />
+									<SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
 									<span>Filters</span>
 									{(filterCategory !== "ALL" ||
 										filterBrand !== "ALL" ||
@@ -2032,16 +2056,17 @@ function ProductsTab() {
 										minPrice ||
 										maxPrice ||
 										minStock) && (
-										<Badge className="bg-sky-500 text-white text-[10px] h-4 px-1 rounded-full ml-1">
+										<Badge className="bg-primary text-primary-foreground text-[10px] h-4 px-1 rounded-full ml-1">
 											Active
 										</Badge>
 									)}
 								</Button>
 								<Button
 									onClick={openCreate}
-									className="h-9 px-4 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl shadow-xs gap-1.5"
+									className="h-9 px-3.5 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-xs gap-1.5 cursor-pointer"
 								>
-									<Plus className="h-4 w-4" /> Add Product
+									<Plus className="h-3.5 w-3.5" />
+									<span>{t("products.addNewProduct", "New Product")}</span>
 								</Button>
 							</div>
 						</div>
@@ -7402,7 +7427,7 @@ function UnitsTab() {
 	);
 }
 
-export function getProductBaseUnit(
+function getProductBaseUnit(
 	product: any,
 	fallbackUnits?: any[],
 ): any | null {
@@ -7467,7 +7492,7 @@ export function getProductBaseUnit(
 	return null;
 }
 
-export function getVariantBaseUnit(
+function getVariantBaseUnit(
 	v: any,
 	product?: any,
 	fallbackUnits?: any[],
@@ -7491,7 +7516,7 @@ export function getVariantBaseUnit(
 	return getProductBaseUnit(product, fallbackUnits);
 }
 
-export function getProductBasePrice(
+function getProductBasePrice(
 	product: any,
 	fallbackUnits?: any[],
 ): number {
@@ -7552,7 +7577,7 @@ export function getProductBasePrice(
 	return Number(val) || 0;
 }
 
-export function getProductBaseCost(
+function getProductBaseCost(
 	product: any,
 	fallbackUnits?: any[],
 ): number {
@@ -7608,7 +7633,7 @@ export function getProductBaseCost(
 	return Number(val) || 0;
 }
 
-export function getVariantPrice(
+function getVariantPrice(
 	v: any,
 	product?: any,
 	fallbackUnits?: any[],
@@ -7675,7 +7700,7 @@ export function getVariantPrice(
 	return Number(val) || 0;
 }
 
-export function getVariantCost(
+function getVariantCost(
 	v: any,
 	product?: any,
 	fallbackUnits?: any[],
@@ -7731,7 +7756,7 @@ export function getVariantCost(
 	return Number(val) || 0;
 }
 
-export function getVariantStock(v: any, product?: any): number {
+function getVariantStock(v: any, product?: any): number {
 	if (!v) return Number(product?.stockQty || product?.inventory?.quantity || 0);
 
 	const val =
@@ -7760,7 +7785,7 @@ export function getVariantStock(v: any, product?: any): number {
 	return Number(val) || 0;
 }
 
-export function renderVariantAttributes(v: any) {
+function renderVariantAttributes(v: any) {
 	if (!v) return <span className="text-slate-400">—</span>;
 
 	if (

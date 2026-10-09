@@ -22,7 +22,8 @@ import {
 } from "@/components/ui-custom/form-controls";
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
-import { Truck, Phone, Building2, RotateCcw, Ban, Edit2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Truck, Phone, Building2, RotateCcw, Ban, Edit2, Plus } from "lucide-react";
 import type { Supplier } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
 
@@ -296,26 +297,14 @@ export default function SuppliersPage() {
 	const isSaving = createMutation.isPending || updateMutation.isPending;
 
 	return (
-		<div className="space-y-6 max-w-7xl mx-auto pb-10">
-			{/* Title Header */}
-			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-				<div>
-					<h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
-						<Truck className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-						{t("suppliers.title")}
-					</h1>
-					<p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-						{t("suppliers.subtitle")}
-					</p>
-				</div>
-			</div>
-
+		<div className="space-y-4 pb-12">
 			{/* Data Table */}
 			<DataTable<Supplier>
 				data={suppliersData?.items || []}
 				columns={columns}
 				getRowId={(s) => String(s.id)}
-				title={t("suppliers.title")}
+				hideHeader={true}
+				hideImportExport={true}
 				searchPlaceholder={t("suppliers.searchPlaceholder")}
 				searchValue={search}
 				onSearchChange={(val) => {
@@ -323,8 +312,15 @@ export default function SuppliersPage() {
 					setPage(1);
 				}}
 				domainFilterFields={SUPPLIER_DOMAIN_FILTERS}
-				createButtonLabel={t("suppliers.addSupplier")}
-				onCreateNew={openCreate}
+				primaryAction={
+					<Button
+						onClick={openCreate}
+						className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+					>
+						<Plus className="h-3.5 w-3.5" />
+						<span>{t("suppliers.addSupplier", "Add Supplier")}</span>
+					</Button>
+				}
 				manualPagination={true}
 				totalCount={suppliersData?.total || 0}
 				page={page}

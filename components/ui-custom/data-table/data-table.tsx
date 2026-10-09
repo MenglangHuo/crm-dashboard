@@ -27,6 +27,7 @@ import {
 	Filter,
 	Maximize2,
 	Minimize2,
+	AlertCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ import {
 	DataTableProps,
 	FilterState,
 	PresetView,
+	RowAction,
 	SortDirection,
 	SortState,
 } from "./types";
@@ -71,6 +73,179 @@ import {
 	FilterCriterion,
 	buildSearchFilterPayload,
 } from "./search-filter-types";
+
+interface DataTableRowProps<T> {
+	row: T;
+	rowId: string;
+	idx: number;
+	isSelected: boolean;
+	isExpandedRow: boolean;
+	selectable: boolean;
+	hasActions: boolean;
+	cellPaddingClass: string;
+	wrapText: boolean;
+	visibleColumns: ColumnDef<T>[];
+	columnWidths: Record<string, number>;
+	onSelectRow: (id: string, row: T, checked: boolean) => void;
+	onRowClick?: (row: T) => void;
+	onViewRow?: (row: T) => void;
+	onEditRow?: (row: T) => void;
+	onDeleteRow?: (row: T) => void;
+	resolvedCustomRowActions: RowAction<T>[];
+	renderSubComponent?: (row: T) => React.ReactNode;
+}
+
+const DataTableRow = React.memo(function DataTableRow<
+	T extends Record<string, any>,
+>({
+	row,
+	rowId,
+	idx,
+	isSelected,
+	isExpandedRow,
+	selectable,
+	hasActions,
+	cellPaddingClass,
+	wrapText,
+	visibleColumns,
+	columnWidths,
+	onSelectRow,
+	onRowClick,
+	onViewRow,
+	onEditRow,
+	onDeleteRow,
+	resolvedCustomRowActions,
+	renderSubComponent,
+}: DataTableRowProps<T>) {
+	return (
+		<React.Fragment>
+			<TableRow
+				onClick={(e) => {
+					// Prevent row click if clicked element is an interactive control (checkbox, button, input)
+					const target = e.target as HTMLElement | null;
+					if (
+						target &&
+						(target.closest("button") ||
+							target.closest("input") ||
+							target.closest("[role='checkbox']") ||
+							target.closest("[data-no-row-click]"))
+					) {
+						return;
+					}
+					onRowClick?.(row);
+				}}
+				className={cn(
+					"transition-colors hover:bg-muted/40 group",
+					isSelected && "bg-primary/5 hover:bg-primary/10",
+					onRowClick && "cursor-pointer",
+				)}
+			>
+				{selectable && (
+					<TableCell
+						data-no-row-click="true"
+						style={{ width: "44px", minWidth: "44px", maxWidth: "44px" }}
+						className={cn("w-11 px-3 align-middle", cellPaddingClass)}
+						onClick={(e) => e.stopPropagation()}
+						onMouseDown={(e) => e.stopPropagation()}
+						onPointerDown={(e) => e.stopPropagation()}
+					>
+						<Checkbox
+							checked={isSelected}
+							onCheckedChange={(checked) =>
+								onSelectRow(rowId, row, !!checked)
+							}
+							onClick={(e) => e.stopPropagation()}
+							onMouseDown={(e) => e.stopPropagation()}
+							onPointerDown={(e) => e.stopPropagation()}
+							aria-label={`Select row ${rowId}`}
+						/>
+					</TableCell>
+				)}
+
+				{visibleColumns.map((col) => {
+					const rawValue = col.accessorFn
+						? col.accessorFn(row)
+						: col.accessorKey
+							? row[col.accessorKey]
+							: null;
+					const colWidth = columnWidths[col.id];
+
+					return (
+						<TableCell
+							key={col.id}
+							style={{
+								width: colWidth
+									? `${colWidth}px`
+									: typeof col.width === "number"
+										? `${col.width}px`
+										: col.width,
+								minWidth: colWidth
+									? `${colWidth}px`
+									: col.minWidth
+										? `${col.minWidth}px`
+										: undefined,
+								maxWidth: colWidth
+									? `${colWidth}px`
+									: col.maxWidth
+										? `${col.maxWidth}px`
+										: undefined,
+							}}
+							className={cn(
+								"align-middle text-sm text-foreground/90 font-normal",
+								cellPaddingClass,
+								!wrapText && "whitespace-nowrap overflow-hidden text-ellipsis",
+								wrapText && "break-words",
+								col.align === "right" && "text-right",
+								col.align === "center" && "text-center",
+								col.stickyLeft &&
+									"sticky left-0 z-10 bg-card group-hover:bg-muted/80 border-r border-border/60 shadow-[4px_0_10px_-3px_rgba(0,0,0,0.08)]",
+							)}
+						>
+							{col.cell
+								? col.cell({ row, value: rawValue, index: idx })
+								: col.render
+									? col.render(row)
+									: String(rawValue ?? "—")}
+						</TableCell>
+					);
+				})}
+
+				{hasActions && (
+					<TableCell
+						style={{ width: "64px", minWidth: "64px", maxWidth: "64px" }}
+						className={cn("w-16 px-3 text-right align-middle", cellPaddingClass)}
+						onClick={(e) => e.stopPropagation()}
+					>
+						<RowActionsCell
+							row={row}
+							onView={onViewRow}
+							onEdit={onEditRow}
+							onDelete={onDeleteRow}
+							customActions={resolvedCustomRowActions}
+						/>
+					</TableCell>
+				)}
+			</TableRow>
+
+			{renderSubComponent && isExpandedRow && (
+				<TableRow className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-border/80">
+					<TableCell
+						colSpan={
+							visibleColumns.length +
+							(selectable ? 1 : 0) +
+							(hasActions ? 1 : 0)
+						}
+						className="p-3"
+					>
+						{renderSubComponent(row)}
+					</TableCell>
+				</TableRow>
+			)}
+		</React.Fragment>
+	);
+}) as <T extends Record<string, any>>(
+	props: DataTableRowProps<T>,
+) => React.ReactElement;
 
 export function DataTable<T extends Record<string, any>>({
 	data = [],
@@ -88,16 +263,19 @@ export function DataTable<T extends Record<string, any>>({
 	searchValue: controlledSearch,
 	searchField,
 	onSearchChange,
+	toolbarSearchSuffix,
 
 	onCreateNew,
 	createButtonLabel = "Add Record",
 	createButtonIcon = <Plus className="h-4 w-4" />,
 	headerActions,
+	primaryAction,
 	toolbarActions,
 	extraHeaderContent,
 	onImport,
 	onExport,
 	exportFilename = "data-table",
+	hideImportExport = false,
 	hideHeader = false,
 	showHeader = true,
 	hideToolbar = false,
@@ -134,6 +312,9 @@ export function DataTable<T extends Record<string, any>>({
 	onFilterChange,
 
 	isLoading = false,
+	isError = false,
+	error,
+	onRetry,
 	density: initialDensity = "compact",
 	emptyState,
 	emptyStateTitle,
@@ -738,23 +919,35 @@ export function DataTable<T extends Record<string, any>>({
 		}
 	};
 
-	const handleSelectRow = (id: string, row: T, checked: boolean) => {
-		let nextIds: string[] = [];
-		if (checked) {
-			nextIds = [...selectedIds, id];
-		} else {
-			nextIds = selectedIds.filter((i) => i !== id);
-		}
+	const selectedIdsRef = useRef(selectedIds);
+	selectedIdsRef.current = selectedIds;
+	const dataRef = useRef(data);
+	dataRef.current = data;
+	const getRowIdRef = useRef(getRowId);
+	getRowIdRef.current = getRowId;
+	const onSelectionChangeRef = useRef(onSelectionChange);
+	onSelectionChangeRef.current = onSelectionChange;
 
-		if (onSelectionChange) {
-			const selectedRowObjects = data.filter((r, idx) =>
-				nextIds.includes(getRowId(r, idx)),
-			);
-			onSelectionChange(nextIds, selectedRowObjects);
-		} else {
-			setUncontrolledSelected(nextIds);
-		}
-	};
+	const handleSelectRow = React.useCallback(
+		(id: string, row: T, checked: boolean) => {
+			let nextIds: string[] = [];
+			if (checked) {
+				nextIds = [...selectedIdsRef.current, id];
+			} else {
+				nextIds = selectedIdsRef.current.filter((i) => i !== id);
+			}
+
+			if (onSelectionChangeRef.current) {
+				const selectedRowObjects = dataRef.current.filter((r, idx) =>
+					nextIds.includes(getRowIdRef.current(r, idx)),
+				);
+				onSelectionChangeRef.current(nextIds, selectedRowObjects);
+			} else {
+				setUncontrolledSelected(nextIds);
+			}
+		},
+		[],
+	);
 
 	// Active filter count indicator
 	const activeFilterCount = Object.keys(filterState).length + (search ? 1 : 0);
@@ -880,35 +1073,37 @@ export function DataTable<T extends Record<string, any>>({
 					)}
 
 					{/* Import / Export Menu Dropdown */}
-					<DropdownMenu>
-						<DropdownMenuTrigger
-							render={
-								<Button
-									variant="outline"
-									className="h-9 px-3 text-sm font-medium gap-2 rounded-lg border-border hover:bg-muted"
+					{!hideImportExport && (
+						<DropdownMenu>
+							<DropdownMenuTrigger
+								render={
+									<Button
+										variant="outline"
+										className="h-9 px-3 text-sm font-medium gap-2 rounded-lg border-border hover:bg-muted"
+									>
+										<Download className="h-4 w-4 text-muted-foreground" />
+										<span>{t("common.importExport", "Import / Export")}</span>
+										<ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+									</Button>
+								}
+							/>
+							<DropdownMenuContent align="end" className="w-48 shadow-lg">
+								<DropdownMenuItem
+									onClick={() => setIsExportOpen(true)}
+									className="cursor-pointer gap-2"
 								>
-									<Download className="h-4 w-4 text-muted-foreground" />
-									<span>{t("common.importExport", "Import / Export")}</span>
-									<ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-								</Button>
-							}
-						/>
-						<DropdownMenuContent align="end" className="w-48 shadow-lg">
-							<DropdownMenuItem
-								onClick={() => setIsExportOpen(true)}
-								className="cursor-pointer gap-2"
-							>
-								<Download className="h-4 w-4 text-primary" /> Export Data
-								(CSV/JSON)
-							</DropdownMenuItem>
-							<DropdownMenuItem
-								onClick={() => setIsImportOpen(true)}
-								className="cursor-pointer gap-2"
-							>
-								<Upload className="h-4 w-4 text-emerald-500" /> Import File
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
+									<Download className="h-4 w-4 text-primary" /> Export Data
+									(CSV/JSON)
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									onClick={() => setIsImportOpen(true)}
+									className="cursor-pointer gap-2"
+								>
+									<Upload className="h-4 w-4 text-emerald-500" /> Import File
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					)}
 				</div>
 			</div>
 			)}
@@ -916,26 +1111,29 @@ export function DataTable<T extends Record<string, any>>({
 			{/* Toolbar (Search, Filter popover, Sort popover, Columns menu, Density & Tools) */}
 			{!hideToolbar && (
 			<div className="flex flex-wrap items-center justify-between gap-3 bg-card p-2.5 rounded-xl border border-border">
-				{/* Search input */}
-				{searchable && !hideSearch && (
-					<div className="relative flex-1 min-w-[220px] max-w-sm">
-						<Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-						<Input
-							placeholder={effectiveSearchPlaceholder}
-							value={localSearch}
-							onChange={(e) => handleDebouncedSearchChange(e.target.value)}
-							className="pl-9 pr-8 h-9 text-sm rounded-lg border-border bg-background focus-visible:ring-primary/40"
-						/>
-						{localSearch && (
-							<button
-								onClick={handleClearSearchImmediate}
-								className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-							>
-								<X className="h-4 w-4" />
-							</button>
-						)}
-					</div>
-				)}
+				{/* Search input and left toolbar controls */}
+				<div className="flex items-center gap-2 flex-1 min-w-[220px] max-w-2xl flex-wrap">
+					{searchable && !hideSearch && (
+						<div className="relative flex-1 min-w-[180px] max-w-sm">
+							<Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+							<Input
+								placeholder={effectiveSearchPlaceholder}
+								value={localSearch}
+								onChange={(e) => handleDebouncedSearchChange(e.target.value)}
+								className="pl-9 pr-8 h-9 text-sm rounded-lg border-border bg-background focus-visible:ring-primary/40"
+							/>
+							{localSearch && (
+								<button
+									onClick={handleClearSearchImmediate}
+									className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+								>
+									<X className="h-4 w-4" />
+								</button>
+							)}
+						</div>
+					)}
+					{toolbarSearchSuffix}
+				</div>
 
 				<div className="flex items-center gap-2 ml-auto flex-wrap">
 					{/* Dynamic Domain Filter Studio Button (if domainFilterFields provided) */}
@@ -944,7 +1142,7 @@ export function DataTable<T extends Record<string, any>>({
 							variant={domainFilters.length > 0 ? "secondary" : "outline"}
 							size="sm"
 							onClick={() => setIsDomainModalOpen(true)}
-							className="h-9 px-3 gap-1.5 text-xs font-semibold rounded-lg border-border hover:bg-primary/10 hover:text-primary transition-all"
+							className="h-9 px-3 gap-1.5 text-xs font-semibold rounded-lg border-border hover:bg-primary/10 hover:text-primary transition-all cursor-pointer"
 						>
 							<SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
 							<span>{effectiveFilterButtonLabel}</span>
@@ -958,6 +1156,9 @@ export function DataTable<T extends Record<string, any>>({
 							)}
 						</Button>
 					)}
+
+					{/* Primary Action Button (placed right near Filter button) */}
+					{primaryAction}
 					{/* Sort By Popover / Menu */}
 					<DropdownMenu>
 						<DropdownMenuTrigger
@@ -1647,6 +1848,44 @@ export function DataTable<T extends Record<string, any>>({
 										</TableRow>
 									),
 								)
+							) : isError ? (
+								<TableRow>
+									<TableCell
+										colSpan={
+											visibleColumns.length +
+											(selectable ? 1 : 0) +
+											(hasActions ? 1 : 0)
+										}
+										className="h-48 text-center"
+									>
+										<div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+											<AlertCircle className="h-10 w-10 mb-3 text-destructive/80" />
+											<p className="text-sm font-semibold text-foreground">
+												{t("common.errorLoadingData", "Failed to load records")}
+											</p>
+											<p className="text-xs text-muted-foreground mt-1 max-w-sm">
+												{typeof error === "string"
+													? error
+													: (error as any)?.message ||
+													  t(
+															"common.unexpectedErrorOccurred",
+															"An unexpected error occurred while communicating with the server.",
+													  )}
+											</p>
+											{onRetry && (
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={onRetry}
+													className="mt-4 h-8 px-3 text-xs gap-1.5"
+												>
+													<RotateCcw className="h-3 w-3" />
+													{t("common.tryAgain", "Try Again")}
+												</Button>
+											)}
+										</div>
+									</TableCell>
+								</TableRow>
 							) : paginatedData.length === 0 ? (
 								<TableRow>
 									<TableCell
@@ -1724,136 +1963,27 @@ export function DataTable<T extends Record<string, any>>({
 										Boolean((row as any)._isExpanded);
 
 									return (
-										<React.Fragment key={rowId}>
-											<TableRow
-												onClick={(e) => {
-													// Prevent row click if clicked element is an interactive control (checkbox, button, input)
-													const target = e.target as HTMLElement | null;
-													if (
-														target &&
-														(target.closest("button") ||
-															target.closest("input") ||
-															target.closest("[role='checkbox']") ||
-															target.closest("[data-no-row-click]"))
-													) {
-														return;
-													}
-													onRowClick?.(row);
-												}}
-												className={cn(
-													"transition-colors hover:bg-muted/40 group",
-													isSelected && "bg-primary/5 hover:bg-primary/10",
-													onRowClick && "cursor-pointer",
-												)}
-											>
-												{selectable && (
-													<TableCell
-														data-no-row-click="true"
-														style={{ width: "44px", minWidth: "44px", maxWidth: "44px" }}
-														className={cn(
-															"w-11 px-3 align-middle",
-															cellPaddingClass,
-														)}
-														onClick={(e) => e.stopPropagation()}
-														onMouseDown={(e) => e.stopPropagation()}
-														onPointerDown={(e) => e.stopPropagation()}
-													>
-														<Checkbox
-															checked={isSelected}
-															onCheckedChange={(checked) =>
-																handleSelectRow(rowId, row, !!checked)
-															}
-															onClick={(e) => e.stopPropagation()}
-															onMouseDown={(e) => e.stopPropagation()}
-															onPointerDown={(e) => e.stopPropagation()}
-															aria-label={`Select row ${rowId}`}
-														/>
-													</TableCell>
-												)}
-
-												{visibleColumns.map((col) => {
-													const rawValue = col.accessorFn
-														? col.accessorFn(row)
-														: col.accessorKey
-															? row[col.accessorKey]
-															: null;
-													const colWidth = columnWidths[col.id];
-
-													return (
-														<TableCell
-															key={col.id}
-															style={{
-																width: colWidth
-																	? `${colWidth}px`
-																	: typeof col.width === "number"
-																		? `${col.width}px`
-																		: col.width,
-																minWidth: colWidth
-																	? `${colWidth}px`
-																	: col.minWidth
-																		? `${col.minWidth}px`
-																		: undefined,
-																maxWidth: colWidth
-																	? `${colWidth}px`
-																	: col.maxWidth
-																		? `${col.maxWidth}px`
-																		: undefined,
-															}}
-															className={cn(
-																"align-middle text-sm text-foreground/90 font-normal",
-																cellPaddingClass,
-																!wrapText && "whitespace-nowrap overflow-hidden text-ellipsis",
-																wrapText && "break-words",
-																col.align === "right" && "text-right",
-																col.align === "center" && "text-center",
-																col.stickyLeft &&
-																	"sticky left-0 z-10 bg-card group-hover:bg-muted/80 border-r border-border/60 shadow-[4px_0_10px_-3px_rgba(0,0,0,0.08)]",
-															)}
-														>
-															{col.cell
-																? col.cell({ row, value: rawValue, index: idx })
-																: col.render
-																	? col.render(row)
-																	: String(rawValue ?? "—")}
-														</TableCell>
-													);
-												})}
-
-												{hasActions && (
-													<TableCell
-														style={{ width: "64px", minWidth: "64px", maxWidth: "64px" }}
-														className={cn(
-															"w-16 px-3 text-right align-middle",
-															cellPaddingClass,
-														)}
-														onClick={(e) => e.stopPropagation()}
-													>
-														<RowActionsCell
-															row={row}
-															onView={onViewRow}
-															onEdit={onEditRow}
-															onDelete={onDeleteRow}
-															customActions={resolvedCustomRowActions}
-														/>
-													</TableCell>
-												)}
-											</TableRow>
-
-											{renderSubComponent && isExpandedRow && (
-												<TableRow className="bg-slate-50/80 dark:bg-slate-900/60 border-b border-border/80">
-													<TableCell
-														colSpan={
-															visibleColumns.length +
-															(selectable ? 1 : 0) +
-															(hasActions ? 1 : 0)
-														}
-														className="p-3"
-													>
-														{renderSubComponent(row)}
-													</TableCell>
-												</TableRow>
-											)}
-										</React.Fragment>
+										<DataTableRow
+											key={rowId}
+											row={row}
+											rowId={rowId}
+											idx={idx}
+											isSelected={isSelected}
+											isExpandedRow={isExpandedRow}
+											selectable={selectable}
+											hasActions={hasActions}
+											cellPaddingClass={cellPaddingClass}
+											wrapText={wrapText}
+											visibleColumns={visibleColumns}
+											columnWidths={columnWidths}
+											onSelectRow={handleSelectRow}
+											onRowClick={onRowClick}
+											onViewRow={onViewRow}
+											onEditRow={onEditRow}
+											onDeleteRow={onDeleteRow}
+											resolvedCustomRowActions={resolvedCustomRowActions}
+											renderSubComponent={renderSubComponent}
+										/>
 									);
 								})
 							)}

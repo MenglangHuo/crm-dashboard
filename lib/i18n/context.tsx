@@ -24,6 +24,35 @@ const dictionaries: Record<Locale, Dictionary> = {
 	km,
 };
 
+const numberFormatCache = new Map<string, Intl.NumberFormat>();
+const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>();
+
+function getCachedNumberFormat(
+	locale: string,
+	options?: Intl.NumberFormatOptions,
+): Intl.NumberFormat {
+	const key = `${locale}:${options ? JSON.stringify(options) : "default"}`;
+	let formatter = numberFormatCache.get(key);
+	if (!formatter) {
+		formatter = new Intl.NumberFormat(locale, options);
+		numberFormatCache.set(key, formatter);
+	}
+	return formatter;
+}
+
+function getCachedDateTimeFormat(
+	locale: string,
+	options?: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+	const key = `${locale}:${options ? JSON.stringify(options) : "default"}`;
+	let formatter = dateTimeFormatCache.get(key);
+	if (!formatter) {
+		formatter = new Intl.DateTimeFormat(locale, options);
+		dateTimeFormatCache.set(key, formatter);
+	}
+	return formatter;
+}
+
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 function getStoredLocale(): Locale {
@@ -164,14 +193,15 @@ export function I18nProvider({
 	const formatCurrency = useCallback(
 		(amount: number, currency: "USD" | "KHR" = "USD"): string => {
 			try {
+				const loc = locale === "km" ? "km-KH" : "en-US";
 				if (currency === "KHR") {
-					return new Intl.NumberFormat(locale === "km" ? "km-KH" : "en-US", {
+					return getCachedNumberFormat(loc, {
 						style: "currency",
 						currency: "KHR",
 						maximumFractionDigits: 0,
 					}).format(amount);
 				}
-				return new Intl.NumberFormat(locale === "km" ? "km-KH" : "en-US", {
+				return getCachedNumberFormat(loc, {
 					style: "currency",
 					currency: "USD",
 					minimumFractionDigits: 2,
@@ -198,10 +228,8 @@ export function I18nProvider({
 					month: "short",
 					day: "numeric",
 				};
-				return new Intl.DateTimeFormat(
-					locale === "km" ? "km-KH" : "en-US",
-					defaultOptions,
-				).format(d);
+				const loc = locale === "km" ? "km-KH" : "en-US";
+				return getCachedDateTimeFormat(loc, defaultOptions).format(d);
 			} catch {
 				return String(dateInput);
 			}
@@ -212,10 +240,8 @@ export function I18nProvider({
 	const formatNumber = useCallback(
 		(value: number, options?: Intl.NumberFormatOptions): string => {
 			try {
-				return new Intl.NumberFormat(
-					locale === "km" ? "km-KH" : "en-US",
-					options,
-				).format(value);
+				const loc = locale === "km" ? "km-KH" : "en-US";
+				return getCachedNumberFormat(loc, options).format(value);
 			} catch {
 				return String(value);
 			}

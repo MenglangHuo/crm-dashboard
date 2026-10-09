@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { DataTable, ColumnDef } from "@/components/ui-custom/data-table";
 import {
 	MessageSquare,
@@ -525,7 +526,7 @@ export default function FeedbackPage() {
 	];
 
 	return (
-		<div className="space-y-6 max-w-7xl mx-auto pb-16">
+		<div className="space-y-4 pb-12">
 			{/* Top Header */}
 			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 				<div>
@@ -546,18 +547,6 @@ export default function FeedbackPage() {
 
 				{/* Global Action Buttons */}
 				<div className="flex items-center gap-2.5 flex-wrap">
-					<ModernButton
-						size="sm"
-						variant="outline"
-						onClick={() => {
-							setEditingQuestion(null);
-							setIsQuestionModalOpen(true);
-						}}
-						leftIcon={<Plus className="h-3.5 w-3.5 text-primary" />}
-					>
-						{t("feedback.addQuestion")}
-					</ModernButton>
-
 					<ModernButton
 						size="sm"
 						onClick={() => {
@@ -803,37 +792,44 @@ export default function FeedbackPage() {
 				{/* ------------------------------------------------------------- */}
 				<ModernTabsContent value="questions">
 					<DataTable<FeedbackQuestion>
-						title={t("feedback.questionsTab")}
+						hideHeader={true}
+						hideImportExport={true}
 						data={questionsList}
 						columns={questionColumns}
 						getRowId={(row) => String(row.questionId)}
 						searchable={false}
 						isLoading={isLoadingQuestions}
-						onCreateNew={() => {
-							setEditingQuestion(null);
-							setIsQuestionModalOpen(true);
-						}}
-						createButtonLabel={t("feedback.addQuestion")}
-						createButtonIcon={<Plus className="h-4 w-4" />}
-						extraHeaderContent={
-							<div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-xs">
-								{["ALL", "SINGLE_CHOICE", "MULTI_CHOICE", "FREE_TEXT"].map(
-									(type) => (
-										<button
-											key={type}
-											onClick={() => setSelectedTypeFilter(type)}
-											className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-												selectedTypeFilter === type
-													? "bg-white dark:bg-slate-900 text-primary shadow-2xs"
-													: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-											}`}
-										>
-											{type === "ALL"
-												? t("feedback.allTypes")
-												: type.replace("_", " ")}
-										</button>
-									),
-								)}
+						primaryAction={
+							<div className="flex items-center gap-2 flex-wrap">
+								<div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-xs">
+									{["ALL", "SINGLE_CHOICE", "MULTI_CHOICE", "FREE_TEXT"].map(
+										(type) => (
+											<button
+												key={type}
+												onClick={() => setSelectedTypeFilter(type)}
+												className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+													selectedTypeFilter === type
+														? "bg-white dark:bg-slate-900 text-primary shadow-2xs"
+														: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+												}`}
+											>
+												{type === "ALL"
+													? t("feedback.allTypes")
+													: type.replace("_", " ")}
+											</button>
+										),
+									)}
+								</div>
+								<Button
+									onClick={() => {
+										setEditingQuestion(null);
+										setIsQuestionModalOpen(true);
+									}}
+									className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+								>
+									<Plus className="h-3.5 w-3.5" />
+									<span>{t("feedback.addQuestion", "Add Question")}</span>
+								</Button>
 							</div>
 						}
 					/>
@@ -995,6 +991,7 @@ export default function FeedbackPage() {
 					{/* Dynamic Submissions Log Table for Selected Template */}
 					<DataTable<FeedbackSubmission>
 						title={`${t("feedback.customerSubmissionsFor")} "${activeTemplate?.name || `Template #${selectedTemplateId}`}"`}
+						hideImportExport={true}
 						data={submissionsList}
 						columns={submissionColumns}
 						getRowId={(row) => String(row.submissionId)}
@@ -1029,7 +1026,8 @@ export default function FeedbackPage() {
 				{/* ------------------------------------------------------------- */}
 				<ModernTabsContent value="answers">
 					<DataTable<any>
-						title={t("feedback.answersTab")}
+						hideHeader={true}
+						hideImportExport={true}
 						data={answersList}
 						columns={answerColumns}
 						getRowId={(row) => String(row.id)}

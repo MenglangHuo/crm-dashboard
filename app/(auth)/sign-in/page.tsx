@@ -254,7 +254,6 @@ function SignInForm() {
 		searchParams.get("returnUrl") || searchParams.get("from"),
 	);
 	const queryUsername = searchParams.get("username");
-	const queryPassword = searchParams.get("password");
 	const isRegistered = searchParams.get("registered") === "true";
 	const isPasswordReset = searchParams.get("passwordReset") === "true";
 
@@ -266,29 +265,26 @@ function SignInForm() {
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			username: queryUsername || "",
-			password: queryPassword || "",
+			password: "",
 			rememberMe: true,
 		},
 	});
 
-	// Auto-fill and notify if redirected from company registration or password reset
+	// Auto-fill username and notify if redirected from company registration or password reset
 	useEffect(() => {
 		if (queryUsername) {
 			form.setValue("username", queryUsername, { shouldValidate: true });
 		}
-		if (queryPassword) {
-			form.setValue("password", queryPassword, { shouldValidate: true });
-		}
 		if (isRegistered) {
 			toast.success(
-				"Company registered successfully! Your administrator credentials have been auto-filled. Click Sign In to begin.",
+				"Company registered successfully! Your administrator username has been filled. Please enter your password to sign in.",
 			);
 		} else if (isPasswordReset) {
 			toast.success(
-				"Password updated successfully! Your credentials have been auto-filled. Click Sign In to continue.",
+				"Password updated successfully! Please enter your new password to sign in.",
 			);
 		}
-	}, [queryUsername, queryPassword, isRegistered, isPasswordReset, form]);
+	}, [queryUsername, isRegistered, isPasswordReset, form]);
 
 	const fillDemoAccount = (acc: (typeof demoAccounts)[0]) => {
 		setSelectedDemo(acc.username);

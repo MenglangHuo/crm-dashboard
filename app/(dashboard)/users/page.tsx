@@ -127,6 +127,7 @@ import {
 	Activity,
 	Copy,
 	Loader2,
+	UserPlus,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -1151,21 +1152,29 @@ export default function UsersPage() {
 	];
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-4 pb-12">
 			{/* Reusable Data Table Component */}
 			<DataTable<User>
 				data={usersData?.items || []}
 				columns={columns}
 				getRowId={(u) => String(u.id)}
-				title={t("users.title")}
+				hideHeader={true}
+				hideImportExport={true}
 				searchPlaceholder={t("users.searchPlaceholder")}
 				searchValue={search}
 				onSearchChange={(val) => {
 					setSearch(val);
 					setPage(1);
 				}}
-				createButtonLabel={t("users.registerNewUser")}
-				onCreateNew={openCreate}
+				primaryAction={
+					<Button
+						onClick={openCreate}
+						className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+					>
+						<UserPlus className="h-3.5 w-3.5" />
+						<span>{t("users.registerNewUser", "Register New User")}</span>
+					</Button>
+				}
 				manualPagination={true}
 				totalCount={usersData?.total || 0}
 				page={page}
@@ -1177,7 +1186,6 @@ export default function UsersPage() {
 				onEditRow={(u) => openEdit(u)}
 				onDeleteRow={(u) => !u.isSuperAdmin && deleteMutation.mutate(u.id)}
 				customRowActions={customActions}
-				exportFilename="users-directory"
 			/>
 
 			{/* View Full Profile Details Modal */}

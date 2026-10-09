@@ -79,11 +79,11 @@ const paymentFormSchema = z.object({
 type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 
-import { useQuickActions } from "@/components/quick-action-modal-context";
+import { useQuickActionDispatch } from "@/components/quick-action-modal-context";
 import { QrCode, Printer, Zap } from "lucide-react";
 
 export default function FinancePage() {
-	const { openQuickPay, openKhqr, openReceipt } = useQuickActions();
+	const { openQuickPay, openKhqr, openReceipt } = useQuickActionDispatch();
 	const queryClient = useQueryClient();
 	const [activeTab, setActiveTab] = useState<"invoices" | "payments">(
 		"invoices",

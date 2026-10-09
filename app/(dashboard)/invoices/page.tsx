@@ -7,7 +7,7 @@ import { MultiInvoicePaymentModal } from "@/components/invoices/multi-invoice-pa
 import { RefundInvoiceModal } from "@/components/invoices/refund-invoice-modal";
 import { VoidInvoiceModal } from "@/components/invoices/void-invoice-modal";
 import { LoanDetailsModal } from "@/components/loan-details-modal";
-import { useQuickActions } from "@/components/quick-action-modal-context";
+import { useQuickActionDispatch } from "@/components/quick-action-modal-context";
 import {
 	ColumnDef,
 	DataTable,
@@ -19,10 +19,9 @@ import {
 	buildSearchFilterPayload,
 } from "@/components/ui-custom/data-table/search-filter-types";
 import {
-	ModernTabs,
-	ModernTabsList,
-	ModernTabsTrigger
-} from "@/components/ui-custom/modern-tabs";
+	StatusFilterDropdown,
+	StatusFilterOption,
+} from "@/components/ui-custom/status-filter-dropdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { customersApi, financeApi, invoicesApi, paymentsApi } from "@/lib/api/endpoints";
@@ -51,6 +50,8 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useCompanyContext } from "@/components/providers/company-context";
+import { useDebounce } from "@/hooks/use-debounce";
 
 function InvoicesPageContent() {
 	const router = useRouter();
@@ -64,11 +65,13 @@ function InvoicesPageContent() {
 		searchParams.get("paymentId");
 	const viewParam = searchParams.get("view");
 	const { t } = useTranslation();
-	const { openQuickPay, openReceipt } = useQuickActions();
+	const { openQuickPay, openReceipt } = useQuickActionDispatch();
 	const queryClient = useQueryClient();
+	const { selectedCompanyId } = useCompanyContext();
 
 	// State Management
 	const [search, setSearch] = useState(() => invoiceParam || "");
+	const debouncedSearch = useDebounce(search, 300);
 	const [statusFilter, setStatusFilter] = useState<string>("ALL");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
@@ -110,7 +113,7 @@ function InvoicesPageContent() {
 	// Advanced Search Payload for POST /v1/invoices/search
 	const searchPayload = useMemo(() => {
 		const payload = buildSearchFilterPayload({
-			searchValue: search,
+			searchValue: debouncedSearch,
 			searchField: "invoiceNumber",
 			activeFilters: activeFilters,
 			sortState: [{ field: "createdAt", direction: "DESC" }],
@@ -144,23 +147,26 @@ function InvoicesPageContent() {
 		}
 
 		return payload;
-	}, [search, activeFilters, statusFilter, page, pageSize]);
+	}, [debouncedSearch, activeFilters, statusFilter, page, pageSize]);
 
 	// Invoices Query using POST /v1/invoices/search with fallback
 	const {
 		data: searchResponse,
 		isLoading,
 		isFetching,
+		isError,
+		error,
 		refetch,
 	} = useQuery({
 		queryKey: [
 			"invoices",
 			"search-v1",
+			selectedCompanyId,
 			searchPayload,
 			statusFilter,
 			page,
 			pageSize,
-			search,
+			debouncedSearch,
 		],
 		queryFn: async () => {
 			try {
@@ -174,17 +180,10 @@ function InvoicesPageContent() {
 			return financeApi.listInvoices({
 				page,
 				limit: pageSize,
-				search,
+				search: debouncedSearch,
 				status: statusFilter !== "ALL" ? statusFilter : undefined,
 			});
 		},
-	});
-
-	// Global query to maintain accurate badge counters across all status tabs
-	const { data: allInvoicesSummary } = useQuery({
-		queryKey: ["invoices-tab-counters-all"],
-		queryFn: () => financeApi.listInvoices({ limit: 500 }),
-		staleTime: 1000 * 30,
 	});
 
 	const rawInvoicesList = searchResponse?.items || [];
@@ -291,8 +290,8 @@ function InvoicesPageContent() {
 		return invoicesList.filter((inv) => selectedIds.includes(String(inv.id)));
 	}, [invoicesList, selectedIds]);
 
-	// Calculate tab counters from full dataset
-	const allList = allInvoicesSummary?.items || rawInvoicesList;
+	// Calculate tab counters from loaded dataset
+	const allList = rawInvoicesList;
 	const unpaidCount = useMemo(
 		() =>
 			allList.filter((i) => {
@@ -333,8 +332,7 @@ function InvoicesPageContent() {
 				.length,
 		[allList],
 	);
-	const totalAllCount =
-		allInvoicesSummary?.total || searchResponse?.total || allList.length;
+	const totalAllCount = searchResponse?.total || allList.length;
 
 	const renderStatusBadge = (status?: string) => {
 		const s = String(status || "UNPAID").toUpperCase();
@@ -794,106 +792,107 @@ function InvoicesPageContent() {
 		},
 	];
 
+	const invoiceStatusOptions: StatusFilterOption[] = useMemo(
+		() => [
+			{
+				id: "ALL",
+				label: t("invoices.allInvoices", "All Invoices"),
+				icon: FileText,
+				badge: totalAllCount,
+				badgeColor: "purple",
+			},
+			{
+				id: "UNPAID",
+				label: t("invoices.unpaid", "Unpaid"),
+				icon: Clock,
+				badge: unpaidCount,
+				badgeColor: "amber",
+				dotColor: "bg-amber-500",
+			},
+			{
+				id: "PARTIAL_PAYMENT",
+				label: t("invoices.partiallyPaid", "Partially Paid"),
+				icon: CreditCard,
+				badge: partialCount,
+				badgeColor: "sky",
+				dotColor: "bg-sky-500",
+			},
+			{
+				id: "PAID",
+				label: t("invoices.paid", "Paid"),
+				icon: CheckCircle2,
+				badge: paidCount,
+				badgeColor: "emerald",
+				dotColor: "bg-emerald-500",
+			},
+			{
+				id: "OVERDUE",
+				label: t("invoices.overdue", "Overdue"),
+				icon: AlertTriangle,
+				badge: overdueCount,
+				badgeColor: "rose",
+				dotColor: "bg-rose-500",
+			},
+			{
+				id: "REFUNDED",
+				label: t("invoices.refunded", "Refunded"),
+				icon: RotateCcw,
+				badge: refundedCount,
+				badgeColor: "purple",
+				dotColor: "bg-purple-500",
+			},
+			{
+				id: "VOID",
+				label: t("invoices.void", "Void"),
+				icon: Ban,
+				badge: voidCount,
+				badgeColor: "rose",
+				dotColor: "bg-slate-500",
+			},
+		],
+		[
+			t,
+			totalAllCount,
+			unpaidCount,
+			partialCount,
+			paidCount,
+			overdueCount,
+			refundedCount,
+			voidCount,
+		],
+	);
+
 	return (
 		<div className="space-y-4 pb-12">
-			{/* Modern Tabs Navigation with Icons & Badges */}
-			<ModernTabs
-				value={statusFilter}
-				onValueChange={(val) => {
-					setStatusFilter(val);
-					setPage(1);
-				}}
-			>
-				<ModernTabsList variant="glass" size="md">
-					<ModernTabsTrigger
-						value="ALL"
-						icon={<FileText className="h-4 w-4" />}
-						badge={totalAllCount}
-						badgeColor="purple"
-					>
-						{t("invoices.allInvoices", "All Invoices")}
-					</ModernTabsTrigger>
-
-					<ModernTabsTrigger
-						value="UNPAID"
-						icon={<Clock className="h-4 w-4" />}
-						badge={unpaidCount}
-						badgeColor="amber"
-					>
-						{t("invoices.unpaid", "Unpaid")}
-					</ModernTabsTrigger>
-
-					<ModernTabsTrigger
-						value="PARTIAL_PAYMENT"
-						icon={<CreditCard className="h-4 w-4" />}
-						badge={partialCount}
-						badgeColor="sky"
-					>
-						{t("invoices.partiallyPaid", "Partially Paid")}
-					</ModernTabsTrigger>
-
-					<ModernTabsTrigger
-						value="PAID"
-						icon={<CheckCircle2 className="h-4 w-4" />}
-						badge={paidCount}
-						badgeColor="emerald"
-					>
-						{t("invoices.paid", "Paid")}
-					</ModernTabsTrigger>
-
-					<ModernTabsTrigger
-						value="OVERDUE"
-						icon={<AlertTriangle className="h-4 w-4" />}
-						badge={overdueCount}
-						badgeColor="amber"
-					>
-						{t("invoices.overdue", "Overdue")}
-					</ModernTabsTrigger>
-
-					<ModernTabsTrigger
-						value="REFUNDED"
-						icon={<RotateCcw className="h-4 w-4" />}
-						badge={refundedCount}
-						badgeColor="purple"
-					>
-						{t("invoices.refunded", "Refunded")}
-					</ModernTabsTrigger>
-
-					<ModernTabsTrigger
-						value="VOID"
-						icon={<Ban className="h-4 w-4" />}
-						badge={voidCount}
-						badgeColor="rose"
-					>
-						{t("invoices.void", "Void")}
-					</ModernTabsTrigger>
-				</ModernTabsList>
-			</ModernTabs>
-
-			{/* Data Table with Integrated Advanced Filters next to Sort button */}
+			{/* Data Table with Integrated Clean Toolbar */}
 			<DataTable<Invoice>
 				data={invoicesList}
 				columns={columns}
 				getRowId={(i) => String(i.id)}
 				onRowClick={(row) => setSelectedInvoiceId(String(row.id))}
-				title={t("invoices.title")}
-				titleIcon={
-					<div className="h-7 w-7 rounded-lg bg-pink-500/10 text-pink-600 dark:bg-pink-500/15 dark:text-pink-400 flex items-center justify-center shrink-0 shadow-2xs">
-						<FileText className="h-4 w-4" />
-					</div>
-				}
+				hideHeader={true}
+				hideImportExport={true}
 				searchPlaceholder={t("common.search")}
 				searchValue={search}
 				onSearchChange={(val) => {
 					setSearch(val);
 					setPage(1);
 				}}
+				toolbarSearchSuffix={
+					<StatusFilterDropdown
+						value={statusFilter}
+						onChange={(val) => {
+							setStatusFilter(val);
+							setPage(1);
+						}}
+						options={invoiceStatusOptions}
+						label={t("invoices.status", "Status")}
+					/>
+				}
 				selectable={true}
 				selectedIds={selectedIds}
 				onSelectionChange={setSelectedIds}
-				createButtonLabel={t("invoices.quickPay")}
-				onCreateNew={() => openQuickPay()}
-				headerActions={
+				primaryAction={
 					<div className="flex items-center gap-2">
 						{selectedIds.length > 0 && (
 							<Button
@@ -907,44 +906,14 @@ function InvoicesPageContent() {
 							</Button>
 						)}
 						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => {
-								refetch();
-								queryClient.invalidateQueries({ queryKey: ["invoices"] });
-								queryClient.invalidateQueries({
-									queryKey: ["invoices-search-v1"],
-								});
-								queryClient.invalidateQueries({
-									queryKey: ["invoice-details"],
-								});
-								toast.success(
-									t(
-										"invoices.refetchedSuccess",
-										"Invoices refetched successfully",
-									),
-								);
-							}}
-							disabled={isLoading || isFetching}
-							className="h-9 px-3 text-xs font-semibold gap-1.5 rounded-lg border-border hover:bg-muted text-foreground cursor-pointer shadow-xs transition-all"
-							title="Refetch and refresh invoice list"
+							onClick={() => openQuickPay()}
+							className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
 						>
-							<RefreshCw
-								className={cn(
-									"h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400",
-									(isLoading || isFetching) && "animate-spin text-primary",
-								)}
-							/>
-							<span>{t("invoices.refetchInvoices", "Refetch Invoices")}</span>
+							<Zap className="h-3.5 w-3.5" />
+							<span>{t("invoices.quickPay", "Quick Pay")}</span>
 						</Button>
 					</div>
 				}
-				onRefresh={() => {
-					refetch();
-					queryClient.invalidateQueries({ queryKey: ["invoices"] });
-					queryClient.invalidateQueries({ queryKey: ["invoices-search-v1"] });
-					queryClient.invalidateQueries({ queryKey: ["invoice-details"] });
-				}}
 				domainFilterFields={INVOICE_DOMAIN_FILTERS}
 				activeDomainFilters={activeFilters}
 				domainTitle="Billing Invoices Filter Studio"
@@ -959,6 +928,9 @@ function InvoicesPageContent() {
 				onPageChange={setPage}
 				onPageSizeChange={setPageSize}
 				isLoading={isLoading}
+				isError={isError}
+				error={error}
+				onRetry={() => refetch()}
 				customRowActions={invoiceCustomActions}
 				exportFilename="billing-invoices"
 			/>

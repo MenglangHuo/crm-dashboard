@@ -1,6 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import { useTheme } from "next-themes";
 
 export interface ThemePreset {
@@ -114,39 +121,50 @@ export function CustomThemeProvider({
 		}
 	}, [preset, customColor, resolvedTheme]);
 
-	const setPreset = (presetKey: string) => {
+	const setPreset = useCallback((presetKey: string) => {
 		setPresetState(presetKey);
 		setCustomColorState(null);
-		localStorage.setItem("rumluos_theme_preset", presetKey);
-		localStorage.removeItem("rumluos_theme_custom_color");
-	};
-
-	const setCustomColor = (color: string | null) => {
-		setCustomColorState(color);
-		if (color) {
-			localStorage.setItem("rumluos_theme_custom_color", color);
-		} else {
+		try {
+			localStorage.setItem("rumluos_theme_preset", presetKey);
 			localStorage.removeItem("rumluos_theme_custom_color");
-		}
-	};
+		} catch {}
+	}, []);
 
-	const resetToDefault = () => {
-		setPreset("brand");
-		setCustomColor(null);
-	};
+	const setCustomColor = useCallback((color: string | null) => {
+		setCustomColorState(color);
+		try {
+			if (color) {
+				localStorage.setItem("rumluos_theme_custom_color", color);
+			} else {
+				localStorage.removeItem("rumluos_theme_custom_color");
+			}
+		} catch {}
+	}, []);
+
+	const resetToDefault = useCallback(() => {
+		setPresetState("brand");
+		setCustomColorState(null);
+		try {
+			localStorage.setItem("rumluos_theme_preset", "brand");
+			localStorage.removeItem("rumluos_theme_custom_color");
+		} catch {}
+	}, []);
+
+	const value = useMemo(
+		() => ({
+			preset,
+			setPreset,
+			customColor,
+			setCustomColor,
+			resetToDefault,
+			isCustomizerOpen,
+			setIsCustomizerOpen,
+		}),
+		[preset, setPreset, customColor, setCustomColor, resetToDefault, isCustomizerOpen],
+	);
 
 	return (
-		<CustomThemeContext.Provider
-			value={{
-				preset,
-				setPreset,
-				customColor,
-				setCustomColor,
-				resetToDefault,
-				isCustomizerOpen,
-				setIsCustomizerOpen,
-			}}
-		>
+		<CustomThemeContext.Provider value={value}>
 			{children}
 		</CustomThemeContext.Provider>
 	);

@@ -50,19 +50,6 @@ export function isUserSystemAdmin(userProfile: any): boolean {
 		return true;
 	}
 
-	// 3. Known platform system admin usernames
-	const username = String(userProfile.username || "")
-		.toLowerCase()
-		.trim();
-	if (
-		username === "bronx@dmin" ||
-		username === "system_admin" ||
-		username === "sysadmin" ||
-		username === "systemadmin"
-	) {
-		return true;
-	}
-
 	// Strict matcher: ONLY matches platform system administrator roles/authorities
 	// Explicitly excludes tenant-level SUPER_ADMIN / ADMIN roles
 	const matchesSystemAdmin = (val: any): boolean => {
@@ -252,35 +239,47 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 		}
 	}, [companies, isSystemAdmin, userProfile]);
 
-	const setSelectedCompanyId = (id: string | null) => {
-		setSelectedCompanyIdState(id);
-		setStoredCompanyId(id);
+	const setSelectedCompanyId = React.useCallback(
+		(id: string | null) => {
+			setSelectedCompanyIdState(id);
+			setStoredCompanyId(id);
 
-		if (typeof window !== "undefined") {
-			window.dispatchEvent(
-				new CustomEvent("company-context-changed", { detail: id }),
-			);
-		}
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(
+					new CustomEvent("company-context-changed", { detail: id }),
+				);
+			}
 
-		// Invalidate all tenant data queries so current page updates immediately
-		queryClient.invalidateQueries({
-			predicate: (query) => {
-				const key = query.queryKey[0];
-				return key !== "profile" && key !== "companies-list-selector";
-			},
-		});
-	};
+			// Remove all previous tenant data queries from memory cache so they do not leak or flash across companies
+			queryClient.removeQueries({
+				predicate: (query) => {
+					const key = query.queryKey[0];
+					return key !== "profile" && key !== "companies-list-selector";
+				},
+			});
+		},
+		[queryClient],
+	);
+
+	const contextValue = React.useMemo<CompanyContextType>(
+		() => ({
+			selectedCompanyId,
+			setSelectedCompanyId,
+			companies,
+			isLoadingCompanies,
+			isSystemAdmin,
+		}),
+		[
+			selectedCompanyId,
+			setSelectedCompanyId,
+			companies,
+			isLoadingCompanies,
+			isSystemAdmin,
+		],
+	);
 
 	return (
-		<CompanyContext.Provider
-			value={{
-				selectedCompanyId,
-				setSelectedCompanyId,
-				companies,
-				isLoadingCompanies,
-				isSystemAdmin,
-			}}
-		>
+		<CompanyContext.Provider value={contextValue}>
 			{children}
 		</CompanyContext.Provider>
 	);

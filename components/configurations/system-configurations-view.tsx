@@ -51,9 +51,17 @@ import {
 	Eye,
 	Building,
 	Hash,
+	ArrowUpDown,
 } from "lucide-react";
 
 import { ModernButton } from "@/components/ui-custom/button";
+import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -158,6 +166,7 @@ export function SystemConfigurationsView() {
 	// Local States
 	const [activeDomain, setActiveDomain] = useState<string>("GENERAL");
 	const [searchQuery, setSearchQuery] = useState<string>("");
+	const [sortOrder, setSortOrder] = useState<"default" | "az" | "za">("default");
 	const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
 	const [dirtyMap, setDirtyMap] = useState<Record<string, any>>({});
 	const [resettingKeys, setResettingKeys] = useState<Record<string, boolean>>(
@@ -515,72 +524,59 @@ export function SystemConfigurationsView() {
 
 	return (
 		<TooltipProvider>
-			<div className="min-h-screen bg-slate-50/70 pb-32 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors">
-				<div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 space-y-5">
-					{/* ============================================================ */}
-					{/* 1. TOP HEADER & TITLE                                        */}
-					{/* ============================================================ */}
-					<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-						<div className="flex items-center gap-3">
-							<div className="h-10 w-10 rounded-2xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-600/20 shadow-2xs">
-								<Settings className="h-5 w-5" />
-							</div>
-							<div>
-								<h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-950 dark:text-white">
-									{t("configurations.title", "System Configurations")}
-								</h1>
-								<p className="text-xs text-slate-500 dark:text-slate-400">
-									{t(
-										"configurations.subtitle",
-										"Manage operational parameters, visit tracking lifecycle rules, and system rules.",
-									)}
-								</p>
-							</div>
+			<div className="space-y-4 pb-12 font-sans text-slate-900 dark:text-slate-100 transition-colors">
+				{/* ============================================================ */}
+				{/* 1. TOP HEADER & TITLE                                        */}
+				{/* ============================================================ */}
+				<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+					<div className="flex items-center gap-3">
+						<div className="h-10 w-10 rounded-2xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-600/20 shadow-2xs">
+							<Settings className="h-5 w-5" />
 						</div>
-
-						<div className="flex items-center gap-2.5 flex-wrap">
-							{/* Active Context */}
-							<div className="flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white px-3.5 py-1.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-								<Building className="h-3.5 w-3.5 text-slate-400" />
-								<div className="text-xs">
-									<span className="font-bold text-slate-800 dark:text-slate-200">
-										{selectedCompanyId === "all"
-											? t("configurations.systemWideScope", "System Wide Scope")
-											: t(
-													"configurations.companyId",
-													`Company ID: ${selectedCompanyId}`,
-													{ id: selectedCompanyId },
-												)}
-									</span>
-								</div>
-							</div>
-
-							{/* Data source indicator */}
-							{isApiError && (
-								<div className="flex items-center gap-1.5 rounded-2xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-400">
-									<AlertCircle className="h-3.5 w-3.5" />
-									{t("configurations.apiUnavailable", "API Unavailable")}
-								</div>
-							)}
-
-							{/* Refresh button */}
-							<ModernButton
-								variant="outline"
-								size="icon-sm"
-								onClick={() => refetch()}
-								disabled={isLoading || isRefetching}
-								title={t("configurations.refreshSettings", "Refresh settings")}
-							>
-								<RefreshCw
-									className={`h-3.5 w-3.5 ${isRefetching ? "animate-spin text-blue-600" : ""}`}
-								/>
-							</ModernButton>
+						<div>
+							<h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-950 dark:text-white">
+								{t("configurations.title", "System Configurations")}
+							</h1>
+							<p className="text-xs text-slate-500 dark:text-slate-400">
+								{t(
+									"configurations.subtitle",
+									"Manage operational parameters, visit tracking lifecycle rules, and system rules.",
+								)}
+							</p>
 						</div>
 					</div>
 
-					{/* ============================================================ */}
-					{/* 2. CATEGORY NAVIGATION TABS (Horizontal Clean Bar)           */}
-					{/* ============================================================ */}
+					<div className="flex items-center gap-2.5 flex-wrap">
+						{/* Active Context */}
+						<div className="flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white px-3.5 py-1.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+							<Building className="h-3.5 w-3.5 text-slate-400" />
+							<div className="text-xs">
+								<span className="font-bold text-slate-800 dark:text-slate-200">
+									{selectedCompanyId === "all"
+										? t("configurations.systemWideScope", "System Wide Scope")
+										: t(
+												"configurations.companyId",
+												`Company ID: ${selectedCompanyId}`,
+												{ id: selectedCompanyId },
+											)}
+								</span>
+							</div>
+						</div>
+
+						{/* Data source indicator */}
+						{isApiError && (
+							<div className="flex items-center gap-1.5 rounded-2xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-400">
+								<AlertCircle className="h-3.5 w-3.5" />
+								{t("configurations.apiUnavailable", "API Unavailable")}
+							</div>
+						)}
+					</div>
+				</div>
+
+				{/* ============================================================ */}
+				{/* 2. CATEGORY NAVIGATION TABS (Hidden if <= 1 Tab)             */}
+				{/* ============================================================ */}
+				{navDomainGroups.length > 1 && (
 					<div className="relative flex items-center bg-white dark:bg-slate-900/90 p-1.5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs">
 						<button
 							type="button"
@@ -641,12 +637,14 @@ export function SystemConfigurationsView() {
 							<ChevronRight className="h-3.5 w-3.5" />
 						</button>
 					</div>
+				)}
 
-					{/* ============================================================ */}
-					{/* 3. GLOBAL SEARCH FILTER (Ctrl+K)                             */}
-					{/* ============================================================ */}
-					<div className="relative">
-						<Search className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
+				{/* ============================================================ */}
+				{/* 3. CLEAN TOOLBAR: SEARCH + SORT + REFRESH ACTION             */}
+				{/* ============================================================ */}
+				<div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+					<div className="relative flex-1 max-w-md">
+						<Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
 						<Input
 							ref={searchInputRef}
 							type="text"
@@ -656,18 +654,78 @@ export function SystemConfigurationsView() {
 								"configurations.searchPlaceholder",
 								"Search all configuration settings by keyword or key...",
 							)}
-							className="h-10 rounded-2xl border-slate-200/90 bg-white pl-10 pr-20 text-xs shadow-2xs dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-100"
+							className="h-9 rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 pl-9 pr-8 text-xs shadow-none dark:text-slate-100"
 						/>
 						{searchQuery && (
 							<button
 								type="button"
 								onClick={() => setSearchQuery("")}
-								className="absolute right-3 top-2.5 flex h-5 w-5 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+								className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
 							>
 								<X className="h-3.5 w-3.5" />
 							</button>
 						)}
 					</div>
+
+					<div className="flex items-center gap-2 ml-auto">
+						{/* Sort Button */}
+						<DropdownMenu>
+							<DropdownMenuTrigger
+								render={
+									<Button
+										variant="outline"
+										size="sm"
+										className="h-9 px-3 gap-1.5 text-xs font-semibold rounded-lg border-slate-200 dark:border-slate-800 bg-background"
+									>
+										<ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+										<span>
+											{t("common.sort", "Sort")}:{" "}
+											{sortOrder === "az"
+												? "A-Z"
+												: sortOrder === "za"
+													? "Z-A"
+													: "Default"}
+										</span>
+									</Button>
+								}
+							/>
+							<DropdownMenuContent align="end" className="w-44">
+								<DropdownMenuItem
+									onClick={() => setSortOrder("default")}
+									className="text-xs cursor-pointer"
+								>
+									Default Order
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									onClick={() => setSortOrder("az")}
+									className="text-xs cursor-pointer"
+								>
+									Section Name (A-Z)
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									onClick={() => setSortOrder("za")}
+									className="text-xs cursor-pointer"
+								>
+									Section Name (Z-A)
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+
+						{/* Action Button (Refresh) placed right near Sort button */}
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => refetch()}
+							disabled={isLoading || isRefetching}
+							className="h-9 px-3.5 text-xs font-semibold gap-1.5 rounded-lg border-slate-200 dark:border-slate-800 cursor-pointer shadow-xs bg-background"
+						>
+							<RefreshCw
+								className={`h-3.5 w-3.5 ${isRefetching ? "animate-spin text-primary" : ""}`}
+							/>
+							<span>{t("configurations.refreshSettings", "Refresh")}</span>
+						</Button>
+					</div>
+				</div>
 
 					{/* ============================================================ */}
 					{/* 4. DYNAMIC SECTION CARDS GRID (2-Column Clean Template)      */}
@@ -786,7 +844,16 @@ export function SystemConfigurationsView() {
 
 									{/* Section Cards Responsive Grid */}
 									<div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-										{domain.sections.map((section) => {
+										{(sortOrder === "az"
+											? [...domain.sections].sort((a, b) =>
+													a.sectionName.localeCompare(b.sectionName),
+												)
+											: sortOrder === "za"
+												? [...domain.sections].sort((a, b) =>
+														b.sectionName.localeCompare(a.sectionName),
+													)
+												: domain.sections
+										).map((section) => {
 											const SectionIcon = getSectionIcon(section.sectionName);
 											const hasComplexEditor = section.configurations.some(
 												(cfg) => {
@@ -1180,7 +1247,6 @@ export function SystemConfigurationsView() {
 								</div>
 							)}
 					</div>
-				</div>
 
 				{/* ============================================================ */}
 				{/* 5. DIRTY STATE & FLOATING BOTTOM SAVE BAR                    */}

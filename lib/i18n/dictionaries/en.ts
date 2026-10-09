@@ -73,6 +73,19 @@ export const en = {
 		systemAdminPortal: "System Admin Portal",
 		saveChanges: "Save Changes",
 		readOnly: "Read-only",
+		company: "Your Organization",
+		change: "Change Photo",
+		remove: "Remove",
+		copyAll: "Copy Credentials",
+		done: "Done",
+		selected: "Selected",
+		apply: "Apply",
+		errorLoadingData: "Failed to load records",
+		unexpectedErrorOccurred: "An unexpected error occurred while communicating with the server.",
+		tryAdjustingSearch: "Try adjusting your search criteria or clear active filters.",
+		more: "More",
+		cards: "Cards View",
+		systemOnline: "System Online",
 	},
 	header: {
 		goodMorning: "Good Morning",
@@ -174,6 +187,10 @@ export const en = {
 		dataMigration: "Data Migration",
 		profileSettings: "Profile Settings",
 		signOut: "Sign Out",
+		stocks: "Stocks",
+		suppliers: "Suppliers",
+		collapse: "Collapse",
+		expand: "Expand sidebar",
 	},
 	auth: {
 		signInTitle: "Welcome back",
@@ -228,10 +245,8 @@ export const en = {
 	},
 	dashboard: {
 		title: "Executive Intelligence",
-		description:
-			"Comprehensive financial reporting, dynamic time-series metrics, and period-over-period income variance.",
-		welcomeMessage:
-			"Here is your business overview and operational metrics today.",
+		description: "Comprehensive financial reporting, dynamic time-series metrics, and period-over-period income variance.",
+		welcomeMessage: "Here is your business overview and operational metrics today.",
 		kpiRevenue: "Total Revenue",
 		kpiGrossSales: "Gross Sales",
 		kpiGrossProfit: "Gross Profit",
@@ -257,8 +272,7 @@ export const en = {
 		lowStockNotice: "Items require immediate stock replenishment",
 		recentInvoices: "Recent Invoices",
 		recentFeedback: "Recent Customer Feedback & CSAT Evaluations",
-		recentFeedbackSub:
-			"Real-time evaluation submissions and customer satisfaction ratings",
+		recentFeedbackSub: "Real-time evaluation submissions and customer satisfaction ratings",
 		feedbackPortal: "Feedback Portal",
 		exportData: "Export",
 		submissionId: "Submission ID",
@@ -272,7 +286,6 @@ export const en = {
 		lastUpdated: "Last updated",
 		filterStaff: "Filter by Staff",
 		allStaff: "All Staff",
-		// Time Series Widget
 		timeSeriesTrends: "Performance Timeline & Trends",
 		tabRevenue: "Revenue",
 		tabOrders: "Orders",
@@ -295,7 +308,6 @@ export const en = {
 		noRevenueData: "No revenue data recorded for this period.",
 		noOrdersData: "No order or invoice data recorded for this period.",
 		noPaymentsData: "No collection inflow recorded for this period.",
-		// Top Products Widget
 		topPerformingProducts: "Top Performing Products",
 		noTopProducts: "No product performance records found for this period.",
 		showingTopItems: "Showing top {count} items from {type}",
@@ -304,10 +316,8 @@ export const en = {
 		productCatalog: "Product Catalog",
 		unitsSold: "Units Sold",
 		avgUnitPrice: "Avg {price}/unit",
-		// Income Variance Widget
 		incomeVarianceTitle: "Income Variance & Period Comparison",
-		incomeVarianceSubtitle:
-			"Historical variance and benchmark against prior financial horizons",
+		incomeVarianceSubtitle: "Historical variance and benchmark against prior financial horizons",
 		horizonsTracked: "Horizons Tracked",
 		selectedPeriodLabel: "Selected Period",
 		current: "Current",
@@ -324,8 +334,7 @@ export const en = {
 	},
 	orders: {
 		title: "Sales Orders",
-		subtitle:
-			"End-to-end order processing, warehouse verification, multi-level approvals, and invoicing.",
+		subtitle: "End-to-end order processing, warehouse verification, multi-level approvals, and invoicing.",
 		createOrder: "Create Order",
 		posStudio: "POS Studio",
 		orderNumber: "Order #",
@@ -358,10 +367,8 @@ export const en = {
 		cloneOrder: "Clone Order",
 		cloneOrderDesc: "Create a new sales order with items and details copied from this order",
 		noOrders: "No orders found",
-		// POS Ordering Studio Modal Keys
 		posStudioTitle: "POS Ordering Studio",
-		posStudioSubtitle:
-			"Create / Configure Multi-Item Order with live pricing, warehouse routing, and real-time inventory reservations.",
+		posStudioSubtitle: "Create / Configure Multi-Item Order with live pricing, warehouse routing, and real-time inventory reservations.",
 		searchCatalogPlaceholder: "Search products by name, SKU, or barcode...",
 		allCategories: "All Categories",
 		standardItem: "Standard Item",
@@ -371,8 +378,7 @@ export const en = {
 		selectUnit: "Select Unit",
 		orderList: "Order Items & Add-ons",
 		orderListEmpty: "Your order list is empty",
-		orderListEmptyDesc:
-			"Select products from the left catalog to add standard or free add-on items with live price calculation.",
+		orderListEmptyDesc: "Select products from the left catalog to add standard or free add-on items with live price calculation.",
 		standardOrderItems: "Standard Order Items",
 		complimentaryAddons: "Complimentary Add-ons",
 		clearAll: "Clear All",
@@ -399,11 +405,14 @@ export const en = {
 		inStock: "In Stock",
 		outOfStock: "Out of Stock",
 		pricingTier: "Pricing Tier",
+		editOrder: "Edit Order",
+		saleManagerApproved: "Sale Manager Approved",
+		saleManagerApprove: "Sale Manager Approve",
+		paymentTerm: "Payment Term",
 	},
 	products: {
 		title: "Product Catalog",
-		subtitle:
-			"Manage product variants, multi-unit conversions, barcodes, and inventory pricing tiers.",
+		subtitle: "Manage product variants, multi-unit conversions, barcodes, and inventory pricing tiers.",
 		addNewProduct: "New Product",
 		productName: "Product Name",
 		sku: "SKU Code",
@@ -429,10 +438,8 @@ export const en = {
 		allCategories: "All Categories",
 		allBrands: "All Brands",
 		totalProducts: "Total Products",
-		// Modals in Product Page
 		mapUnitModalTitle: "Map Secondary Unit of Measure",
-		mapUnitModalSubtitle:
-			"Configure conversion multipliers, tier pricing, and variant overrides",
+		mapUnitModalSubtitle: "Configure conversion multipliers, tier pricing, and variant overrides",
 		targetUnit: "Target Unit",
 		baseUnit: "Base Unit",
 		multiplierQty: "Conversion(1 Unit = X Base)",
@@ -445,8 +452,7 @@ export const en = {
 		samePriceAllVariants: "Apply Same Unit Price Across All Variants",
 		customPricePerVariant: "Custom Price per Variant",
 		priceHistoryModalTitle: "Price History & Audit Matrix",
-		priceHistoryModalSubtitle:
-			"Comprehensive audit trail of selling price adjustments and unit conversions",
+		priceHistoryModalSubtitle: "Comprehensive audit trail of selling price adjustments and unit conversions",
 		timelineView: "Timeline View",
 		matrixView: "Pricing Matrix",
 		priceChange: "Price Change",
@@ -469,14 +475,12 @@ export const en = {
 		createUnit: "Create Unit",
 		editUnit: "Edit Unit",
 		selectMedia: "Select Media & Attachments",
-		selectMediaDesc:
-			"Browse existing uploaded assets or upload new files directly to storage.",
+		selectMediaDesc: "Browse existing uploaded assets or upload new files directly to storage.",
 		mediaLibrary: "Media Library",
 		uploadNew: "Upload New",
 		searchFileName: "Search file name...",
 		noAttachmentsFound: "No attachments found",
-		noAttachmentsDesc:
-			"Upload new media files or try adjusting your search filters.",
+		noAttachmentsDesc: "Upload new media files or try adjusting your search filters.",
 		useSelected: "Use Selected",
 		unitConversionHierarchy: "Unit Conversion Hierarchy",
 		noUnitData: "No unit conversion data available.",
@@ -511,8 +515,7 @@ export const en = {
 		tagsOverviewRemarks: "Tags & Overview Remarks",
 		restoreAsset: "Restore Product",
 		noDynamicAttributes: "No dynamic attributes configured",
-		noDescriptionRegistered:
-			"No specific detailed remarks or technical notes registered.",
+		noDescriptionRegistered: "No specific detailed remarks or technical notes registered.",
 		samePriceAcrossVariants: "Same Price across variants",
 		customVariantPrices: "Custom Variant Price(s)",
 		baseReference: "Base Reference",
@@ -530,18 +533,15 @@ export const en = {
 		lowStockThreshold: "Low Stock Alert Threshold",
 		discountNote: "Discount Note / Special Terms",
 		detailedDescription: "Detailed Description",
-		detailedDescriptionPlaceholder:
-			"Features, technical specifications, and condition detail remarks...",
+		detailedDescriptionPlaceholder: "Features, technical specifications, and condition detail remarks...",
 		productImage: "Product Image",
-		uploadImageDesc:
-			"Upload a high quality product photo or choose from your media vault.",
+		uploadImageDesc: "Upload a high quality product photo or choose from your media vault.",
 		dropOrClickToUpload: "Click or drag to upload product image",
 		primaryProductPhoto: "Primary Product Photo",
 		uploadFromComputer: "Upload from Computer",
 		chooseFromVault: "Choose from Vault",
 		productVariantsGenerator: "Product Variants Generator",
-		generateVariantsDesc:
-			"Generate matrix variants based on attributes (Color, Size, etc.).",
+		generateVariantsDesc: "Generate matrix variants based on attributes (Color, Size, etc.).",
 		enableVariants: "Enable Variants?",
 		attributesAndValues: "Product Attributes & Values",
 		addAttributeBox: "+ Add Attribute Box",
@@ -554,8 +554,7 @@ export const en = {
 		combination: "Combination",
 		include: "Include",
 		exclude: "Exclude",
-		optionalPhysicalSpecs:
-			"Optional Specifications: Physical packaging, shipping weight, and dimensions for this product. All fields are optional and not required.",
+		optionalPhysicalSpecs: "Optional Specifications: Physical packaging, shipping weight, and dimensions for this product. All fields are optional and not required.",
 		netWeight: "Net Wt (kg)",
 		grossWeight: "Gross Wt (kg)",
 		height: "Height (cm)",
@@ -596,16 +595,22 @@ export const en = {
 		addCategory: "Add Category",
 		addBrand: "Add Brand",
 		addUnit: "Add Unit",
+		clickToUpload: "Click to browse photo",
+		addPhoto: "Add Photo",
+		tags: "Tags",
+		tagsPlaceholder: "Search existing tags or type to create new...",
+		discountAndNotes: "Discount & Notes",
+		variants: "Variants",
+		searchProductsPlaceholder: "Search products by code, barcode, title, brand...",
 	},
 	invoices: {
 		title: "Invoices & Billing",
-		subtitle:
-			"Manage tax receipts, KHQR Bakong payments, receivables tracking, void, and refund operations.",
+		subtitle: "Manage tax receipts, KHQR Bakong payments, receivables tracking, void, and refund operations.",
 		createInvoice: "New Invoice",
 		refetchInvoices: "Refetch Invoices",
 		refetchedSuccess: "Invoices refetched successfully",
 		quickPay: "Quick Pay",
-		khqrPayment: "ABA KHQR",
+		khqrPayment: "ABA KHQR (Scan to Pay)",
 		printReceipt: "Print Receipt",
 		invoiceNumber: "Invoice #",
 		customer: "Customer",
@@ -633,15 +638,13 @@ export const en = {
 		paymentHistory: "Payment History",
 		changePaymentTerm: "Change Payment Term",
 		changePaymentTermTitle: "Change Payment Term",
-		changePaymentTermSubtitle:
-			"Update credit term and payment due date schedule",
+		changePaymentTermSubtitle: "Update credit term and payment due date schedule",
 		voidInvoice: "Void Invoice",
 		refundInvoice: "Refund Invoice",
 		payWithKhqr: "Pay with ABA KHQR",
 		scanKhqrToPay: "Scan KHQR with any Cambodian Banking App",
 		invoiceDetails: "Invoice Statement Details",
-		invoiceDetailsSubtitle:
-			"Detailed breakdown of items, financial summary, and payment status.",
+		invoiceDetailsSubtitle: "Detailed breakdown of items, financial summary, and payment status.",
 		recordPayment: "Record Payment",
 		itemsPurchased: "Items Purchased",
 		financialBreakdown: "Financial Breakdown",
@@ -674,10 +677,17 @@ export const en = {
 		restockInventory: "Restock Returned Inventory",
 		restockInventoryDesc: "Return items back into warehouse available stock",
 		paymentHistoryTitle: "Payment Settlement History",
-		paymentHistorySubtitle:
-			"Complete record of settlement payments, received staff, and outstanding balance breakdown.",
+		paymentHistorySubtitle: "Complete record of settlement payments, received staff, and outstanding balance breakdown.",
 		payOutstanding: "Pay Outstanding",
 		noPaymentsRecorded: "No settlement payments recorded for this invoice yet.",
+		issueCreditNote: "Issue Credit Note",
+		creditNoteIssued: "Credit Note Issued",
+		confirmAndSubmitPayment: "Confirm & Submit Payment",
+		paymentAmount: "Payment Amount",
+		paymentMethod: "Payment Method",
+		referenceNumber: "Reference Number",
+		notesDescription: "Notes & Description",
+		status: "Invoice Status",
 	},
 	quickPay: {
 		modalTitle: "Quick Payment Settlement",
@@ -696,11 +706,11 @@ export const en = {
 		notesPlaceholder: "e.g. Bank transfer settlement payment collected...",
 		recordPayment: "Record Payment & Issue Receipt",
 		paymentRecordedSuccess: "Payment recorded successfully!",
+		receiptAttachment: "Payment Receipt / Transfer Slip (Optional)",
 	},
 	stocks: {
 		title: "Stock & Inventory",
-		subtitle:
-			"Real-time warehouse stock balance, low-stock warnings, inventory adjustments, and transfers.",
+		subtitle: "Real-time warehouse stock balance, low-stock warnings, inventory adjustments, and transfers.",
 		searchStockTab: "Search Stock",
 		lowStockTab: "Low Stock Alert",
 		outOfStockTab: "Out of Stock",
@@ -724,18 +734,14 @@ export const en = {
 		soldQuantity: "Sold",
 		allMovements: "All Movements",
 		movementHistory: "Movement History",
-		movementHistorySubtitle:
-			"Audit trail of inbound imports, outbound sales orders, transfers, and stock adjustments.",
+		movementHistorySubtitle: "Audit trail of inbound imports, outbound sales orders, transfers, and stock adjustments.",
 		adjustStockTitle: "Adjust Warehouse Stock",
-		adjustStockSubtitle:
-			"Reconcile physical inventory discrepancies with audit notes and quantity changes.",
+		adjustStockSubtitle: "Reconcile physical inventory discrepancies with audit notes and quantity changes.",
 		importStockTitle: "Import Stock / Inbound Shipments",
-		importStockSubtitle:
-			"Record supplier purchases, landed cost breakdown, and warehouse receiving.",
+		importStockSubtitle: "Record supplier purchases, landed cost breakdown, and warehouse receiving.",
 		unitCost: "Unit Cost",
 		physical: "Physical",
-		searchPlaceholder:
-			"Search products by title, SKU, barcode... (Press / to focus)",
+		searchPlaceholder: "Search products by title, SKU, barcode... (Press / to focus)",
 		allCategories: "All Categories",
 		manifest: "Manifest",
 		items: "Items",
@@ -752,8 +758,7 @@ export const en = {
 		processing: "Processing...",
 		loadingInventory: "Loading catalog inventory...",
 		noProductsFound: "No products found",
-		noProductsMatchDesc:
-			"No products matched your search or category filter. Try changing your search query.",
+		noProductsMatchDesc: "No products matched your search or category filter. Try changing your search query.",
 		currentStock: "Current Stock",
 		selectVariant: "Select Variant",
 		adjust: "Adjust",
@@ -778,10 +783,8 @@ export const en = {
 		adjustmentItems: "Adjustment Items",
 		inboundLineItems: "Inbound Line Items",
 		noItemsInManifest: "No items in manifest",
-		noItemsManifestDescAdjustment:
-			"Click on any product from the catalog on the left to select items for stock audit adjustment.",
-		noItemsManifestDescImport:
-			"Click on any product from the catalog on the left to add items to this inbound shipment.",
+		noItemsManifestDescAdjustment: "Click on any product from the catalog on the left to select items for stock audit adjustment.",
+		noItemsManifestDescImport: "Click on any product from the catalog on the left to add items to this inbound shipment.",
 		adjustmentQty: "Adjustment Qty",
 		projectedBalance: "Projected Balance",
 		itemSpecificReason: "Item Specific Reason",
@@ -791,8 +794,7 @@ export const en = {
 		quantity: "Quantity",
 		retailPrice: "Retail Price ($)",
 		receivingNotes: "Receiving Notes / Shipment Details",
-		receivingNotesPlaceholder:
-			"e.g. Bulk shipment from primary supplier, container #451...",
+		receivingNotesPlaceholder: "e.g. Bulk shipment from primary supplier, container #451...",
 		totalItems: "Total Items",
 		totalQuantityImpact: "Total Quantity Impact",
 		totalQuantity: "Total Quantity",
@@ -803,16 +805,16 @@ export const en = {
 		packagingUnit: "Packaging Unit",
 		addToManifest: "Add to Manifest",
 		quickRegisterSupplier: "Quick Register Supplier",
-		quickRegisterSupplierSubtitle:
-			"Add a new vendor to your procurement directory.",
+		quickRegisterSupplierSubtitle: "Add a new vendor to your procurement directory.",
 		supplierName: "Supplier Company Name",
 		supplierPhone: "Phone Number",
 		saveSupplier: "Save Supplier",
+		notes: "Notes",
+		netBalanceImpact: "Net Impact",
 	},
 	customers: {
 		title: "Customer Management",
-		subtitle:
-			"Manage client directory, shop locations, visit cycles, and balances",
+		subtitle: "Manage client directory, shop locations, visit cycles, and balances",
 		addNewCustomer: "Add Customer",
 		customerName: "Customer Name",
 		phone: "Phone Number",
@@ -847,8 +849,7 @@ export const en = {
 		editProfile: "Edit Profile",
 		createCustomer: "Create Customer",
 		updateCustomer: "Update Customer",
-		modalSubtitle:
-			"Register customer store details, assign company staff, configure routes, and specify GPS coordinates.",
+		modalSubtitle: "Register customer store details, assign company staff, configure routes, and specify GPS coordinates.",
 		primaryPhone: "Primary Phone Number",
 		alternateContact: "Alternate Contact",
 		contactPerson: "Contact Person",
@@ -881,11 +882,9 @@ export const en = {
 		positionRole: "Position / Role",
 		secondaryPhone: "Secondary Phone",
 		setAsPrimaryContact: "Set as Primary Contact",
-		deleteShopContactConfirm:
-			"Are you sure you want to delete this shop contact?",
+		deleteShopContactConfirm: "Are you sure you want to delete this shop contact?",
 		financialTitle: "Customer Financial & Activity Performance",
-		financialSubtitle:
-			"Aggregated metrics for orders, invoices, gross revenue, profit margins, and collections",
+		financialSubtitle: "Aggregated metrics for orders, invoices, gross revenue, profit margins, and collections",
 		last30Days: "Last 30 Days",
 		last90Days: "90 Days",
 		last1Year: "1 Year",
@@ -901,19 +900,16 @@ export const en = {
 		revenueTrendTitle: "Net Revenue & Gross Profit Trend",
 		ordersTrendTitle: "Orders & Invoices Volume",
 		paymentsTrendTitle: "Payment Collections Over Time",
-		timeSeriesSubtitle:
-			"Historical time-series breakdown across active timeframe",
+		timeSeriesSubtitle: "Historical time-series breakdown across active timeframe",
 		revenueAndProfit: "Revenue & Profit",
 		ordersAndInvoices: "Orders & Invoices",
 		payments: "Payments",
 		visitTimelineTitle: "Field Visit Timeline",
-		visitTimelineSubtitle:
-			"Chronological history of sales visits and client check-ins",
+		visitTimelineSubtitle: "Chronological history of sales visits and client check-ins",
 		recordNewVisit: "Record New Visit",
 		conductedOnsiteVisit: "conducted on-site visit",
 		noVisitsYet: "No visits recorded yet",
-		visitSyncDesc:
-			"Keep your team in sync by logging on-site visits, inventory observations, and meeting feedback.",
+		visitSyncDesc: "Keep your team in sync by logging on-site visits, inventory observations, and meeting feedback.",
 		recordFirstVisit: "Record First Visit",
 		recentOrdersTitle: "Recent Sales Orders",
 		recentOrdersSubtitle: "Orders placed by this customer store",
@@ -924,16 +920,16 @@ export const en = {
 		date: "Date",
 		status: "Status",
 		totalAmount: "Total Amount",
+		inactivatedSuccess: "Customer deactivated successfully",
+		restoredSuccess: "Customer restored successfully",
 	},
 	departments: {
 		title: "Departments Directory",
-		subtitle:
-			"Manage company operating departments and parent division assignments.",
+		subtitle: "Manage company operating departments and parent division assignments.",
 		addDepartment: "Add Department",
 		createDepartment: "Create New Department",
 		editDepartment: "Edit Department",
-		modalSubtitle:
-			"Configure department specifications and parent organizational division.",
+		modalSubtitle: "Configure department specifications and parent organizational division.",
 		departmentName: "Department Name",
 		parentDivision: "Parent Division",
 		description: "Description",
@@ -947,8 +943,7 @@ export const en = {
 	},
 	suppliers: {
 		title: "Suppliers Directory",
-		subtitle:
-			"Manage procurement vendors, primary contact phones, and company accounts",
+		subtitle: "Manage procurement vendors, primary contact phones, and company accounts",
 		addSupplier: "Add Supplier",
 		createSupplier: "Create New Supplier",
 		editSupplier: "Edit Supplier",
@@ -969,13 +964,11 @@ export const en = {
 	},
 	deliveries: {
 		title: "Delivery Carriers & Logistics",
-		subtitle:
-			"Manage dispatch drivers, transport vehicle types, and province coverage",
+		subtitle: "Manage dispatch drivers, transport vehicle types, and province coverage",
 		addCarrier: "Add Carrier",
 		createCarrier: "Register New Delivery Carrier",
 		editCarrier: "Edit Delivery Carrier",
-		modalSubtitle:
-			"Register fleet transport specs, driver contact numbers, and province routes.",
+		modalSubtitle: "Register fleet transport specs, driver contact numbers, and province routes.",
 		carrierCode: "Carrier Code",
 		carrierName: "Carrier Name",
 		deliveryType: "Delivery Type",
@@ -1010,8 +1003,7 @@ export const en = {
 	},
 	feedback: {
 		title: "Customer Feedback & Surveys",
-		subtitle:
-			"Manage survey templates, question bank, CSAT scores, and customer response submissions",
+		subtitle: "Manage survey templates, question bank, CSAT scores, and customer response submissions",
 		templatesTab: "Survey Templates",
 		questionsTab: "Question Bank",
 		submissionsTab: "Submissions & Responses",
@@ -1052,8 +1044,7 @@ export const en = {
 		questionsCount: "questions",
 		noQuestionsAssigned: "No questions assigned",
 		selectTemplateToPreview: "Select Survey Template to Preview Submissions",
-		clickTemplateDesc:
-			"Click on any template to dynamically inspect its customer evaluations via",
+		clickTemplateDesc: "Click on any template to dynamically inspect its customer evaluations via",
 		activeId: "Active ID",
 		selectedTemplate: "Selected Template",
 		customerSubmissionsFor: "Customer Submissions for",
@@ -1063,8 +1054,7 @@ export const en = {
 	},
 	inventory: {
 		title: "Inventory & Products",
-		subtitle:
-			"Real-time stock balance, multi-unit SKU catalog, and warehouse routing",
+		subtitle: "Real-time stock balance, multi-unit SKU catalog, and warehouse routing",
 		addNewProduct: "New Product",
 		productName: "Product Name",
 		sku: "SKU Code",
@@ -1080,8 +1070,7 @@ export const en = {
 	},
 	finance: {
 		title: "Invoices & Billing",
-		subtitle:
-			"Create tax receipts, KHQR Bakong payments, and receivables management",
+		subtitle: "Create tax receipts, KHQR Bakong payments, and receivables management",
 		createInvoice: "New Invoice",
 		invoiceNumber: "Invoice #",
 		customer: "Customer",
@@ -1102,22 +1091,19 @@ export const en = {
 	},
 	configurations: {
 		title: "System Configurations",
-		subtitle:
-			"Manage operational parameters, visit tracking lifecycle rules, and system rules.",
+		subtitle: "Manage operational parameters, visit tracking lifecycle rules, and system rules.",
 		systemWideScope: "System Wide Scope",
 		companyId: "Company ID: {{id}}",
 		apiUnavailable: "API Unavailable",
 		refreshSettings: "Refresh settings",
 		searchPlaceholder: "Search all configuration settings by keyword or key...",
 		noConfigurationsFound: "No configurations found",
-		noConfigurationsDesc:
-			"The API returned no configuration data. Configurations may not have been seeded yet for this company.",
+		noConfigurationsDesc: "The API returned no configuration data. Configurations may not have been seeded yet for this company.",
 		noSearchResults: "No configuration settings found",
-		noSearchResultsDesc: 'We couldn\'t find any settings matching "{{query}}".',
+		noSearchResultsDesc: "We couldn't find any settings matching \"{{query}}\".",
 		clearSearch: "Clear search",
 		failedLoad: "Failed to load configurations",
-		failedLoadDesc:
-			"Could not connect to the backend API. Please check that the service is running and you are authenticated.",
+		failedLoadDesc: "Could not connect to the backend API. Please check that the service is running and you are authenticated.",
 		retry: "Retry",
 		controls: "controls",
 		settings: "settings",
@@ -1172,13 +1158,11 @@ export const en = {
 			"Approval Thresholds": "Approval Thresholds",
 			"Workflow Schema Rules": "Workflow Schema Rules",
 			"Purchase Order Approval Chain": "Purchase Order Approval Chain",
-			"Invoice Discount Approval Threshold":
-				"Invoice Discount Approval Threshold",
+			"Invoice Discount Approval Threshold": "Invoice Discount Approval Threshold",
 			"Payment Gateways & KHQR": "Payment Gateways & KHQR",
 			"KHQR & Bank Settlement Gateways": "KHQR & Bank Settlement Gateways",
 			"Early Settlement Discounts": "Early Settlement Discounts",
-			"Early Payment Discounts & Credit Terms":
-				"Early Payment Discounts & Credit Terms",
+			"Early Payment Discounts & Credit Terms": "Early Payment Discounts & Credit Terms",
 			"Early Payment Discount Tiers": "Early Payment Discount Tiers",
 		},
 		items: {
@@ -1434,8 +1418,7 @@ export const en = {
 	},
 	subscriptions: {
 		title: "Subscription & Plans",
-		subtitle:
-			"Unified subscription lifecycle, feature gating catalog, pricing matrix, and enterprise entitlements.",
+		subtitle: "Unified subscription lifecycle, feature gating catalog, pricing matrix, and enterprise entitlements.",
 		activePlan: "Active Plan",
 		adminMode: "Admin Mode",
 		sync: "Sync",
@@ -1472,24 +1455,19 @@ export const en = {
 			activating: "Activating...",
 			cancelPlan: "Cancel Plan",
 			managedSubscriptionTitle: "Managed Subscription",
-			managedSubscriptionDesc:
-				"Subscription plan tier and billing cycles are managed centrally by the platform administrator.",
+			managedSubscriptionDesc: "Subscription plan tier and billing cycles are managed centrally by the platform administrator.",
 			gracePeriodTitle: "Payment Past Due (Grace Period Active)",
-			gracePeriodDesc:
-				"Payment renewal could not be settled. System features remain active for 3 more days until grace period expires.",
+			gracePeriodDesc: "Payment renewal could not be settled. System features remain active for 3 more days until grace period expires.",
 			teamSeatAllocation: "Team Seat Allocation",
 			teamSeatDesc: "{{current}} of {{max}} user seats assigned ({{percent}}%)",
-			activeFeatureEntitlements:
-				"Active Plan Feature Entitlements ({{count}} enabled)",
-			activeFeatureEntitlementsDesc:
-				"Granular capabilities and system permissions unlocked under the active plan tier.",
+			activeFeatureEntitlements: "Active Plan Feature Entitlements ({{count}} enabled)",
+			activeFeatureEntitlementsDesc: "Granular capabilities and system permissions unlocked under the active plan tier.",
 			gatedAndVerified: "Gated & Verified",
 			includedInTier: "Included in Tier",
 			statusActive: "Status: Active",
 			transparentPlans: "Transparent Subscription Plans",
 			chooseTierTitle: "Choose the Perfect Tier for Your Business",
-			chooseTierDesc:
-				"Scale seamlessly from startup to enterprise with flexible billing cycles and granular feature flags.",
+			chooseTierDesc: "Scale seamlessly from startup to enterprise with flexible billing cycles and granular feature flags.",
 			monthlyBilling: "Monthly Billing",
 			yearlyBilling: "Yearly Billing",
 			save20: "Save 20%",
@@ -1502,6 +1480,20 @@ export const en = {
 			upgradeViaAdmin: "Upgrade via Admin",
 			perYear: "year",
 			perMonth: "month",
+			noSubscription: "No Active Subscription",
+			noTier: "NO TIER",
+			noActiveSubscriptionDesc: "This company currently has no active subscription. Choose a tier from the catalog below or start a 14-day free trial.",
+			registeredUsers: "registered team member(s)",
+			choosePlan: "Choose Subscription Plan",
+			teamSeatNoLimit: "{{current}} team member(s) registered (No plan seat limit applied)",
+			noPlanFeatures: "No specific feature flags are attached to this plan tier.",
+			subscribeToUnlockFeatures: "No active feature entitlements. Subscribe to a plan below to activate CRM capabilities.",
+			currentActivePlanBadge: "Active Plan",
+			activeCycleBadge: "Active ({{cycle}})",
+			freeTrialDesc: "14-Day Free Evaluation • Zero Cost",
+			standardPricing: "Standard Tier Pricing",
+			switchToYearly: "Switch to Yearly Billing",
+			switchToMonthly: "Switch to Monthly Billing",
 		},
 		subscribeModal: {
 			title: "Subscribe to {{name}}",
@@ -1522,23 +1514,18 @@ export const en = {
 			title: "Cancel Active Subscription",
 			desc: "Confirm cancellation preferences for this tenant company.",
 			termsTitle: "Cancellation Terms",
-			termsDesc:
-				"The subscription will remain active until the end of the current billing cycle unless you select immediate termination.",
+			termsDesc: "The subscription will remain active until the end of the current billing cycle unless you select immediate termination.",
 			immediateTitle: "Immediate Cancellation",
-			immediateDesc:
-				"Cancel immediately and terminate feature entitlements right now instead of at the end of the billing period.",
+			immediateDesc: "Cancel immediately and terminate feature entitlements right now instead of at the end of the billing period.",
 			reasonLabel: "Reason for Cancellation",
-			reasonPlaceholder:
-				"Tell us why you are canceling or what could be improved...",
+			reasonPlaceholder: "Tell us why you are canceling or what could be improved...",
 			cancelling: "Cancelling...",
 			confirmCancellation: "Confirm Cancellation",
 		},
 		auditHistory: {
 			title: "Subscription Audit History Log",
-			subtitle:
-				"Full immutable event trail of plan upgrades, renewals, trial starts, and tenant state transitions.",
-			searchPlaceholder:
-				"Search audit trail by company, plan, user, or reason...",
+			subtitle: "Full immutable event trail of plan upgrades, renewals, trial starts, and tenant state transitions.",
+			searchPlaceholder: "Search audit trail by company, plan, user, or reason...",
 			allActions: "All Actions",
 			upgrade: "Upgrade",
 			trialStart: "Trial Start",
@@ -1547,8 +1534,7 @@ export const en = {
 			renew: "Renew",
 			cancel: "Cancel",
 			noAuditLogs: "No audit logs found",
-			noAuditLogsDesc:
-				"No subscription change events have been recorded for this company context.",
+			noAuditLogsDesc: "No subscription change events have been recorded for this company context.",
 			viewDetails: "View Details",
 			columns: {
 				timestamp: "Timestamp & Event",
@@ -1565,6 +1551,15 @@ export const en = {
 				statusShift: "Status Shift",
 				remarkNotes: "Remark & Notes",
 			},
+			createdBy: "Created by ID: #{{id}}",
+			planCancelled: "Plan Cancelled",
+			actionUpgrade: "Upgrade",
+			actionTrialStart: "Trial Start",
+			actionSubscribe: "Subscribe",
+			actionDowngrade: "Downgrade",
+			actionCancel: "Cancel",
+			emptyTitle: "No subscription audit log entries found",
+			emptyDesc: "Subscription changes, upgrades, and trial activations will be recorded here automatically.",
 		},
 		auditDetailModal: {
 			title: "Subscription Audit Detail #{{id}}",
@@ -1590,11 +1585,24 @@ export const en = {
 			unchangedFeatures: "Unchanged Features ({{count}})",
 			noChanges: "No feature entitlement changes recorded for this event.",
 			close: "Close Audit Inspector",
+			planRateModel: "Plan Rate & Billing Model",
+			validityPeriod: "Subscription Validity Period",
+			startDate: "Start / Subscribe Date",
+			endDate: "End / Expire Date",
+			transitionTitle: "Plan Tier & Capability Transition",
+			previousPlan: "Previous Plan",
+			featuresCount: "{{count}} Features",
+			noPriorPlan: "No Prior Plan",
+			newActivePlan: "New Active Plan",
+			planCancelledSuspended: "Plan Cancelled / Suspended",
+			featureComparisonEvaluated: "Feature Entitlements Comparison ({{count}} items evaluated)",
+			newlyAdded: "Newly Added",
+			included: "Included",
+			removed: "Removed",
 		},
 		monitorTab: {
 			title: "Company Subscriptions Monitor",
-			subtitle:
-				"System Admin oversight of active corporate subscriptions, MRR revenue metrics, and renewal dates across all tenants.",
+			subtitle: "System Admin oversight of active corporate subscriptions, MRR revenue metrics, and renewal dates across all tenants.",
 			totalCompanies: "Total Companies",
 			activeSubscriptions: "Active Subscriptions",
 			trialCompanies: "Free Trials",
@@ -1611,9 +1619,9 @@ export const en = {
 			gridView: "Grid View",
 			tableView: "Table View",
 			dispatchSubscription: "Dispatch Subscription",
-			inspectEntitlement: "Inspect Entitlements",
+			inspectEntitlement: "Inspect Details",
 			renewingOn: "Renews on {{date}}",
-			noActiveSub: "No Active Subscription",
+			noActiveSub: "No Active Sub",
 			columns: {
 				company: "Company / Tenant",
 				activePlan: "Active Plan Tier",
@@ -1623,11 +1631,12 @@ export const en = {
 				userSeats: "User Seats",
 				actions: "Actions",
 			},
+			unnamedPlan: "Active Plan",
+			noPlan: "None",
 		},
 		featuresTab: {
 			title: "Feature Gating Catalog",
-			subtitle:
-				"Manage granular system capabilities and feature flags for subscription entitlement packages.",
+			subtitle: "Manage granular system capabilities and feature flags for subscription entitlement packages.",
 			registerFeature: "Register New Feature",
 			searchPlaceholder: "Search feature code, name, or description...",
 			active: "Active",
@@ -1639,36 +1648,54 @@ export const en = {
 				status: "Status",
 				createdAt: "Created Date",
 				actions: "Actions",
+				code: "Feature Code",
+				name: "Feature Name",
+				registeredDate: "Registered Date",
 			},
 			edit: "Edit Feature",
 			deactivate: "Deactivate Feature",
 			restore: "Restore Feature",
 			modal: {
-				createTitle: "Register System Feature Flag",
-				createDesc:
-					"Define a unique feature code and user-facing title to unlock in subscription tiers.",
-				editTitle: "Edit Feature Flag",
+				createTitle: "Register New Feature",
+				createDesc: "Define a unique feature code and user-facing title to unlock in subscription tiers.",
+				editTitle: "Edit Feature Definition",
 				editDesc: "Update capability details and descriptions.",
-				codeLabel: "Feature Code (Uppercase Unique)",
-				codePlaceholder: "e.g. ADVANCED_REPORTS",
-				codeHelper:
-					"Used in code entitlement checks: entitlement.featureCodes.includes(code)",
-				nameLabel: "Feature Display Name",
-				namePlaceholder: "e.g. Advanced Analytics & Cohorts",
+				codeLabel: "Feature Code",
+				codePlaceholder: "e.g. ADVANCED_ANALYTICS",
+				codeHelper: "Unique uppercase system identifier (e.g. CONTACT_MGMT, DEAL_PIPELINE)",
+				nameLabel: "Feature Name",
+				namePlaceholder: "e.g. Advanced Analytics & Funnels",
 				descLabel: "Description",
-				descPlaceholder:
-					"Detail what capabilities this feature flag unlocks for users...",
+				descPlaceholder: "Describe what capabilities this feature unlocks in the platform...",
 				confirmDeleteTitle: "Deactivate Feature",
-				confirmDeleteDesc:
-					"Are you sure you want to deactivate feature '{{name}}'? Plans referencing this feature code will no longer grant access.",
+				confirmDeleteDesc: "Are you sure you want to deactivate feature '{{name}}'? Plans referencing this feature code will no longer grant access.",
 				deactivating: "Deactivating...",
 				confirmDeactivate: "Confirm Deactivation",
+				desc: "Configure feature keys for role and plan entitlements gating.",
+				saveChanges: "Save Changes",
+				createFeature: "Create Feature",
+			},
+			statusActive: "Active",
+			statusInactive: "Disabled",
+			actions: {
+				edit: "Edit",
+				restore: "Restore Feature",
+				archive: "Delete",
+			},
+			createButton: "Create Feature",
+			emptyTitle: "No features found",
+			emptyDesc: "Try adjusting your search criteria or register a new feature code.",
+			archiveModal: {
+				title: "Deactivate Feature",
+				desc: "Are you sure you want to deactivate this feature? It will be removed from future plan assignments.",
+				confirmMessage: "Deactivating {{code}} ({{name}}) will flag this entitlement as inactive. You can restore it at any time.",
+				deactivating: "Deactivating...",
+				confirm: "Deactivate Feature",
 			},
 		},
 		plansTab: {
 			title: "Plans & Pricing Matrix Management",
-			subtitle:
-				"Configure subscription tiers, max user seat allocations, feature packages, and billing cycle rates.",
+			subtitle: "Configure subscription tiers, max user seat allocations, feature packages, and billing cycle rates.",
 			createPlan: "Create New Plan",
 			createPrice: "Add Plan Price",
 			subscriptionPlansCount: "Subscription Plans ({{count}})",
@@ -1677,8 +1704,7 @@ export const en = {
 			newPlanButton: "New Plan",
 			addPriceTagButton: "Add Price Tag",
 			emptyPlansTitle: "No plans defined",
-			emptyPlansDesc:
-				"Create subscription plans to package features and user seat capacities.",
+			emptyPlansDesc: "Create subscription plans to package features and user seat capacities.",
 			pricesCount: "{{count}} Price(s)",
 			usersMax: "{{count}} max users",
 			entitlementsCount: "{{count}} Entitlements",
@@ -1727,10 +1753,8 @@ export const en = {
 				flagsLabel: "Plan Flags",
 				publicPricing: "Public Pricing Page",
 				freeTrialTier: "Free Trial Tier",
-				descPlaceholder:
-					"Outline who this plan is for and key value propositions...",
-				includedFeaturesChecklist:
-					"Included Features Checklist ({{count}} selected)",
+				descPlaceholder: "Outline who this plan is for and key value propositions...",
+				includedFeaturesChecklist: "Included Features Checklist ({{count}} selected)",
 				selectAll: "Select All",
 				deselectAll: "Deselect All",
 				saveChanges: "Save Plan Changes",
@@ -1748,14 +1772,30 @@ export const en = {
 				intervalUnit: "Interval Unit",
 				durationDays: "Duration Days",
 				durationDaysHelper: "Total validity days",
+				updatePrice: "Update Price",
+				savePrice: "Save Pricing Option",
 			},
+			pricingTreeTitle: "Pricing Tree & Rate Cards",
+			optionSingular: "Option",
+			optionPlural: "Options",
+			pricingTreeDesc: "Configured billing cycles and rate cards for this subscription plan. Click edit on any pricing option to modify.",
+			addPriceOption: "Add Price Option",
+			everyInterval: "Every {{count}} {{unit}}(s)",
+			durationDays: "{{count}} billing days",
+			editPrice: "Edit Price",
+			noPricingAttached: "No Pricing Options Attached",
+			addPriceOptionDesc: "Add monthly, annual, or custom pricing tiers for this plan.",
+			createFirstPriceTag: "Create First Price Tag",
+			priceTag: "Price",
+			removePrice: "Remove Price",
+			emptyPricesTitle: "No pricing intervals found",
+			emptyPricesDesc: "Attach billing cycles and recurring prices to plans.",
 		},
 	},
 	superAdmin: {
 		companies: {
 			title: "Company Tenants & Subscriptions",
-			subtitle:
-				"Manage multi-tenant business accounts, subscription licensing, branch configurations, and geographic locations.",
+			subtitle: "Manage multi-tenant business accounts, subscription licensing, branch configurations, and geographic locations.",
 			syncData: "Sync Data",
 			addCompany: "Add Company",
 			totalCompanies: "Total Companies",
@@ -1772,11 +1812,9 @@ export const en = {
 			paidTab: "Paid Subscriptions",
 			deletedTab: "Inactive / Deleted",
 			listTitle: "Tenants List",
-			searchPlaceholder:
-				"Search company by name, username, email, phone, address, notes...",
+			searchPlaceholder: "Search company by name, username, email, phone, address, notes...",
 			emptyTitle: "No companies found",
-			emptyDesc:
-				"Create a new company tenant or adjust your search filter query.",
+			emptyDesc: "Create a new company tenant or adjust your search filter query.",
 			columns: {
 				companyOwner: "Company & Owner",
 				subscriptionPlan: "Subscription & Plan",
@@ -1796,8 +1834,7 @@ export const en = {
 			},
 			createModal: {
 				title: "Register New Company",
-				subtitle:
-					"Provision a new tenant organization with licensing, owner credentials, and coordinates.",
+				subtitle: "Provision a new tenant organization with licensing, owner credentials, and coordinates.",
 				companyInfo: "Company Information",
 				nameLabel: "Company Name",
 				namePlaceholder: "e.g. Menglang",
@@ -1817,11 +1854,9 @@ export const en = {
 				lngPlaceholder: "e.g. 105.024648",
 				businessOps: "Business Features & Operations",
 				multiBranchLabel: "Multi-Branch Support",
-				multiBranchDesc:
-					"Enable branch hierarchy and multi-location data partitioning",
+				multiBranchDesc: "Enable branch hierarchy and multi-location data partitioning",
 				accountStatusLabel: "Initial Account Status",
-				accountStatusDesc:
-					"Activate company upon creation to grant immediate access",
+				accountStatusDesc: "Activate company upon creation to grant immediate access",
 				ownerCredentials: "Owner Administrative Account Credentials",
 				ownerUsernameLabel: "Owner Initial Username",
 				ownerUsernamePlaceholder: "e.g. admin_menglang",
@@ -1833,14 +1868,12 @@ export const en = {
 			},
 			editModal: {
 				title: "Edit Company Tenant #{{id}}",
-				subtitle:
-					"Update organization profile, location details, branch capabilities, and operational status.",
+				subtitle: "Update organization profile, location details, branch capabilities, and operational status.",
 				saveButton: "Save Changes",
 			},
 			inspectModal: {
 				title: "Company Tenant Operations Overview #{{id}}",
-				subtitle:
-					"Detailed tenant specifications, active subscription state, branch structure, and owner details.",
+				subtitle: "Detailed tenant specifications, active subscription state, branch structure, and owner details.",
 				specsTab: "Overview & Specs",
 				subTab: "Subscription & Plan",
 				branchTab: "Branch Structure",
@@ -1849,8 +1882,7 @@ export const en = {
 		},
 		admins: {
 			title: "Super Administrators Directory",
-			subtitle:
-				"Root governance, security roles, operational support staff, and administrative audit trails.",
+			subtitle: "Root governance, security roles, operational support staff, and administrative audit trails.",
 			syncData: "Sync Data",
 			addAdmin: "Provision Admin",
 			totalAdmins: "Total Super Admins",
@@ -1864,8 +1896,7 @@ export const en = {
 			listTitle: "Super Administrators List",
 			searchPlaceholder: "Search admin by name, username, email, notes...",
 			emptyTitle: "No administrators found",
-			emptyDesc:
-				"Provision a new administrator account or adjust search criteria.",
+			emptyDesc: "Provision a new administrator account or adjust search criteria.",
 			columns: {
 				adminInfo: "Admin Name & Username",
 				email: "Email Address",
@@ -1881,8 +1912,7 @@ export const en = {
 			},
 			createModal: {
 				title: "Provision Super Administrator",
-				subtitle:
-					"Create a new administrative account with designated privilege level and credentials.",
+				subtitle: "Create a new administrative account with designated privilege level and credentials.",
 				displayNameLabel: "Display Name",
 				displayNamePlaceholder: "e.g. Menglang Huo",
 				usernameLabel: "Username",
@@ -1893,13 +1923,11 @@ export const en = {
 				passwordPlaceholder: "••••••••",
 				levelLabel: "Admin Access Level",
 				supportLevelLabel: "Support Team (SUPPORT)",
-				supportLevelDesc:
-					"Operational support, user assistance, and management",
+				supportLevelDesc: "Operational support, user assistance, and management",
 				readOnlyLevelLabel: "Read Only (READ_ONLY)",
 				readOnlyLevelDesc: "View-only access across administrative domains",
 				fullLevelLabel: "Full Administrator (FULL)",
-				fullLevelDesc:
-					"Unrestricted root administrative permissions and settings",
+				fullLevelDesc: "Unrestricted root administrative permissions and settings",
 				statusLabel: "Account Active Status",
 				notesLabel: "Internal Operational Notes",
 				notesPlaceholder: "Operational scope, contact details, or notes...",
@@ -1907,22 +1935,19 @@ export const en = {
 			},
 			editModal: {
 				title: "Edit Administrator #{{id}}",
-				subtitle:
-					"Update account profile, access privileges, security parameters, and active status.",
+				subtitle: "Update account profile, access privileges, security parameters, and active status.",
 				passwordHelper: "Leave blank to keep existing password unchanged",
 				saveButton: "Save Changes",
 			},
 			inspectModal: {
 				title: "System Administrator Profile #{{id}}",
-				subtitle:
-					"Comprehensive security parameters, access privileges, and creation metadata.",
+				subtitle: "Comprehensive security parameters, access privileges, and creation metadata.",
 			},
 		},
 	},
 	users: {
 		title: "User Management Directory",
-		subtitle:
-			"Manage company staff accounts, credentials, system access roles, and direct permission grants.",
+		subtitle: "Manage company staff accounts, credentials, system access roles, and direct permission grants.",
 		registerNewUser: "Register New User",
 		cloneUser: "Clone User",
 		cloneUserDesc: "Provision a new user account with pre-filled roles and department setup",
@@ -1977,22 +2002,21 @@ export const en = {
 		bioNotes: "Bio / Notes",
 		address: "Address",
 		customPermissionsTitle: "Direct Custom Permissions & Exclusions",
-		customPermissionsSubtitle:
-			"Override role permissions by explicitly allowing or excluding granular permissions for this user.",
+		customPermissionsSubtitle: "Override role permissions by explicitly allowing or excluding granular permissions for this user.",
 		allowedPermissions: "Explicitly Allowed Permissions",
 		excludedPermissions: "Explicitly Excluded Permissions",
 		savePermissions: "Save Custom Permissions",
 		excludeGrantTitle: "Module Action Exclusion Override",
-		excludeGrantSubtitle:
-			"Restrict specific actions (Delete, Export, Edit, Create, Approve) for target modules on this user.",
+		excludeGrantSubtitle: "Restrict specific actions (Delete, Export, Edit, Create, Approve) for target modules on this user.",
 		targetModule: "Target Module",
 		restrictedActions: "Restricted Actions",
 		applyExclusions: "Apply Exclusion Grants",
+		tempPasswordTitle: "Temporary Password Generated",
+		tempPasswordDesc: "The user account temporary password:",
 	},
 	roles: {
 		title: "Access Control Roles",
-		subtitle:
-			"Define authorization roles, assign permission bundles, and configure hierarchy priority for security.",
+		subtitle: "Define authorization roles, assign permission bundles, and configure hierarchy priority for security.",
 		createRole: "Create New Role",
 		cloneRole: "Clone Role",
 		cloneRoleDesc: "Create a new role using this role's permission matrix as a template",
@@ -2012,18 +2036,21 @@ export const en = {
 		deleteRole: "Delete Role",
 		deleteConfirm: "Are you sure you want to delete this role?",
 		roleDetailsTitle: "Role Specifications & Scope",
-		roleDetailsSubtitle:
-			"System security role configuration and assigned permissions.",
+		roleDetailsSubtitle: "System security role configuration and assigned permissions.",
 		roleNameInput: "Role Identifier Name (e.g. ROLE_SALES_MANAGER)",
 		displayNameInput: "Human Readable Display Name",
 		descriptionInput: "Scope & Operational Usage Description",
 		priorityRankInput: "Hierarchy Priority Rank (Lower = Higher Privilege)",
 		assignedPermissionsBundle: "Assigned Permissions Bundle",
+		createdSuccess: "Role created successfully",
+		updatedSuccess: "Role updated successfully",
+		deletedSuccess: "Role deleted successfully",
+		listView: "List View",
+		matrixView: "Module Matrix",
 	},
 	permissions: {
 		title: "System Permissions Registry",
-		subtitle:
-			"Comprehensive list of all fine-grained security permissions, modules, and role assignments.",
+		subtitle: "Comprehensive list of all fine-grained security permissions, modules, and role assignments.",
 		totalPermissions: "Total Permissions",
 		activeModules: "Active Modules",
 		superAdminScope: "Super Admin Scope",
@@ -2052,11 +2079,9 @@ export const en = {
 		},
 		personalCard: {
 			title: "Personal Information",
-			subtitle:
-				"Update your basic identity, profile avatar, position, and contact details.",
+			subtitle: "Update your basic identity, profile avatar, position, and contact details.",
 			picture: "Profile Picture",
-			pictureHelper:
-				"Supported formats: JPG, PNG, WEBP. Maximum file size: 5MB.",
+			pictureHelper: "Supported formats: JPG, PNG, WEBP. Maximum file size: 5MB.",
 			firstName: "First Name",
 			firstNamePlaceholder: "Enter first name",
 			lastName: "Last Name",
@@ -2081,11 +2106,9 @@ export const en = {
 		},
 		staffCard: {
 			title: "Staff & Human Resources Profile",
-			subtitle:
-				"Detailed employment records, branch assignment, and emergency contact details.",
+			subtitle: "Detailed employment records, branch assignment, and emergency contact details.",
 			calloutTitle: "Linked HR Staff Profile Active",
-			calloutDesc:
-				"Your user login account is linked to your HR Staff record. Organization structures, department assignments, and branch permissions apply to this record.",
+			calloutDesc: "Your user login account is linked to your HR Staff record. Organization structures, department assignments, and branch permissions apply to this record.",
 			fullName: "Full Name",
 			jobTitle: "Position / Job Title",
 			employeeCode: "Employee Code",
@@ -2099,19 +2122,16 @@ export const en = {
 			emergencyPhone: "Emergency Contact Phone",
 			notProvided: "Not provided",
 			noStaffTitle: "No HR Staff Record Linked",
-			noStaffDesc:
-				"This user account is currently operating as an administrative login without a linked HR Staff record. Administrative users can complete full profile setup to bind employee positions and branch details.",
+			noStaffDesc: "This user account is currently operating as an administrative login without a linked HR Staff record. Administrative users can complete full profile setup to bind employee positions and branch details.",
 			completeSetup: "Complete Profile Setup",
 		},
 		securityCard: {
 			title: "Change Account Password",
-			subtitle:
-				"Ensure your account is protected by using a strong, unique password.",
+			subtitle: "Ensure your account is protected by using a strong, unique password.",
 			currentPassword: "Current Password",
 			currentPasswordPlaceholder: "Enter your current password",
 			newPassword: "New Password",
-			newPasswordPlaceholder:
-				"Enter new password (min. 8 chars, 1 uppercase, 1 number)",
+			newPasswordPlaceholder: "Enter new password (min. 8 chars, 1 uppercase, 1 number)",
 			confirmPassword: "Confirm New Password",
 			confirmPasswordPlaceholder: "Confirm your new password",
 			strengthLabel: "Password Strength:",
@@ -2126,8 +2146,7 @@ export const en = {
 			accountStatus: "Account Status",
 			activeVerified: "Active & Verified",
 			tokenSecurity: "Token Security",
-			tokenDesc:
-				"JWT Token Authentication with automated token refresh rotation enabled.",
+			tokenDesc: "JWT Token Authentication with automated token refresh rotation enabled.",
 		},
 		permissionsCard: {
 			assignedRolesTitle: "Assigned Roles ({{count}})",
@@ -2135,24 +2154,21 @@ export const en = {
 			noRoles: "No direct roles assigned",
 			inheritingDefault: "Inheriting default permissions",
 			grantsTitle: "Effective Grants & Permissions ({{count}})",
-			grantsSubtitle:
-				"Granular API authorities and menu view capabilities active for your session.",
+			grantsSubtitle: "Granular API authorities and menu view capabilities active for your session.",
 			searchPlaceholder: "Search permissions...",
-			noMatch: 'No permissions match "{{query}}"',
+			noMatch: "No permissions match \"{{query}}\"",
 			grantsCount: "({{count}} grants)",
 		},
 	},
 	migrations: {
 		title: "Data Migration Center",
 		etlPipeline: "ETL PIPELINE",
-		subtitle:
-			"Resilient, multi-tenant bulk ingestion for catalogs, products, units, packaging tiers, and stock balances.",
+		subtitle: "Resilient, multi-tenant bulk ingestion for catalogs, products, units, packaging tiers, and stock balances.",
 		hideSchema: "Hide Schema",
 		schemaGuide: "Schema Guide",
 		downloadSampleCsv: "Download Sample CSV",
 		schemaTitle: "Catalog CSV Schema Specifications",
-		schemaSubtitle:
-			"Columns required and optional for automatic catalog ingestion and hierarchy resolution.",
+		schemaSubtitle: "Columns required and optional for automatic catalog ingestion and hierarchy resolution.",
 		copyHeaderRow: "Copy Header Row",
 		headersCopied: "Headers Copied",
 		step1Title: "1. Select Migration Domain",
@@ -2162,17 +2178,14 @@ export const en = {
 		comingSoon: "Coming Soon",
 		step2Title: "2. Target Organization (Tenant)",
 		step2Badge: "Step 2",
-		step2DescAdmin:
-			"Platform Admin: assign data migration to any registered tenant.",
-		step2DescTenant:
-			"Tenant Admin: migrations are strictly scoped to your organization.",
+		step2DescAdmin: "Platform Admin: assign data migration to any registered tenant.",
+		step2DescTenant: "Tenant Admin: migrations are strictly scoped to your organization.",
 		selectTargetOrg: "Select target organization...",
 		tenantScopedEnv: "Tenant Scoped Environment",
 		verified: "Verified",
 		step3Title: "3. Upload Data File (.csv or .json)",
 		step3Badge: "Step 3",
-		step3Desc:
-			"Files are sliced into 5MB chunks and streamed with automatic network backoff retry.",
+		step3Desc: "Files are sliced into 5MB chunks and streamed with automatic network backoff retry.",
 		dropzoneHeading: "Drag & drop your CSV or JSON dataset here",
 		dropzoneSubheading: "or click anywhere to browse from your computer",
 		resumableSlicing: "5MB Resumable Slicing",
@@ -2183,18 +2196,14 @@ export const en = {
 		step4Title: "4. Ingestion Controls & Settings",
 		step4Badge: "Step 4",
 		dryRunLabel: "Dry Run Pre-flight",
-		dryRunDesc:
-			"Simulate complete ingestion and validate schemas without writing rows to database.",
+		dryRunDesc: "Simulate complete ingestion and validate schemas without writing rows to database.",
 		simulation: "Simulation",
 		commitToDb: "Commit to DB",
 		autoCreateLabel: "Auto-create Master Data",
-		autoCreateDesc:
-			"Automatically register missing Brands, Categories, and Measurement Units on the fly.",
+		autoCreateDesc: "Automatically register missing Brands, Categories, and Measurement Units on the fly.",
 		strictMode: "Strict Mode",
-		dryRunActiveNote:
-			"Dry Run active: No database rows will be created or modified.",
-		liveModeNote:
-			"Live Mode: Ingestion will create new products, variants, and stock balances.",
+		dryRunActiveNote: "Dry Run active: No database rows will be created or modified.",
+		liveModeNote: "Live Mode: Ingestion will create new products, variants, and stock balances.",
 		cancelUpload: "Cancel Upload",
 		uploadingProgress: "Uploading ({{percent}}%)",
 		processingIngestion: "Processing Ingestion...",
@@ -2234,18 +2243,38 @@ export const en = {
 		toast: {
 			dryRunSuccess: "Dry run verified: {{count}} items validated successfully!",
 			migrationSuccess: "Migration completed: {{count}} items imported!",
-			completedWithIssues:
-				"Migration completed with issues: {{successCount}} succeeded, {{failedCount}} failed.",
+			completedWithIssues: "Migration completed with issues: {{successCount}} succeeded, {{failedCount}} failed.",
 			fatalError: "Migration job encountered a fatal error.",
 			selectFile: "Please select or drop a CSV or JSON file.",
 			selectCompany: "Please select a target company.",
-			uploadSuccess:
-				"File uploaded successfully. Processing ingestion in background...",
+			uploadSuccess: "File uploaded successfully. Processing ingestion in background...",
 			startFailed: "Failed to start migration.",
 			downloadedReport: "Downloaded failure report.",
 			downloadFailed: "Failed to download failure report.",
 			headerCopied: "CSV header row copied to clipboard!",
 		},
+	},
+	locations: {
+		title: "Administrative Locations",
+		subtitle: "Manage Cambodia administrative geographic hierarchy (Provinces, Districts, Communes, Villages).",
+		addNew: "Add New Location",
+		globalSearchPlaceholder: "Search provinces, districts, communes or villages...",
+		breadcrumb: {
+			dashboard: "Dashboard",
+			company: "Company & Logistics",
+			locations: "Locations",
+		},
+		createModal: {
+			title: "Add Administrative Division",
+			desc: "Create a new geographic boundary division in the Cambodia address registry.",
+		},
+		editModal: {
+			title: "Edit Administrative Division",
+			desc: "Update geographic name, postal code, or display sorting.",
+		},
+	},
+	company: {
+		name: "Company Name",
 	},
 };
 

@@ -17,6 +17,7 @@ import {
 	FileText,
 	Clock,
 	ChevronRight,
+	ChevronLeft,
 	Folder,
 	ShieldCheck,
 	KeyRound,
@@ -38,6 +39,8 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearClientSession } from "@/lib/api/client";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -72,6 +75,11 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { isUserSystemAdmin } from "@/components/providers/company-context";
 import { useTranslation } from "@/lib/i18n/context";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -289,7 +297,7 @@ function SidebarCollapsibleGroup({
 export function AppSidebar() {
 	const pathname = usePathname();
 	const router = useRouter();
-	const { state } = useSidebar();
+	const { state, toggleSidebar } = useSidebar();
 	const isCollapsed = state === "collapsed";
 	const { t } = useTranslation();
 	const {
@@ -298,18 +306,16 @@ export function AppSidebar() {
 		isLoading,
 	} = usePermissions();
 
+	const queryClient = useQueryClient();
+
 	const handleSignOut = async () => {
 		try {
 			await authApi.signOut();
 		} catch {
 			// ignore
 		}
-		if (typeof window !== "undefined") {
-			localStorage.removeItem("rumluos_user_profile");
-			localStorage.removeItem("rumluos_access_token");
-			localStorage.removeItem("rumluos_refresh_token");
-			localStorage.removeItem("rumluos_company_id");
-		}
+		clearClientSession();
+		queryClient.clear();
 		await clearAuthCookies();
 		router.push("/sign-in");
 	};
@@ -569,87 +575,86 @@ export function AppSidebar() {
 				)}
 			</SidebarContent>
 
-			{/* Footer Profile & Logout Menu */}
-			<SidebarFooter className="p-3 border-t border-slate-200/80 dark:border-slate-800 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-				<SidebarMenu>
-					<SidebarMenuItem className="flex group-data-[collapsible=icon]:justify-center">
-						<DropdownMenu>
-							<DropdownMenuTrigger
-								render={
-									<SidebarMenuButton
-										size="lg"
-										tooltip={userProfile?.firstName || "Profile"}
-										className="hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl p-1.5 transition-all group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center"
-									/>
-								}
+			{/* Modern Utility & Status Footer (Replaces redundant profile & company info) */}
+			<SidebarFooter className="p-2.5 border-t border-slate-200/80 dark:border-slate-800">
+				{isCollapsed ? (
+					<div className="flex flex-col items-center gap-2 py-1">
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<button
+									onClick={toggleSidebar}
+									type="button"
+									className="size-9 flex items-center justify-center rounded-xl bg-slate-100/90 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+								>
+									<ChevronRight className="size-4" />
+								</button>
+							</TooltipTrigger>
+							<TooltipContent side="right">
+								{t("sidebar.expand", "Expand sidebar")}
+							</TooltipContent>
+						</Tooltip>
+
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Link
+									href="/configurations"
+									className="size-9 flex items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+								>
+									<Settings className="size-4" />
+								</Link>
+							</TooltipTrigger>
+							<TooltipContent side="right">
+								{t("sidebar.systemSettings", "System Settings")}
+							</TooltipContent>
+						</Tooltip>
+
+						{/* Live Health Dot in Collapsed */}
+						<div
+							className="size-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 my-1 shrink-0"
+							title={t("common.systemOnline", "System Online")}
+						/>
+					</div>
+				) : (
+					<div className="space-y-2">
+						{/* System Status Banner */}
+						<div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800/70 text-xs">
+							<div className="flex items-center gap-2">
+								<span className="relative flex size-2">
+									<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+									<span className="relative inline-flex rounded-full size-2 bg-emerald-500" />
+								</span>
+								<span className="font-semibold text-[11px] text-slate-700 dark:text-slate-300">
+									{t("common.systemOnline", "System Online")}
+								</span>
+							</div>
+							<span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200/50 dark:border-emerald-800/50">
+								v1.2 Pro
+							</span>
+						</div>
+
+						{/* Quick Action Toolbar */}
+						<div className="flex items-center justify-between gap-1 px-1">
+							<Link
+								href="/configurations"
+								className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+								title={t("sidebar.systemSettings", "System Settings")}
 							>
-								<Avatar className="h-8 w-8 rounded-lg border border-slate-200 dark:border-slate-700">
-									<AvatarImage
-										src={fileUrl(userProfile?.avatarKey) || ""}
-										alt={userProfile?.firstName}
-									/>
-									<AvatarFallback
-										suppressHydrationWarning
-										className="rounded-lg bg-primary/10 text-primary font-bold text-xs"
-									>
-										{isMounted &&
-										(userProfile?.firstName?.[0] ||
-											userProfile?.username?.[0]) ? (
-											(
-												userProfile.firstName?.[0] ||
-												userProfile.username?.[0]
-											).toUpperCase()
-										) : (
-											<UserIcon className="size-3.5" />
-										)}
-									</AvatarFallback>
-								</Avatar>
-								<div className="flex flex-col gap-0.5 leading-none flex-1 overflow-hidden ml-2 text-left group-data-[collapsible=icon]:hidden">
-									<span
-										suppressHydrationWarning
-										className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate"
-									>
-										{!isMounted || (isLoading && !userProfile) ? (
-											<Skeleton className="h-3 w-20 mb-0.5" />
-										) : userProfile?.firstName ? (
-											`${userProfile.firstName} ${userProfile.lastName || ""}`.trim()
-										) : userProfile?.username ? (
-											userProfile.username
-										) : (
-											""
-										)}
-									</span>
-									<span
-										suppressHydrationWarning
-										className="text-[10px] text-slate-400 dark:text-slate-500 truncate"
-									>
-										{!isMounted || (isLoading && !userProfile) ? (
-											<Skeleton className="h-2 w-14" />
-										) : userProfile?.username ? (
-											`@${userProfile.username}`
-										) : isSystemAdmin ? (
-											"@system_admin"
-										) : userProfile?.roles?.[0]?.name ? (
-											`@${userProfile.roles[0].name.toLowerCase()}`
-										) : (
-											""
-										)}
-									</span>
-								</div>
-							</DropdownMenuTrigger>
-							{/* <DropdownMenuContent className="w-52 rounded-2xl p-1.5 shadow-xl border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-950" align="end" side="right" sideOffset={8}>
-                <DropdownMenuItem render={<Link href="/profile" />} className="cursor-pointer rounded-xl dark:hover:bg-slate-800">
-                  <Settings className="mr-2 h-4 w-4 text-slate-500 dark:text-slate-400" />
-                  <span>{t("sidebar.profileSettings")}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSignOut} className="rounded-xl text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/50 cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>{t("sidebar.signOut")}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent> */}
-						</DropdownMenu>
-					</SidebarMenuItem>
-				</SidebarMenu>
+								<Settings className="size-3.5 text-slate-400" />
+								<span>{t("sidebar.settings", "Settings")}</span>
+							</Link>
+
+							<button
+								onClick={toggleSidebar}
+								type="button"
+								className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+								title={t("sidebar.collapse", "Collapse sidebar")}
+							>
+								<ChevronLeft className="size-3.5" />
+								<span>{t("sidebar.collapse", "Collapse")}</span>
+							</button>
+						</div>
+					</div>
+				)}
 			</SidebarFooter>
 			<SidebarRail />
 		</Sidebar>

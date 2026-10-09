@@ -27,6 +27,7 @@ import {
 	RowAction,
 } from "@/components/ui-custom/data-table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ModernButton } from "@/components/ui-custom/modern-button";
 import { PaymentTermModal } from "@/components/payment-terms/payment-term-modal";
 import { PaymentTermDetailsModal } from "@/components/payment-terms/payment-term-details-modal";
@@ -259,11 +260,11 @@ export default function PaymentTermsPage() {
 	];
 
 	return (
-		<div className="p-4 sm:p-6 space-y-4 max-w-7xl mx-auto">
+		<div className="space-y-4 pb-12">
 			{/* Main DataTable */}
 			<DataTable<PaymentTerm>
-				title="Payment Terms & Early Settlement"
-				titleIcon={<Clock className="size-5 text-primary" />}
+				hideHeader={true}
+				hideImportExport={true}
 				columns={columns}
 				data={filteredTerms}
 				isLoading={isLoading}
@@ -273,16 +274,14 @@ export default function PaymentTermsPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search payment terms by name or description..."
-				toolbarActions={
-					<ModernButton
-						variant="primary"
-						size="sm"
-						rounded="lg"
+				primaryAction={
+					<Button
 						onClick={openCreateModal}
-						leftIcon={<Plus className="size-4" />}
+						className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
 					>
-						New Payment Term
-					</ModernButton>
+						<Plus className="h-3.5 w-3.5" />
+						<span>New Payment Term</span>
+					</Button>
 				}
 			/>
 

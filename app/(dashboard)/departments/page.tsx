@@ -6,7 +6,8 @@ import { departmentsApi, divisionsApi } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Building2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Building2, Plus } from "lucide-react";
 import {
 	DataTable,
 	ColumnDef,
@@ -187,24 +188,13 @@ export default function DepartmentsPage() {
 	];
 
 	return (
-		<div className="space-y-6 max-w-7xl mx-auto pb-10">
-			<div className="flex items-center justify-between gap-4">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-						<Building2 className="h-6 w-6 text-indigo-600" />{" "}
-						{t("departments.title")}
-					</h1>
-					<p className="text-slate-500 text-xs mt-1">
-						{t("departments.subtitle")}
-					</p>
-				</div>
-			</div>
-
+		<div className="space-y-4 pb-12">
 			<DataTable<Department>
 				data={data?.items || []}
 				columns={columns}
 				getRowId={(item) => String(item.id)}
-				title={t("departments.title")}
+				hideHeader={true}
+				hideImportExport={true}
 				searchPlaceholder={t("departments.searchPlaceholder")}
 				searchValue={search}
 				onSearchChange={(val) => {
@@ -212,8 +202,15 @@ export default function DepartmentsPage() {
 					setPage(1);
 				}}
 				domainFilterFields={domainFilterFields}
-				createButtonLabel={t("departments.addDepartment")}
-				onCreateNew={openCreateDialog}
+				primaryAction={
+					<Button
+						onClick={openCreateDialog}
+						className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+					>
+						<Plus className="h-3.5 w-3.5" />
+						<span>{t("departments.addDepartment", "Add Department")}</span>
+					</Button>
+				}
 				manualPagination={true}
 				totalCount={data?.total || 0}
 				page={page}

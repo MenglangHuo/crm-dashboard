@@ -81,9 +81,7 @@ export async function getSession(): Promise<UserProfile | null> {
 		const user = db.users.find((u) => u.username === payload.username);
 		if (user) profile = resolveProfile(user.id);
 	}
-	if (!profile) {
-		profile = resolveProfile(db.users[0]?.id || "user_super");
-	}
+	if (!profile) return null;
 	if (!profile || !profile.active) return null;
 	return profile;
 }

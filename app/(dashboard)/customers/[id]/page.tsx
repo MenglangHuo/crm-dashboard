@@ -85,26 +85,6 @@ export default function CustomerProfilePage({
 		queryFn: () => customersApi.getVisitHistory(customerId, visitPage, 10),
 	});
 
-	// 3. Fetch Customer Orders
-	const { data: ordersData } = useQuery({
-		queryKey: ["customer-orders", String(customerId)],
-		queryFn: () => ordersApi.list({ limit: 20 }),
-	});
-	const customerOrders =
-		ordersData?.items?.filter(
-			(o: any) => String(o.customerId || o.customer?.id) === String(customerId),
-		) || [];
-
-	// 4. Fetch Customer Invoices Count
-	const { data: invoicesData } = useQuery({
-		queryKey: ["customer-invoices-count", String(customerId)],
-		queryFn: () => invoicesApi.list({ limit: 20 }),
-	});
-	const customerInvoices =
-		invoicesData?.items?.filter(
-			(i: any) => String(i.customerId || i.customer?.id) === String(customerId),
-		) || [];
-
 	// Deactivate Mutation
 	const deleteMutation = useMutation({
 		mutationFn: () => customersApi.remove(customerId),
@@ -324,14 +304,14 @@ export default function CustomerProfilePage({
 						className="rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
 					>
 						<ShoppingCart className="h-3.5 w-3.5" />
-						<span>{t("customers.ordersSalesTab")} ({customerOrders.length})</span>
+						<span>{t("customers.ordersSalesTab")}</span>
 					</ModernTabsTrigger>
 					<ModernTabsTrigger
 						value="invoices"
 						className="rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
 					>
 						<Receipt className="h-3.5 w-3.5" />
-						<span>{t("sidebar.invoices", "Invoices")} ({customerInvoices.length})</span>
+						<span>{t("sidebar.invoices", "Invoices")}</span>
 					</ModernTabsTrigger>
 				</ModernTabsList>
 

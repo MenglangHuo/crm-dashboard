@@ -79,55 +79,62 @@ export interface ReceiptData {
 	invoice?: Invoice | any;
 }
 
-interface QuickActionContextType {
+export interface QuickActionState {
 	// Command palette
 	isCommandPaletteOpen: boolean;
-	setCommandPaletteOpen: (open: boolean) => void;
 
 	// Unified Loan Origination Wizard
 	isLoanWizardOpen: boolean;
 	loanWizardInitialData: LoanWizardInitialValues | null;
-	openLoanWizard: (initialData?: LoanWizardInitialValues) => void;
-	closeLoanWizard: () => void;
 
 	// Quick Payment Modal
 	isQuickPayOpen: boolean;
 	quickPayInitialData: QuickPayInitialValues | null;
-	openQuickPay: (initialData?: QuickPayInitialValues) => void;
-	closeQuickPay: () => void;
 
 	// KHQR Modal
 	isKhqrOpen: boolean;
 	khqrData: KhqrModalData | null;
-	openKhqr: (data: KhqrModalData) => void;
-	closeKhqr: () => void;
 
 	// Print Receipt Modal
 	isReceiptOpen: boolean;
 	receiptData: ReceiptData | null;
-	openReceipt: (data: ReceiptData) => void;
-	closeReceipt: () => void;
 
 	// Add Customer / Add Product quick triggers
 	isAddCustomerOpen: boolean;
+	isAddProductOpen: boolean;
+}
+
+export interface QuickActionDispatch {
+	setCommandPaletteOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+	openLoanWizard: (initialData?: LoanWizardInitialValues) => void;
+	closeLoanWizard: () => void;
+	openQuickPay: (initialData?: QuickPayInitialValues) => void;
+	closeQuickPay: () => void;
+	openKhqr: (data: KhqrModalData) => void;
+	closeKhqr: () => void;
+	openReceipt: (data: ReceiptData) => void;
+	closeReceipt: () => void;
 	openAddCustomer: () => void;
 	closeAddCustomer: () => void;
-
-	isAddProductOpen: boolean;
 	openAddProduct: () => void;
 	closeAddProduct: () => void;
 }
 
-const QuickActionContext = createContext<QuickActionContextType | undefined>(
+export type QuickActionContextType = QuickActionState & QuickActionDispatch;
+
+const QuickActionStateContext = createContext<QuickActionState | undefined>(
 	undefined,
 );
+const QuickActionDispatchContext = createContext<
+	QuickActionDispatch | undefined
+>(undefined);
 
 export function QuickActionProvider({
 	children,
 }: {
 	children: React.ReactNode;
 }) {
-	const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
+	const [isCommandPaletteOpen, setCommandPaletteOpenState] = useState(false);
 
 	const [isLoanWizardOpen, setIsLoanWizardOpen] = useState(false);
 	const [loanWizardInitialData, setLoanWizardInitialData] =
@@ -146,100 +153,177 @@ export function QuickActionProvider({
 	const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
 	const [isAddProductOpen, setIsAddProductOpen] = useState(false);
 
+	const setCommandPaletteOpen = React.useCallback(
+		(openOrFn: boolean | ((prev: boolean) => boolean)) => {
+			setCommandPaletteOpenState(openOrFn);
+		},
+		[],
+	);
+
 	// Listen for Ctrl+K or Cmd+K
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
 				e.preventDefault();
-				setCommandPaletteOpen((prev) => !prev);
+				setCommandPaletteOpenState((prev) => !prev);
 			}
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, []);
 
-	const openLoanWizard = (initialData?: LoanWizardInitialValues) => {
-		setLoanWizardInitialData(initialData || null);
-		setIsLoanWizardOpen(true);
-	};
-	const closeLoanWizard = () => {
+	const openLoanWizard = React.useCallback(
+		(initialData?: LoanWizardInitialValues) => {
+			setLoanWizardInitialData(initialData || null);
+			setIsLoanWizardOpen(true);
+		},
+		[],
+	);
+	const closeLoanWizard = React.useCallback(() => {
 		setIsLoanWizardOpen(false);
 		setLoanWizardInitialData(null);
-	};
+	}, []);
 
-	const openQuickPay = (initialData?: QuickPayInitialValues) => {
-		setQuickPayInitialData(initialData || null);
-		setIsQuickPayOpen(true);
-	};
-	const closeQuickPay = () => {
+	const openQuickPay = React.useCallback(
+		(initialData?: QuickPayInitialValues) => {
+			setQuickPayInitialData(initialData || null);
+			setIsQuickPayOpen(true);
+		},
+		[],
+	);
+	const closeQuickPay = React.useCallback(() => {
 		setIsQuickPayOpen(false);
 		setQuickPayInitialData(null);
-	};
+	}, []);
 
-	const openKhqr = (data: KhqrModalData) => {
+	const openKhqr = React.useCallback((data: KhqrModalData) => {
 		setKhqrData(data);
 		setIsKhqrOpen(true);
-	};
-	const closeKhqr = () => {
+	}, []);
+	const closeKhqr = React.useCallback(() => {
 		setIsKhqrOpen(false);
 		setKhqrData(null);
-	};
+	}, []);
 
-	const openReceipt = (data: ReceiptData) => {
+	const openReceipt = React.useCallback((data: ReceiptData) => {
 		setReceiptData(data);
 		setIsReceiptOpen(true);
-	};
-	const closeReceipt = () => {
+	}, []);
+	const closeReceipt = React.useCallback(() => {
 		setIsReceiptOpen(false);
 		setReceiptData(null);
-	};
+	}, []);
 
-	const openAddCustomer = () => setIsAddCustomerOpen(true);
-	const closeAddCustomer = () => setIsAddCustomerOpen(false);
+	const openAddCustomer = React.useCallback(() => setIsAddCustomerOpen(true), []);
+	const closeAddCustomer = React.useCallback(() => setIsAddCustomerOpen(false), []);
 
-	const openAddProduct = () => setIsAddProductOpen(true);
-	const closeAddProduct = () => setIsAddProductOpen(false);
+	const openAddProduct = React.useCallback(() => setIsAddProductOpen(true), []);
+	const closeAddProduct = React.useCallback(() => setIsAddProductOpen(false), []);
+
+	const dispatchValue = React.useMemo<QuickActionDispatch>(
+		() => ({
+			setCommandPaletteOpen,
+			openLoanWizard,
+			closeLoanWizard,
+			openQuickPay,
+			closeQuickPay,
+			openKhqr,
+			closeKhqr,
+			openReceipt,
+			closeReceipt,
+			openAddCustomer,
+			closeAddCustomer,
+			openAddProduct,
+			closeAddProduct,
+		}),
+		[
+			setCommandPaletteOpen,
+			openLoanWizard,
+			closeLoanWizard,
+			openQuickPay,
+			closeQuickPay,
+			openKhqr,
+			closeKhqr,
+			openReceipt,
+			closeReceipt,
+			openAddCustomer,
+			closeAddCustomer,
+			openAddProduct,
+			closeAddProduct,
+		],
+	);
+
+	const stateValue = React.useMemo<QuickActionState>(
+		() => ({
+			isCommandPaletteOpen,
+			isLoanWizardOpen,
+			loanWizardInitialData,
+			isQuickPayOpen,
+			quickPayInitialData,
+			isKhqrOpen,
+			khqrData,
+			isReceiptOpen,
+			receiptData,
+			isAddCustomerOpen,
+			isAddProductOpen,
+		}),
+		[
+			isCommandPaletteOpen,
+			isLoanWizardOpen,
+			loanWizardInitialData,
+			isQuickPayOpen,
+			quickPayInitialData,
+			isKhqrOpen,
+			khqrData,
+			isReceiptOpen,
+			receiptData,
+			isAddCustomerOpen,
+			isAddProductOpen,
+		],
+	);
 
 	return (
-		<QuickActionContext.Provider
-			value={{
-				isCommandPaletteOpen,
-				setCommandPaletteOpen,
-				isLoanWizardOpen,
-				loanWizardInitialData,
-				openLoanWizard,
-				closeLoanWizard,
-				isQuickPayOpen,
-				quickPayInitialData,
-				openQuickPay,
-				closeQuickPay,
-				isKhqrOpen,
-				khqrData,
-				openKhqr,
-				closeKhqr,
-				isReceiptOpen,
-				receiptData,
-				openReceipt,
-				closeReceipt,
-				isAddCustomerOpen,
-				openAddCustomer,
-				closeAddCustomer,
-				isAddProductOpen,
-				openAddProduct,
-				closeAddProduct,
-			}}
-		>
-			{children}
-		</QuickActionContext.Provider>
+		<QuickActionDispatchContext.Provider value={dispatchValue}>
+			<QuickActionStateContext.Provider value={stateValue}>
+				{children}
+			</QuickActionStateContext.Provider>
+		</QuickActionDispatchContext.Provider>
 	);
 }
 
-export function useQuickActions() {
-	const context = useContext(QuickActionContext);
+export function useQuickActionDispatch(): QuickActionDispatch {
+	const context = useContext(QuickActionDispatchContext);
 	if (!context) {
+		throw new Error(
+			"useQuickActionDispatch must be used within a QuickActionProvider",
+		);
+	}
+	return context;
+}
+
+export function useQuickActionState(): QuickActionState {
+	const context = useContext(QuickActionStateContext);
+	if (!context) {
+		throw new Error(
+			"useQuickActionState must be used within a QuickActionProvider",
+		);
+	}
+	return context;
+}
+
+export function useQuickActions(): QuickActionContextType {
+	const state = useContext(QuickActionStateContext);
+	const dispatch = useContext(QuickActionDispatchContext);
+	if (!state || !dispatch) {
 		throw new Error(
 			"useQuickActions must be used within a QuickActionProvider",
 		);
 	}
-	return context;
+	return React.useMemo(
+		() => ({
+			...state,
+			...dispatch,
+		}),
+		[state, dispatch],
+	);
 }

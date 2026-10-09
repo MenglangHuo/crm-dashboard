@@ -4,7 +4,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customersApi, usersApi, deliveriesApi } from "@/lib/api/endpoints";
 import { Customer } from "@/lib/types";
-import { CAMBODIA_PROVINCES } from "@/lib/data/provinces";
+import { CAMBODIA_PROVINCES, getProvinceCoordinates } from "@/lib/data/provinces";
 import { toast } from "sonner";
 import {
 	ModernModal,
@@ -204,6 +204,20 @@ export function CustomerFormModal({ isOpen, onClose, customer }: Props) {
 		});
 	}, [availableDeliveries]);
 
+	// Cambodia Provinces Searchable Options List
+	const provinceOptions: SearchSelectOption[] = useMemo(() => {
+		return [
+			{ value: "", label: "None / Custom Region" },
+			...availableProvinces.map((p) => ({
+				value: p.provinceCode,
+				label: `${p.provinceEn} (${p.provinceKh})`,
+				subtitle: `Region Code: ${p.provinceCode}`,
+				badge: p.provinceCode,
+				icon: <MapPin className="h-3.5 w-3.5 text-rose-500" />,
+			})),
+		];
+	}, [availableProvinces]);
+
 	const captureGPS = () => {
 		if (!navigator.geolocation) {
 			toast.error("Geolocation is not supported by your browser");
@@ -294,7 +308,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: Props) {
 		>
 			<div className="space-y-5 py-2 max-h-[75vh] overflow-y-auto pr-1">
 				{/* Basic Information */}
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 relative z-20">
 					<ModernInput
 						label={`${t("customers.customerName")} *`}
 						value={form.name}
@@ -334,18 +348,24 @@ export function CustomerFormModal({ isOpen, onClose, customer }: Props) {
 						]}
 					/>
 
-					<ModernSelect
+					<ModernSearchSelect
 						label={t("customers.provinceCode")}
 						value={form.addressCode}
-						onChange={(val) => setForm({ ...form, addressCode: val })}
+						onChange={(val) => {
+							const pCode = String(val || "");
+							const coords = pCode ? getProvinceCoordinates(pCode) : null;
+							setForm((prev) => ({
+								...prev,
+								addressCode: pCode,
+								...(coords && (!prev.lat || prev.lat === 11.5564)
+									? { lat: coords.lat, lng: coords.lng }
+									: {}),
+							}));
+						}}
 						placeholder="Select province..."
-						options={[
-							{ value: "", label: "None / Custom Code" },
-							...availableProvinces.map((p) => ({
-								value: p.provinceCode,
-								label: `${p.provinceEn} (${p.provinceKh}) - [${p.provinceCode}]`,
-							})),
-						]}
+						searchPlaceholder="Search province name or code..."
+						options={provinceOptions}
+						selectSize="md"
 					/>
 				</div>
 

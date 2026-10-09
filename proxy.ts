@@ -6,6 +6,7 @@ const AUTH_PAGES = [
 	"/sign-in",
 	"/forgot-password",
 	"/reset-password",
+	"/set-new-password",
 	"/register-company",
 ];
 
@@ -13,23 +14,23 @@ function isValidToken(token?: string): boolean {
 	if (!token || typeof token !== "string" || !token.trim()) return false;
 	try {
 		const parts = token.split(".");
-		if (parts.length === 3) {
-			const rawBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-			const base64 = rawBase64.padEnd(
-				rawBase64.length + ((4 - (rawBase64.length % 4)) % 4),
-				"=",
-			);
-			const json = atob(base64);
-			const payload = JSON.parse(json);
-			if (payload.exp && typeof payload.exp === "number") {
-				const expiresAt =
-					payload.exp < 10_000_000_000 ? payload.exp * 1000 : payload.exp;
-				if (expiresAt < Date.now()) return false;
-			}
+		if (parts.length !== 3) return false;
+
+		const rawBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+		const base64 = rawBase64.padEnd(
+			rawBase64.length + ((4 - (rawBase64.length % 4)) % 4),
+			"=",
+		);
+		const json = atob(base64);
+		const payload = JSON.parse(json);
+		if (payload.exp && typeof payload.exp === "number") {
+			const expiresAt =
+				payload.exp < 10_000_000_000 ? payload.exp * 1000 : payload.exp;
+			if (expiresAt < Date.now()) return false;
 		}
 		return true;
 	} catch {
-		return token.length > 5;
+		return false;
 	}
 }
 

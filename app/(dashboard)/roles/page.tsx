@@ -484,7 +484,7 @@ export default function RolesPage() {
 
 	const toolbarActionsNode = (
 		<div className="flex items-center gap-2 flex-wrap">
-			{/* View Mode Switcher Tabs (Theme-based background) */}
+			{/* View Mode Switcher Tabs */}
 			<div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/90 dark:bg-slate-800/90 p-1 shadow-2xs">
 				<button
 					type="button"
@@ -496,7 +496,7 @@ export default function RolesPage() {
 							: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100",
 					)}
 				>
-					<List className="size-3.5" /> Table
+					<List className="size-3.5" /> {t("roles.listView", "List View")}
 				</button>
 				<button
 					type="button"
@@ -508,7 +508,7 @@ export default function RolesPage() {
 							: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100",
 					)}
 				>
-					<LayoutGrid className="size-3.5" /> Grid Cards
+					<LayoutGrid className="size-3.5" /> {t("roles.matrixView", "Module Matrix")}
 				</button>
 			</div>
 
@@ -524,7 +524,7 @@ export default function RolesPage() {
 	);
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-4 pb-12">
 			{/* Grid Cards View Mode */}
 			{viewMode === "grid" ? (
 				<div className="space-y-4">
@@ -763,13 +763,15 @@ export default function RolesPage() {
 					data={rolesList}
 					columns={columns}
 					getRowId={(r) => String(r.id)}
-					title={t("roles.title")}
+					hideHeader={true}
+					hideImportExport={true}
 					searchPlaceholder={t("roles.searchPlaceholder")}
 					searchValue={search}
 					onSearchChange={(val) => {
 						setSearch(val);
 						setPage(1);
 					}}
+					primaryAction={toolbarActionsNode}
 					manualPagination={true}
 					totalCount={data?.total || 0}
 					page={page}
@@ -781,8 +783,6 @@ export default function RolesPage() {
 					onEditRow={(r) => openEdit(r)}
 					onDeleteRow={(r) => deleteMutation.mutate(r.id)}
 					customRowActions={customActions}
-					toolbarActions={toolbarActionsNode}
-					exportFilename="roles-permissions-catalogue"
 				/>
 			)}
 

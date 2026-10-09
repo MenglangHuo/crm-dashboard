@@ -50,6 +50,21 @@ import {
 	Copy,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useCompanyContext } from "@/components/providers/company-context";
+import { useDebounce } from "@/hooks/use-debounce";
+import {
+	StatusFilterDropdown,
+	StatusFilterOption,
+} from "@/components/ui-custom/status-filter-dropdown";
+
+const ORDER_STATUS_OPTIONS: StatusFilterOption[] = [
+	{ id: "ALL", label: "All Orders", icon: Layers },
+	{ id: "DRAFT", label: "1. Draft", icon: ShoppingCart, dotColor: "bg-slate-400" },
+	{ id: "POSTED", label: "2. Posted", icon: Send, dotColor: "bg-blue-500" },
+	{ id: "APPROVED", label: "3. Approved", icon: ShieldCheck, dotColor: "bg-emerald-500" },
+	{ id: "COMPLETED", label: "4. Completed", icon: CheckCircle2, dotColor: "bg-indigo-500" },
+	{ id: "VOID", label: "Void", icon: Ban, dotColor: "bg-rose-500" },
+];
 
 function OrdersPageContent() {
 	const router = useRouter();
@@ -59,6 +74,7 @@ function OrdersPageContent() {
 		searchParams.get("orderId") ||
 		searchParams.get("orderCode");
 	const queryClient = useQueryClient();
+	const { selectedCompanyId } = useCompanyContext();
 	const { t } = useTranslation();
 	const {
 		isAdmin,
@@ -76,6 +92,7 @@ function OrdersPageContent() {
 	} = usePermissions();
 
 	const [search, setSearch] = useState("");
+	const debouncedSearch = useDebounce(search, 300);
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
 	const [searchPayload, setSearchPayload] = useState<SearchFilterPayload>(() =>
@@ -111,13 +128,14 @@ function OrdersPageContent() {
 	const [isTimelineOpen, setIsTimelineOpen] = useState(false);
 
 	// Fetch Orders using JPA Search Specification Payload
-	const { data, isLoading } = useQuery({
+	const { data, isLoading, isError, error, refetch } = useQuery({
 		queryKey: [
 			"orders-search",
+			selectedCompanyId,
 			searchPayload,
 			page,
 			pageSize,
-			search,
+			debouncedSearch,
 			stageTab,
 		],
 		queryFn: async () => {
@@ -127,6 +145,10 @@ function OrdersPageContent() {
 				page: Math.max(0, page - 1),
 				size: pageSize,
 			};
+
+			if (debouncedSearch.trim()) {
+				basePayload.searchValue = debouncedSearch.trim();
+			}
 
 			// If stageTab selected (DRAFT, POSTED, APPROVED, COMPLETED) add stage filter
 			if (stageTab !== "ALL") {
@@ -144,7 +166,7 @@ function OrdersPageContent() {
 				const res = await ordersApi.search(basePayload);
 				return res;
 			} catch {
-				return ordersApi.list({ page, limit: pageSize, search });
+				return ordersApi.list({ page, limit: pageSize, search: debouncedSearch });
 			}
 		},
 		staleTime: 15 * 1000,
@@ -156,7 +178,6 @@ function OrdersPageContent() {
 		onSuccess: (res) => {
 			toast.success((res as any)?.message || "Order returned to draft");
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsUnpostOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -168,7 +189,6 @@ function OrdersPageContent() {
 		onSuccess: (res) => {
 			toast.success((res as any)?.message || "Order approval revoked");
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsUnapproveOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -184,7 +204,6 @@ function OrdersPageContent() {
 					"Order rejected and inventory reservations freed",
 			);
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsRejectOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -197,7 +216,6 @@ function OrdersPageContent() {
 		onSuccess: (res) => {
 			toast.success((res as any)?.message || "Order voided and stock released");
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsVoidOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -210,7 +228,6 @@ function OrdersPageContent() {
 		onSuccess: (res) => {
 			toast.success((res as any)?.message || "Order returned to draft");
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsMoveToDraftOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -654,58 +671,13 @@ function OrdersPageContent() {
 
 	return (
 		<div className="space-y-4 pb-12">
-			{/* Stage Flow Segmented Tabs (All, Draft, Posted, Approved, Completed, Void) */}
-			<div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 w-full sm:w-auto overflow-x-auto">
-				{[
-					{ id: "ALL", label: t("orders.allOrders"), icon: Layers },
-					{ id: "DRAFT", label: `1. ${t("orders.draft")}`, icon: ShoppingCart },
-					{ id: "POSTED", label: `2. ${t("orders.posted")}`, icon: Send },
-					{
-						id: "APPROVED",
-						label: `3. ${t("orders.approved")}`,
-						icon: ShieldCheck,
-					},
-					{
-						id: "COMPLETED",
-						label: `4. ${t("orders.completed")}`,
-						icon: CheckCircle2,
-					},
-					{ id: "VOID", label: t("orders.void", "Void"), icon: Ban },
-				].map((tab) => {
-					const TabIcon = tab.icon;
-					const isActive = stageTab === tab.id;
-
-					return (
-						<button
-							key={tab.id}
-							onClick={() => {
-								setStageTab(tab.id);
-								setPage(1);
-							}}
-							className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-								isActive
-									? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs ring-1 ring-slate-200/80 dark:ring-slate-700"
-									: "text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
-							}`}
-						>
-							<TabIcon className="h-3.5 w-3.5" />
-							<span>{tab.label}</span>
-						</button>
-					);
-				})}
-			</div>
-
-			{/* Main Data Table with Domain Filter Configs */}
+			{/* Main Data Table with Integrated Clean Toolbar */}
 			<DataTable<Order>
 				data={items}
 				columns={columns}
 				getRowId={(item) => String(item.id)}
-				title={t("orders.title")}
-				titleIcon={
-					<div className="h-7 w-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-2xs">
-						<Store className="h-4 w-4" />
-					</div>
-				}
+				hideHeader={true}
+				hideImportExport={true}
 				searchPlaceholder={t("common.search")}
 				searchValue={search}
 				searchField="orderNumber"
@@ -713,22 +685,37 @@ function OrdersPageContent() {
 					setSearch(val);
 					setPage(1);
 				}}
+				toolbarSearchSuffix={
+					<StatusFilterDropdown
+						value={stageTab}
+						onChange={(val) => {
+							setStageTab(val);
+							setPage(1);
+						}}
+						options={ORDER_STATUS_OPTIONS}
+						label={t("orders.status", "Status")}
+					/>
+				}
 				domainFilterFields={ORDER_DOMAIN_FILTERS}
 				domainTitle="Order Filter Studio"
 				onSearchFilterChange={(payload) => {
 					setSearchPayload(payload);
 					setPage(1);
 				}}
-				createButtonLabel={t("orders.createOrder")}
-				createButtonIcon={<ShoppingCart className="h-4 w-4" />}
-				onCreateNew={
-					canCreateOrder
-						? () => {
+				primaryAction={
+					canCreateOrder ? (
+						<Button
+							onClick={() => {
 								setSelectedOrder(null);
 								setClonedOrder(null);
 								setIsPosOpen(true);
-							}
-						: undefined
+							}}
+							className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+						>
+							<ShoppingCart className="h-3.5 w-3.5" />
+							<span>{t("orders.createOrder", "Create Order")}</span>
+						</Button>
+					) : undefined
 				}
 				manualPagination={true}
 				totalCount={totalOrders}
@@ -737,6 +724,9 @@ function OrdersPageContent() {
 				onPageChange={setPage}
 				onPageSizeChange={setPageSize}
 				isLoading={isLoading}
+				isError={isError}
+				error={error}
+				onRetry={() => refetch()}
 				customRowActions={customRowActions}
 			/>
 
@@ -749,7 +739,6 @@ function OrdersPageContent() {
 						setSelectedOrder(null);
 						setClonedOrder(null);
 						queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-						queryClient.refetchQueries({ queryKey: ["orders-search"] });
 					}
 				}}
 				editingOrder={selectedOrder?.status === "DRAFT" ? selectedOrder : null}
@@ -757,7 +746,6 @@ function OrdersPageContent() {
 				onSuccess={() => {
 					setClonedOrder(null);
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 				}}
 			/>
 
@@ -767,12 +755,10 @@ function OrdersPageContent() {
 					setIsCreateOpen(open);
 					if (!open) {
 						queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-						queryClient.refetchQueries({ queryKey: ["orders-search"] });
 					}
 				}}
 				onSuccess={() => {
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 				}}
 			/>
 
@@ -802,7 +788,6 @@ function OrdersPageContent() {
 							router.replace("/orders", { scroll: false });
 						}
 						queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-						queryClient.refetchQueries({ queryKey: ["orders-search"] });
 					}
 				}}
 			/>
@@ -814,12 +799,10 @@ function OrdersPageContent() {
 					setIsVerifyOpen(open);
 					if (!open) {
 						queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-						queryClient.refetchQueries({ queryKey: ["orders-search"] });
 					}
 				}}
 				onSuccess={() => {
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 				}}
 			/>
 
@@ -831,12 +814,10 @@ function OrdersPageContent() {
 					setIsApproveOpen(open);
 					if (!open) {
 						queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-						queryClient.refetchQueries({ queryKey: ["orders-search"] });
 					}
 				}}
 				onSuccess={() => {
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 				}}
 			/>
 
@@ -847,12 +828,10 @@ function OrdersPageContent() {
 					setIsInvoiceOpen(open);
 					if (!open) {
 						queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-						queryClient.refetchQueries({ queryKey: ["orders-search"] });
 					}
 				}}
 				onSuccess={() => {
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 				}}
 			/>
 

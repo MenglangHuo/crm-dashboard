@@ -31,6 +31,7 @@ import {
 import { LeafletMap } from "@/components/customers/leaflet-map";
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
 	Truck,
 	Phone,
@@ -46,6 +47,7 @@ import {
 	RotateCcw,
 	ExternalLink,
 	Loader2,
+	Plus,
 } from "lucide-react";
 import type { Delivery, DeliveryInput } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
@@ -638,20 +640,7 @@ export default function DeliveriesPage() {
 	const isSaving = createMutation.isPending || updateMutation.isPending;
 
 	return (
-		<div className="space-y-6 max-w-7xl mx-auto pb-10">
-			{/* Title Header */}
-			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-				<div>
-					<h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
-						<Truck className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-						{t("deliveries.title")}
-					</h1>
-					<p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-						{t("deliveries.subtitle")}
-					</p>
-				</div>
-			</div>
-
+		<div className="space-y-4 pb-12">
 			{/* Metrics Summary Cards */}
 			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 				<Card className="rounded-2xl border-slate-200/80 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
@@ -724,7 +713,8 @@ export default function DeliveriesPage() {
 				data={deliveriesData?.items || []}
 				columns={columns}
 				getRowId={(d) => String(d.id)}
-				title={t("deliveries.title")}
+				hideHeader={true}
+				hideImportExport={true}
 				searchPlaceholder={t("deliveries.searchPlaceholder")}
 				searchValue={search}
 				onSearchChange={(val) => {
@@ -732,8 +722,15 @@ export default function DeliveriesPage() {
 					setPage(1);
 				}}
 				domainFilterFields={DELIVERY_DOMAIN_FILTERS}
-				createButtonLabel={t("deliveries.addCarrier")}
-				onCreateNew={openCreate}
+				primaryAction={
+					<Button
+						onClick={openCreate}
+						className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+					>
+						<Plus className="h-3.5 w-3.5" />
+						<span>{t("deliveries.addCarrier", "Add Carrier")}</span>
+					</Button>
+				}
 				manualPagination={true}
 				totalCount={deliveriesData?.total || 0}
 				page={page}

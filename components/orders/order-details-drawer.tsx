@@ -203,7 +203,6 @@ export function OrderDetailsDrawer({
 			queryClient.invalidateQueries({ queryKey: ["orders"] });
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
 			queryClient.invalidateQueries({ queryKey: ["order-detail", orderId] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
 	});
@@ -218,7 +217,6 @@ export function OrderDetailsDrawer({
 			queryClient.invalidateQueries({ queryKey: ["orders"] });
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
 			queryClient.invalidateQueries({ queryKey: ["order-detail", orderId] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
 	});
@@ -236,7 +234,6 @@ export function OrderDetailsDrawer({
 			queryClient.invalidateQueries({ queryKey: ["orders"] });
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
 			queryClient.invalidateQueries({ queryKey: ["order-detail", orderId] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsUnpostOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -255,7 +252,6 @@ export function OrderDetailsDrawer({
 			queryClient.invalidateQueries({ queryKey: ["orders"] });
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
 			queryClient.invalidateQueries({ queryKey: ["order-detail", orderId] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsVoidOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -274,7 +270,6 @@ export function OrderDetailsDrawer({
 			queryClient.invalidateQueries({ queryKey: ["orders"] });
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
 			queryClient.invalidateQueries({ queryKey: ["order-detail", orderId] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsMoveToDraftOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -293,7 +288,6 @@ export function OrderDetailsDrawer({
 			queryClient.invalidateQueries({ queryKey: ["orders"] });
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
 			queryClient.invalidateQueries({ queryKey: ["order-detail", orderId] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsUnapproveOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -312,7 +306,6 @@ export function OrderDetailsDrawer({
 			queryClient.invalidateQueries({ queryKey: ["orders"] });
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
 			queryClient.invalidateQueries({ queryKey: ["order-detail", orderId] });
-			queryClient.refetchQueries({ queryKey: ["orders-search"] });
 			setIsRejectOpen(false);
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
@@ -1397,7 +1390,6 @@ export function OrderDetailsDrawer({
 						queryKey: ["order-detail", orderId],
 					});
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 				}}
 			/>
 
@@ -1407,7 +1399,6 @@ export function OrderDetailsDrawer({
 				clonedOrder={order || null}
 				onSuccess={() => {
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 					onOpenChange(false);
 				}}
 			/>
@@ -1421,7 +1412,6 @@ export function OrderDetailsDrawer({
 						queryKey: ["order-detail", orderId],
 					});
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 				}}
 			/>
 
@@ -1435,7 +1425,6 @@ export function OrderDetailsDrawer({
 						queryKey: ["order-detail", orderId],
 					});
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 				}}
 			/>
 
@@ -1451,7 +1440,6 @@ export function OrderDetailsDrawer({
 					queryClient.invalidateQueries({ queryKey: ["invoices"] });
 					queryClient.invalidateQueries({ queryKey: ["invoices-search-v1"] });
 					queryClient.invalidateQueries({ queryKey: ["invoice-details"] });
-					queryClient.refetchQueries({ queryKey: ["orders-search"] });
 				}}
 			/>
 

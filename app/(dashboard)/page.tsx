@@ -212,10 +212,6 @@ export default function DashboardPage() {
 		try {
 			const res = await reportsApi.refreshReports();
 			await Promise.all([
-				refetchDashboard(),
-				refetchTimeSeries(),
-				refetchIncome(),
-				refetchSubmissions(),
 				queryClient.invalidateQueries({ queryKey: ["dashboard-report"] }),
 				queryClient.invalidateQueries({ queryKey: ["time-series-report"] }),
 				queryClient.invalidateQueries({
@@ -235,10 +231,14 @@ export default function DashboardPage() {
 			});
 		} catch {
 			await Promise.all([
-				refetchDashboard(),
-				refetchTimeSeries(),
-				refetchIncome(),
-				refetchSubmissions(),
+				queryClient.invalidateQueries({ queryKey: ["dashboard-report"] }),
+				queryClient.invalidateQueries({ queryKey: ["time-series-report"] }),
+				queryClient.invalidateQueries({
+					queryKey: ["income-comparison-report"],
+				}),
+				queryClient.invalidateQueries({
+					queryKey: ["feedback-submissions-summary"],
+				}),
 			]);
 			const nowStr = new Date().toLocaleTimeString([], {
 				hour: "2-digit",
