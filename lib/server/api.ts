@@ -63,8 +63,8 @@ export function decodeToken(token: string): TokenPayload | null {
 	}
 }
 
-export const ACCESS_COOKIE = "rumluos_access_token";
-export const REFRESH_COOKIE = "rumluos_refresh_token";
+export const ACCESS_COOKIE = "crm_access_token";
+export const REFRESH_COOKIE = "crm_refresh_token";
 
 export async function getSession(): Promise<UserProfile | null> {
 	const store = await cookies();

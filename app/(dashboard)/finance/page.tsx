@@ -396,14 +396,24 @@ export default function FinancePage() {
 		{
 			label: "Quick Pay",
 			icon: <Zap className="h-3.5 w-3.5 text-amber-500 fill-current" />,
-			onClick: (inv) =>
+			onClick: (inv) => {
+				const rem =
+					inv.remainingAmount !== undefined && inv.remainingAmount !== null
+						? Number(inv.remainingAmount)
+						: Math.max(
+								0,
+								Number(inv.totalAmount || 0) -
+									Number(inv.paidAmount || 0) -
+									Number(inv.paymentDiscountAmount || 0),
+							);
 				openQuickPay({
 					customerId: inv.customerId ? String(inv.customerId) : undefined,
 					invoiceId: inv.id ? String(inv.id) : undefined,
-					amount: inv.totalAmount,
+					amount: rem > 0 ? rem : Number(inv.totalAmount || 0),
 					currency: inv.currency || "USD",
 					invoiceNo: inv.invoiceNo,
-				}),
+				});
+			},
 		},
 		{
 			label: "Generate ABA QR",

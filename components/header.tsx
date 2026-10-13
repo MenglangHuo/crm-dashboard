@@ -1,51 +1,41 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-	Sun,
-	Sunrise,
-	Sunset,
-	Moon,
-	Globe,
-	Palette,
-	User,
-	Settings,
-	Building2,
-	Activity,
-	HelpCircle,
-	LogOut,
-	ChevronDown,
-	ShieldCheck,
-	ShieldAlert,
-	Layers,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useTheme } from "next-themes";
+import { clearAuthCookies } from "@/app/actions/auth";
 import { useCustomTheme } from "@/components/custom-theme-provider";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { profileApi, fileUrl } from "@/lib/api/endpoints";
-import { clearClientSession } from "@/lib/api/client";
+import { CompanySwitcher } from "@/components/header/company-switcher";
+import { LanguageSwitcher } from "@/components/header/language-switcher";
+import { NotificationCenter } from "@/components/notifications/notification-center";
+import { isUserSystemAdmin } from "@/components/providers/company-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuGroup,
 	DropdownMenuItem,
-	DropdownMenuLabel,
 	DropdownMenuSeparator,
-	DropdownMenuTrigger,
+	DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { CompanySwitcher } from "@/components/header/company-switcher";
-import { LanguageSwitcher } from "@/components/header/language-switcher";
-import { NotificationCenter } from "@/components/notifications/notification-center";
-import { isUserSystemAdmin } from "@/components/providers/company-context";
-import { useRouter } from "next/navigation";
-import { clearAuthCookies } from "@/app/actions/auth";
-import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { clearClientSession } from "@/lib/api/client";
+import { fileUrl, profileApi } from "@/lib/api/endpoints";
 import { useTranslation } from "@/lib/i18n/context";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	ChevronDown,
+	HelpCircle,
+	LogOut,
+	Moon,
+	Palette,
+	Settings,
+	Sun,
+	User
+} from "lucide-react";
+import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
+import React from "react";
+import { toast } from "sonner";
 
 function getTimeGreetingType(): "morning" | "afternoon" | "evening" | "night" {
 	const hour = new Date().getHours();
@@ -97,44 +87,9 @@ function HeaderGreeting() {
 		}
 	}, [greetingType, t]);
 
-	const renderIcon = () => {
-		switch (greetingType) {
-			case "morning":
-				return (
-					<div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500 dark:bg-amber-400/15 dark:text-amber-400 shrink-0 shadow-2xs">
-						<Sunrise className="h-4 w-4" />
-					</div>
-				);
-			case "afternoon":
-				return (
-					<div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500 dark:bg-amber-400/15 dark:text-amber-400 shrink-0 shadow-2xs">
-						<Sun className="h-4 w-4" />
-					</div>
-				);
-			case "evening":
-				return (
-					<div className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500 dark:bg-orange-400/15 dark:text-orange-400 shrink-0 shadow-2xs">
-						<Sunset className="h-4 w-4" />
-					</div>
-				);
-			case "night":
-				return (
-					<div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500 dark:bg-indigo-400/15 dark:text-indigo-400 shrink-0 shadow-2xs">
-						<Moon className="h-4 w-4" />
-					</div>
-				);
-			default:
-				return (
-					<div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500 dark:bg-amber-400/15 dark:text-amber-400 shrink-0 shadow-2xs">
-						<Sun className="h-4 w-4" />
-					</div>
-				);
-		}
-	};
-
 	return (
 		<>
-			{renderIcon()}
+		
 			<span suppressHydrationWarning>{greetingText}</span>
 		</>
 	);
@@ -191,7 +146,7 @@ export function Header() {
 	return (
 		<header className="sticky top-0 z-20 flex h-20 shrink-0 items-center justify-between border-b border-slate-200/70 bg-white/82 px-4 shadow-sm shadow-slate-200/40 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/82 dark:shadow-black/20 md:px-8">
 			<div className="flex items-center gap-4">
-				<SidebarTrigger className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100" />
+				{/* <SidebarTrigger className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100" /> */}
 
 				{/* Welcome Greeting */}
 				<div className="hidden sm:block">
@@ -199,15 +154,15 @@ export function Header() {
 						<HeaderGreeting />
 						<span className="inline-flex items-center gap-1">
 							{userName ? (
-								<span>, {userName}</span>
+								<span>• {userName}</span>
 							) : userProfile?.username ? (
-								<span>, {userProfile.username}</span>
+								<span>• {userProfile.username}</span>
 							) : isLoadingProfile && !userProfile ? (
 								<Skeleton className="h-4 w-28 ml-1 inline-block align-middle" />
 							) : null}
 						</span>
 					</h2>
-					<div className="text-xs font-medium text-slate-400 dark:text-slate-500 pl-8 min-h-[18px] flex items-center">
+					<div className="text-xs font-medium text-slate-400 dark:text-slate-500 min-h-[18px] flex items-center">
 						{isLoadingProfile && !userProfile ? (
 							<Skeleton className="h-3 w-40 my-0.5" />
 						) : companyName ? (

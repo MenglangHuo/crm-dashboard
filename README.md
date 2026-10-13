@@ -40,7 +40,7 @@ The CRM frontend is designed as a secure, high-performance single-page/server-re
 
 ### Why Same-Origin Reverse Proxy?
 - **CORS Protection**: The browser only communicates with the same origin (`/api/v1/*`), preventing browser CORS errors and strict-origin issues.
-- **Secure Token & Cookie Handling**: Authentication cookies (`rumluos_access_token`, `rumluos_refresh_token`) work smoothly with `SameSite=Lax` without cross-site cookie blocking.
+- **Secure Token & Cookie Handling**: Authentication cookies (`crm_access_token`, `crm_refresh_token`) work smoothly with `SameSite=Lax` without cross-site cookie blocking.
 - **Clean API Abstraction**: Frontend code interacts with standard relative endpoints while Next.js handles routing to the target backend.
 
 ---

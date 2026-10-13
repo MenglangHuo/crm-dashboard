@@ -21,8 +21,8 @@ const CompanyContext = createContext<CompanyContextType>({
 	isSystemAdmin: false,
 });
 
-const COOKIE_NAME = "rumluos_company_id";
-const ADMIN_COOKIE_NAME = "rumluos_is_system_admin";
+const COOKIE_NAME = "crm_company_id";
+const ADMIN_COOKIE_NAME = "crm_is_system_admin";
 
 export function isUserSystemAdmin(userProfile: any): boolean {
 	if (!userProfile) return false;

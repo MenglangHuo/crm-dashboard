@@ -1505,9 +1505,9 @@ function seed(): MockDb {
 }
 
 // Persist across HMR reloads in dev.
-const globalStore = globalThis as unknown as { __rumluosDb?: MockDb };
+const globalStore = globalThis as unknown as { __crmDb?: MockDb };
 export const db: MockDb =
-	globalStore.__rumluosDb ?? (globalStore.__rumluosDb = seed());
+	globalStore.__crmDb ?? (globalStore.__crmDb = seed());
 export const mockDb = db;
 
 // Ensure arrays exist if store was created before edit

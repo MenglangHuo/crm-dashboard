@@ -247,6 +247,8 @@ const DataTableRow = React.memo(function DataTableRow<
 	props: DataTableRowProps<T>,
 ) => React.ReactElement;
 
+const DEFAULT_EMPTY_DOMAIN_FILTERS: FilterCriterion[] = [];
+
 export function DataTable<T extends Record<string, any>>({
 	data = [],
 	columns = [],
@@ -336,7 +338,7 @@ export function DataTable<T extends Record<string, any>>({
 
 	domainFilterFields = [],
 	domainTitle = "Filter Studio",
-	activeDomainFilters: initialDomainFilters = [],
+	activeDomainFilters: initialDomainFilters = DEFAULT_EMPTY_DOMAIN_FILTERS,
 	onDomainFilterChange,
 	onSearchFilterChange,
 	filterButtonLabel,
@@ -445,6 +447,29 @@ export function DataTable<T extends Record<string, any>>({
 	const [domainFilters, setDomainFilters] =
 		useState<FilterCriterion[]>(initialDomainFilters);
 	const [isDomainModalOpen, setIsDomainModalOpen] = useState(false);
+
+	React.useEffect(() => {
+		if (initialDomainFilters !== undefined) {
+			setDomainFilters((prev) => {
+				if (prev === initialDomainFilters) return prev;
+				if (
+					prev.length === initialDomainFilters.length &&
+					prev.every((p, idx) => {
+						const next = initialDomainFilters[idx];
+						return (
+							p.field === next?.field &&
+							p.operator === next?.operator &&
+							p.value === next?.value &&
+							p.valueTo === next?.valueTo
+						);
+					})
+				) {
+					return prev;
+				}
+				return initialDomainFilters;
+			});
+		}
+	}, [initialDomainFilters]);
 
 	// Local search state for instant typing response
 	const [localSearch, setLocalSearch] = useState(search || "");

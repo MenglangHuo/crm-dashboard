@@ -75,8 +75,8 @@ export function OneSignalProvider({ children }: { children: React.ReactNode }) {
 			"/register-company",
 		].some((p) => window.location.pathname.startsWith(p));
 		const tokenExists =
-			document.cookie.includes("rumluos_access_token") ||
-			Boolean(localStorage.getItem("rumluos_access_token"));
+			document.cookie.includes("crm_access_token") ||
+			Boolean(localStorage.getItem("crm_access_token"));
 		setHasToken(!isAuthPage && tokenExists);
 	}, []);
 

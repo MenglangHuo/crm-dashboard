@@ -20,6 +20,7 @@ import {
 	ModernSelect,
 	ModernInput,
 	ModernSwitch,
+	ModernDatePicker,
 	SelectOption,
 } from "@/components/ui-custom/form-controls";
 import { Badge } from "@/components/ui/badge";
@@ -409,11 +410,10 @@ export function ChangePaymentTermModal({
 
 						{overrideDueDate && (
 							<div className="pt-1">
-								<ModernInput
+								<ModernDatePicker
 									label="កាលបរិច្ឆេទផុតកំណត់ផ្ទាល់ខ្លួន (Custom Due Date)"
-									type="date"
 									value={customDueDate}
-									onChange={(e) => setCustomDueDate(e.target.value)}
+									onChange={(date) => setCustomDueDate(date)}
 									helperText="កាលបរិច្ឆេទនេះនឹងជំនួសការគណនាស្វ័យប្រវត្តិនៃលក្ខខណ្ឌទូទាត់"
 									required
 								/>

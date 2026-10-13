@@ -19,7 +19,9 @@ import {
 	ModernModalFooter,
 	ModernModalCancelButton,
 	ModernModalSubmitButton,
+	ModernModalActionButton,
 } from "@/components/ui-custom/modal";
+import { cn } from "@/lib/utils";
 import {
 	ModernInput,
 	ModernTextarea,
@@ -333,23 +335,33 @@ export function WarehouseVerifyModal({
 			resizable={true}
 			isLoading={verifyMutation.isPending || isOrderLoading}
 			footer={
-				<ModernModalFooter>
-					<ModernModalCancelButton onClick={() => onOpenChange(false)} />
-					<Button
-						type="button"
-						variant="outline"
+				<ModernModalFooter className="gap-3">
+					<ModernModalCancelButton
+						onClick={() => onOpenChange(false)}
+						height="h-11"
+						width="min-w-[120px]"
+						padding="px-5"
+					/>
+					<ModernModalActionButton
 						onClick={() => handleSave(true)}
 						disabled={verifyMutation.isPending || !canSubmitVerification}
-						className="rounded-xl text-xs border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 font-semibold"
+						variant="outline"
+						height="h-11"
+						width="min-w-[170px]"
+						padding="px-5"
+						className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40 font-semibold"
+						icon={<Save className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
 					>
-						<Save className="h-3.5 w-3.5 mr-1.5" /> Temporary Save (No History
-						Log)
-					</Button>
+						Temporary Save (Draft)
+					</ModernModalActionButton>
 					<ModernModalSubmitButton
 						onClick={() => handleSave(false)}
 						disabled={!canSubmitVerification}
 						isLoading={verifyMutation.isPending}
 						loadingText="Submitting..."
+						height="h-11"
+						width="min-w-[190px]"
+						padding="px-6"
 						icon={
 							hasAnyAdjustment ? (
 								<AlertCircle className="h-4 w-4" />
@@ -360,11 +372,11 @@ export function WarehouseVerifyModal({
 						className={
 							hasAnyAdjustment
 								? "bg-amber-600 hover:bg-amber-700 text-white"
-								: "bg-emerald-600 hover:bg-emerald-700 text-white"
+								: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
 						}
 					>
 						{hasAnyAdjustment
-							? "Adjust Quantities & Request Re-approval"
+							? "Adjust & Request Re-approval"
 							: "Submit Final Approval"}
 					</ModernModalSubmitButton>
 				</ModernModalFooter>
@@ -410,17 +422,22 @@ export function WarehouseVerifyModal({
 							variant="outline"
 							className={`text-xs font-semibold ${
 								percentChecked === 100
-									? "bg-emerald-50 text-emerald-700 border-emerald-300"
+									? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
 									: percentChecked > 0
-										? "bg-amber-50 text-amber-700 border-amber-300"
-										: "bg-slate-100 text-slate-600 border-slate-300"
+										? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+										: "bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
 							}`}
 						>
-							{percentChecked === 100
-								? "CHECKED_ALL"
-								: percentChecked > 0
-									? "PARTIAL_CHECK"
-									: "NOT_YET"}
+							{percentChecked === 100 ? (
+								<span className="inline-flex items-center gap-1">
+									<CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+									All Items Verified
+								</span>
+							) : percentChecked > 0 ? (
+								"Partially Verified"
+							) : (
+								"Pending Inspection"
+							)}
 						</Badge>
 					</div>
 
@@ -429,29 +446,29 @@ export function WarehouseVerifyModal({
 
 				{/* Verification Items Table */}
 				<div className="space-y-2">
-					<div className="flex items-center justify-between px-1">
+					<div className="flex items-center justify-between gap-4 px-1 py-1">
 						<ModernCheckbox
 							label="Check / Uncheck All Line Items"
 							checked={totalItems > 0 && checkedCount === totalItems}
 							onCheckedChange={(c) => handleToggleCheckAll(Boolean(c))}
 						/>
-						<span className="text-xs font-mono text-slate-400">
-							Order No:{" "}
-							<strong className="text-slate-700 dark:text-slate-300">
-								{order.orderNumber || order.orderNo}
-							</strong>
-						</span>
+						<div className="flex items-center gap-1.5 text-xs whitespace-nowrap shrink-0">
+							<span className="text-slate-400 dark:text-slate-500 font-medium">Order No:</span>
+							<span className="font-mono font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200/90 dark:border-slate-700/80 select-all">
+								{order.orderNumber || order.orderNo || `#${order.id}`}
+							</span>
+						</div>
 					</div>
 
 					<div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
 						<table className="w-full text-left text-xs">
-							<thead className="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-800">
+							<thead className="bg-slate-100/90 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-800">
 								<tr>
-									<th className="p-3 w-12 text-center">Tick</th>
-									<th className="p-3">Product Name & SKU</th>
+									<th className="p-3 w-14 text-center">Verify</th>
+									<th className="p-3">Product Items</th>
 									<th className="p-3 w-28 text-center">Ordered Qty</th>
-									<th className="p-3 w-36">Physical Count</th>
-									<th className="p-3 w-28 text-center">Verification Status</th>
+									<th className="p-3 w-36 text-center">Physical Count</th>
+									<th className="p-3 w-32 text-center">Status</th>
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -488,15 +505,17 @@ export function WarehouseVerifyModal({
 											</td>
 
 											<td className="p-3">
-												<div className="flex items-center gap-2">
-													{row.isAddon ? (
-														<Gift className="h-4 w-4 text-purple-600 shrink-0" />
-													) : (
-														<Package className="h-4 w-4 text-slate-500 shrink-0" />
-													)}
-													<div>
-														<div className="flex items-center gap-1.5">
-															<span className="font-bold text-slate-900 dark:text-slate-100">
+												<div className="flex items-center gap-2.5">
+													<div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 shrink-0 border border-slate-200/60 dark:border-slate-700/60">
+														{row.isAddon ? (
+															<Gift className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+														) : (
+															<Package className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+														)}
+													</div>
+													<div className="min-w-0">
+														<div className="flex items-center gap-1.5 flex-wrap">
+															<span className="font-bold text-slate-900 dark:text-slate-100 truncate">
 																{row.productName}
 															</span>
 															{row.isAddon && (
@@ -508,21 +527,34 @@ export function WarehouseVerifyModal({
 																</Badge>
 															)}
 														</div>
-														<div className="text-[11px] font-mono text-slate-400 flex flex-wrap items-center gap-2">
-															<span>SKU: {row.sku}</span>
+														<div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
 															{row.availableStock !== undefined && (
-																<span className="text-slate-500 dark:text-slate-400 font-medium">
-																	In Stock: <strong className="font-semibold text-slate-700 dark:text-slate-300">{row.availableStock}</strong>
+																<span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium">
+																	<span
+																		className={cn(
+																			"h-1.5 w-1.5 rounded-full shrink-0",
+																			row.availableStock >= row.orderQuantity
+																				? "bg-emerald-500"
+																				: "bg-rose-500",
+																		)}
+																	/>
+																	<span>
+																		In Stock:{" "}
+																		<strong className="font-semibold text-slate-700 dark:text-slate-300">
+																			{row.availableStock}
+																		</strong>
+																	</span>
 																</span>
 															)}
-															{row.availableStock !== undefined && row.availableStock < row.orderQuantity && (
-																<Badge
-																	variant="outline"
-																	className="bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900 text-[10px] py-0 px-1 font-semibold"
-																>
-																	Shortage: Lack {row.orderQuantity - row.availableStock}
-																</Badge>
-															)}
+															{row.availableStock !== undefined &&
+																row.availableStock < row.orderQuantity && (
+																	<Badge
+																		variant="outline"
+																		className="bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900 text-[10px] py-0 px-1.5 font-semibold"
+																	>
+																		Shortage: Lack {row.orderQuantity - row.availableStock}
+																	</Badge>
+																)}
 														</div>
 													</div>
 												</div>
@@ -551,14 +583,14 @@ export function WarehouseVerifyModal({
 														)
 													}
 													inputSize="sm"
-													className={`font-mono font-bold ${
+													className={`font-mono font-bold text-center ${
 														hasDifference
-															? "border-amber-500 bg-amber-50 text-amber-900"
+															? "border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
 															: ""
 													}`}
 												/>
 												{hasDifference && (
-													<div className="text-[10px] text-amber-600 font-medium mt-0.5">
+													<div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-0.5 text-center">
 														Delta ({delta > 0 ? `+${delta}` : delta})
 													</div>
 												)}
@@ -566,13 +598,13 @@ export function WarehouseVerifyModal({
 
 											<td className="p-3 text-center">
 												{row.isVerified ? (
-													<Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2.5 gap-1">
+													<Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-[10px] py-0.5 px-2.5 gap-1 shadow-2xs">
 														<CheckCircle2 className="h-3 w-3" /> Checked
 													</Badge>
 												) : (
 													<Badge
 														variant="outline"
-														className="text-slate-400 border-slate-300 text-[10px]"
+														className="text-slate-400 border-slate-300 dark:border-slate-700 text-[10px]"
 													>
 														Pending
 													</Badge>
@@ -587,13 +619,16 @@ export function WarehouseVerifyModal({
 				</div>
 
 				{/* Verification Note */}
-				<ModernTextarea
-					label="Stockkeeper Inspection Notes"
-					value={reason}
-					onChange={(e) => setReason(e.target.value)}
-					placeholder="Notes on aisle location, physical condition, or variance justification..."
-					rows={2}
-				/>
+				<div className="space-y-1">
+					<ModernTextarea
+						label="Stockkeeper Inspection Notes"
+						value={reason}
+						onChange={(e) => setReason(e.target.value)}
+						placeholder="Notes on aisle location, physical condition, packaging integrity, or variance justification..."
+						rows={2}
+						helperText="Optional reference notes recorded with this verification submission."
+					/>
+				</div>
 			</div>
 		</ModernModal>
 	);

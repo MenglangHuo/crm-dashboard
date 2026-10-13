@@ -16,6 +16,7 @@ import {
 	ModernInput,
 	ModernTextarea,
 	ModernSelect,
+	ModernDatePicker,
 } from "@/components/ui-custom/form-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -565,11 +566,10 @@ export function MultiInvoicePaymentModal({
 							required
 						/>
 
-						<ModernInput
+						<ModernDatePicker
 							label="Payment Date"
-							type="date"
 							value={paymentDate}
-							onChange={(e) => setPaymentDate(e.target.value)}
+							onChange={(date) => setPaymentDate(date)}
 							required
 						/>
 

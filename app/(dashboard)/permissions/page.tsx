@@ -253,12 +253,12 @@ export default function PermissionsPage() {
 						data={filteredPermissions}
 						columns={columns}
 						getRowId={(p) => p.id}
-						title={t("permissions.title")}
+						// title={t("permissions.title")}
 						searchPlaceholder={t("permissions.searchPlaceholder")}
 						searchValue={search}
 						onSearchChange={setSearch}
 						isLoading={isLoading}
-						exportFilename="permissions-list"
+						// exportFilename="permissions-list"
 					/>
 				</ModernTabsContent>
 

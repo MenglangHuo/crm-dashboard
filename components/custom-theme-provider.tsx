@@ -79,7 +79,7 @@ export function CustomThemeProvider({
 	const [preset, setPresetState] = useState<string>(() => {
 		if (typeof window !== "undefined") {
 			try {
-				const savedPreset = localStorage.getItem("rumluos_theme_preset");
+				const savedPreset = localStorage.getItem("crm_theme_preset");
 				if (savedPreset && THEME_PRESETS.some((p) => p.key === savedPreset)) {
 					return savedPreset;
 				}
@@ -90,7 +90,7 @@ export function CustomThemeProvider({
 	const [customColor, setCustomColorState] = useState<string | null>(() => {
 		if (typeof window !== "undefined") {
 			try {
-				return localStorage.getItem("rumluos_theme_custom_color");
+				return localStorage.getItem("crm_theme_custom_color");
 			} catch {}
 		}
 		return null;
@@ -125,8 +125,8 @@ export function CustomThemeProvider({
 		setPresetState(presetKey);
 		setCustomColorState(null);
 		try {
-			localStorage.setItem("rumluos_theme_preset", presetKey);
-			localStorage.removeItem("rumluos_theme_custom_color");
+			localStorage.setItem("crm_theme_preset", presetKey);
+			localStorage.removeItem("crm_theme_custom_color");
 		} catch {}
 	}, []);
 
@@ -134,9 +134,9 @@ export function CustomThemeProvider({
 		setCustomColorState(color);
 		try {
 			if (color) {
-				localStorage.setItem("rumluos_theme_custom_color", color);
+				localStorage.setItem("crm_theme_custom_color", color);
 			} else {
-				localStorage.removeItem("rumluos_theme_custom_color");
+				localStorage.removeItem("crm_theme_custom_color");
 			}
 		} catch {}
 	}, []);
@@ -145,8 +145,8 @@ export function CustomThemeProvider({
 		setPresetState("brand");
 		setCustomColorState(null);
 		try {
-			localStorage.setItem("rumluos_theme_preset", "brand");
-			localStorage.removeItem("rumluos_theme_custom_color");
+			localStorage.setItem("crm_theme_preset", "brand");
+			localStorage.removeItem("crm_theme_custom_color");
 		} catch {}
 	}, []);
 

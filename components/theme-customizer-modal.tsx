@@ -48,17 +48,22 @@ export function ThemeCustomizerModal() {
 			footer={
 				<ModernModalFooter>
 					<ModernButton
-						variant="primary"
+						variant="danger"
 						size="sm"
 						onClick={resetToDefault}
-						leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+						// leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
 						className="rounded-[12px] p-5"
 					>
 						Reset to Default
 					</ModernButton>
-					<ModernModalCancelButton onClick={() => setIsCustomizerOpen(false)}>
+					<ModernButton 
+					variant="primary"
+					size="sm"
+					// leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+					className="rounded-[12px] p-5"
+					onClick={() => setIsCustomizerOpen(false)}>
 						Done
-					</ModernModalCancelButton>
+					</ModernButton>
 				</ModernModalFooter>
 			}
 		>

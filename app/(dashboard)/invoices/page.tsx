@@ -51,7 +51,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useCompanyContext } from "@/components/providers/company-context";
-import { useDebounce } from "@/hooks/use-debounce";
 
 function InvoicesPageContent() {
 	const router = useRouter();
@@ -71,7 +70,6 @@ function InvoicesPageContent() {
 
 	// State Management
 	const [search, setSearch] = useState(() => invoiceParam || "");
-	const debouncedSearch = useDebounce(search, 300);
 	const [statusFilter, setStatusFilter] = useState<string>("ALL");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
@@ -112,8 +110,9 @@ function InvoicesPageContent() {
 
 	// Advanced Search Payload for POST /v1/invoices/search
 	const searchPayload = useMemo(() => {
+		const trimmedSearch = search.trim();
 		const payload = buildSearchFilterPayload({
-			searchValue: debouncedSearch,
+			searchValue: trimmedSearch,
 			searchField: "invoiceNumber",
 			activeFilters: activeFilters,
 			sortState: [{ field: "createdAt", direction: "DESC" }],
@@ -147,7 +146,7 @@ function InvoicesPageContent() {
 		}
 
 		return payload;
-	}, [debouncedSearch, activeFilters, statusFilter, page, pageSize]);
+	}, [search, activeFilters, statusFilter, page, pageSize]);
 
 	// Invoices Query using POST /v1/invoices/search with fallback
 	const {
@@ -163,12 +162,9 @@ function InvoicesPageContent() {
 			"search-v1",
 			selectedCompanyId,
 			searchPayload,
-			statusFilter,
-			page,
-			pageSize,
-			debouncedSearch,
 		],
 		queryFn: async () => {
+			const trimmedSearch = search.trim();
 			try {
 				const res = await invoicesApi.search(searchPayload);
 				if (res && res.items) {
@@ -180,7 +176,7 @@ function InvoicesPageContent() {
 			return financeApi.listInvoices({
 				page,
 				limit: pageSize,
-				search: debouncedSearch,
+				search: trimmedSearch || undefined,
 				status: statusFilter !== "ALL" ? statusFilter : undefined,
 			});
 		},
@@ -422,11 +418,18 @@ function InvoicesPageContent() {
 							e.stopPropagation();
 							const invNo = row.invoiceNumber || row.invoiceNo;
 							const rem =
-								row.remainingAmount ?? row.totalAmount - (row.paidAmount || 0);
+								row.remainingAmount !== undefined && row.remainingAmount !== null
+									? Number(row.remainingAmount)
+									: Math.max(
+											0,
+											Number(row.totalAmount || 0) -
+												Number(row.paidAmount || 0) -
+												Number(row.paymentDiscountAmount || 0),
+										);
 							openQuickPay({
 								customerId: String(row.customerId || row.customer?.id || ""),
 								invoiceId: String(row.id),
-								amount: rem > 0 ? rem : row.totalAmount,
+								amount: rem > 0 ? rem : Number(row.totalAmount || 0),
 								currency: row.currency || "USD",
 								invoiceNo: invNo,
 							});
@@ -874,6 +877,7 @@ function InvoicesPageContent() {
 				hideImportExport={true}
 				searchPlaceholder={t("common.search")}
 				searchValue={search}
+				searchField="invoiceNumber"
 				onSearchChange={(val) => {
 					setSearch(val);
 					setPage(1);
@@ -985,7 +989,7 @@ function InvoicesPageContent() {
 				onSuccess={() => {
 					refetch();
 					queryClient.invalidateQueries({ queryKey: ["invoices"] });
-					queryClient.invalidateQueries({ queryKey: ["invoices-search-v1"] });
+					queryClient.invalidateQueries({ queryKey: ["invoices", "search-v1"] });
 					queryClient.invalidateQueries({ queryKey: ["invoice-details"] });
 				}}
 			/>
@@ -998,7 +1002,7 @@ function InvoicesPageContent() {
 				onSuccess={() => {
 					refetch();
 					queryClient.invalidateQueries({ queryKey: ["invoices"] });
-					queryClient.invalidateQueries({ queryKey: ["invoices-search-v1"] });
+					queryClient.invalidateQueries({ queryKey: ["invoices", "search-v1"] });
 					queryClient.invalidateQueries({ queryKey: ["invoice-details"] });
 				}}
 			/>
@@ -1011,7 +1015,7 @@ function InvoicesPageContent() {
 				onSuccess={() => {
 					refetch();
 					queryClient.invalidateQueries({ queryKey: ["invoices"] });
-					queryClient.invalidateQueries({ queryKey: ["invoices-search-v1"] });
+					queryClient.invalidateQueries({ queryKey: ["invoices", "search-v1"] });
 					queryClient.invalidateQueries({ queryKey: ["invoice-details"] });
 				}}
 			/>

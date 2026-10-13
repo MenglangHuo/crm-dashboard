@@ -23,8 +23,8 @@ export const SUPPORTED_LOCALES: LocaleOption[] = [
 ];
 
 export const DEFAULT_LOCALE: Locale = "en";
-export const LOCALE_COOKIE_KEY = "rumluos_locale";
-export const LOCALE_STORAGE_KEY = "rumluos_locale";
+export const LOCALE_COOKIE_KEY = "crm_locale";
+export const LOCALE_STORAGE_KEY = "crm_locale";
 
 export type TranslationParams = Record<string, string | number>;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
 	Filter,
 	RotateCcw,
@@ -100,19 +100,29 @@ export function resolveAsyncEntity(
 	return undefined;
 }
 
+const entityDefaultOptionsCache: Partial<
+	Record<AsyncFilterEntityType, SearchSelectOption[]>
+> = {};
+
 export async function loadEntityOptions(
 	entity: AsyncFilterEntityType,
 	query: string = "",
 ): Promise<SearchSelectOption[]> {
+	const trimmedQuery = query.trim();
+	if (!trimmedQuery && entityDefaultOptionsCache[entity]) {
+		return entityDefaultOptionsCache[entity]!;
+	}
+
 	try {
+		let results: SearchSelectOption[] = [];
 		switch (entity) {
 			case "customer": {
 				const res = await customersApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 30,
 				} as any);
 				const items = res?.items || [];
-				return items.map((c: any) => {
+				results = items.map((c: any) => {
 					const fullName =
 						`${c.firstName || c.firstname || ""} ${c.lastName || c.lastname || ""}`.trim();
 					const name =
@@ -134,75 +144,81 @@ export async function loadEntityOptions(
 						badge: c.status,
 					};
 				});
+				break;
 			}
 			case "category": {
 				const res = await categoriesApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 100,
 				} as any);
 				const items = res?.items || [];
-				return items.map((cat: any) => ({
+				results = items.map((cat: any) => ({
 					value: cat.id,
 					label: cat.name || cat.categoryName || `Category #${cat.id}`,
 					subtitle: cat.code ? `Code: ${cat.code}` : undefined,
 				}));
+				break;
 			}
 			case "brand": {
 				const res = await brandsApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 100,
 				} as any);
 				const items = res?.items || [];
-				return items.map((b: any) => ({
+				results = items.map((b: any) => ({
 					value: b.id,
 					label: b.name || b.brandName || `Brand #${b.id}`,
 					subtitle: b.code ? `Code: ${b.code}` : undefined,
 				}));
+				break;
 			}
 			case "warehouse": {
 				const res = await warehousesApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 100,
 				} as any);
 				const items = res?.items || [];
-				return items.map((w: any) => ({
+				results = items.map((w: any) => ({
 					value: w.id,
 					label: w.name || w.warehouseName || `Warehouse #${w.id}`,
 					subtitle: w.location || w.address || undefined,
 				}));
+				break;
 			}
 			case "branch": {
 				const res = await branchesApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 100,
 				} as any);
 				const items = res?.items || [];
-				return items.map((br: any) => ({
+				results = items.map((br: any) => ({
 					value: br.id,
 					label: br.name || br.branchName || `Branch #${br.id}`,
 					subtitle: br.address || br.phone || undefined,
 				}));
+				break;
 			}
 			case "supplier": {
 				const res = await suppliersApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 100,
 				} as any);
 				const items = res?.items || [];
-				return items.map((s: any) => ({
+				results = items.map((s: any) => ({
 					value: s.id,
 					label: s.name || s.supplierName || `Supplier #${s.id}`,
 					subtitle: s.contactName || s.phone || s.email || undefined,
 				}));
+				break;
 			}
 			case "user":
 			case "staff": {
 				const res = await usersApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 100,
 				} as any);
 				const items = res?.items || [];
-				return items.map((u: any) => {
+				results = items.map((u: any) => {
 					const fullName =
 						`${u.firstName || u.firstname || ""} ${u.lastName || u.lastname || ""}`.trim();
 					const name =
@@ -219,56 +235,66 @@ export async function loadEntityOptions(
 						badge: u.role || (u.roles && u.roles[0]?.name),
 					};
 				});
+				break;
 			}
 			case "division": {
 				const res = await divisionsApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 100,
 				} as any);
 				const items = res?.items || [];
-				return items.map((d: any) => ({
+				results = items.map((d: any) => ({
 					value: d.id,
 					label: d.name || d.divisionName || `Division #${d.id}`,
 				}));
+				break;
 			}
 			case "department": {
 				const res = await departmentsApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 100,
 				} as any);
 				const items = res?.items || [];
-				return items.map((dep: any) => ({
+				results = items.map((dep: any) => ({
 					value: dep.id,
 					label: dep.name || dep.departmentName || `Department #${dep.id}`,
 				}));
+				break;
 			}
 			case "unit": {
 				const res = await unitsApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 100,
 				} as any);
 				const items = res?.items || [];
-				return items.map((un: any) => ({
+				results = items.map((un: any) => ({
 					value: un.id,
 					label: un.name || un.unitName || `Unit #${un.id}`,
 					subtitle: un.symbol ? `Symbol: ${un.symbol}` : undefined,
 				}));
+				break;
 			}
 			case "product": {
 				const res = await productsApi.list({
-					search: query || undefined,
+					search: trimmedQuery || undefined,
 					limit: 50,
 				} as any);
 				const items = res?.items || [];
-				return items.map((p: any) => ({
+				results = items.map((p: any) => ({
 					value: p.id,
 					label: p.name || p.productName || `Product #${p.id}`,
 					subtitle: p.code ? `SKU: ${p.code}` : undefined,
 				}));
+				break;
 			}
 			default:
-				return [];
+				results = [];
 		}
+
+		if (!trimmedQuery && results.length > 0) {
+			entityDefaultOptionsCache[entity] = results;
+		}
+		return results;
 	} catch (err) {
 		console.error(`Failed to load options for entity ${entity}:`, err);
 		return [];
@@ -304,6 +330,18 @@ export function DynamicFilterModal({
 		{},
 	);
 
+	// Stable reference cache for async entity option loaders
+	const entityLoaderMap = useRef<
+		Record<string, (q: string) => Promise<SearchSelectOption[]>>
+	>({});
+	const getEntityLoader = (entity: AsyncFilterEntityType) => {
+		if (!entityLoaderMap.current[entity]) {
+			entityLoaderMap.current[entity] = (q: string) =>
+				loadEntityOptions(entity, q);
+		}
+		return entityLoaderMap.current[entity];
+	};
+
 	// Sync draft state whenever modal opens or activeFilters change
 	useEffect(() => {
 		if (open) {
@@ -311,7 +349,23 @@ export function DynamicFilterModal({
 			activeFilters.forEach((af) => {
 				map[af.field] = { ...af };
 			});
-			setDraftFilters(map);
+			setDraftFilters((prev) => {
+				const prevKeys = Object.keys(prev);
+				const newKeys = Object.keys(map);
+				if (
+					prevKeys.length === newKeys.length &&
+					prevKeys.every(
+						(k) =>
+							prev[k]?.field === map[k]?.field &&
+							prev[k]?.operator === map[k]?.operator &&
+							prev[k]?.value === map[k]?.value &&
+							prev[k]?.valueTo === map[k]?.valueTo,
+					)
+				) {
+					return prev;
+				}
+				return map;
+			});
 		}
 	}, [open, activeFilters]);
 
@@ -322,6 +376,13 @@ export function DynamicFilterModal({
 		if (existing) {
 			if (isStatus && existing.operator !== "EQUAL") {
 				return { ...existing, operator: "EQUAL" };
+			}
+			if (
+				fieldDef.lockOperator &&
+				fieldDef.defaultOperator &&
+				existing.operator !== fieldDef.defaultOperator
+			) {
+				return { ...existing, operator: fieldDef.defaultOperator };
 			}
 			return existing;
 		}
@@ -375,10 +436,9 @@ export function DynamicFilterModal({
 		onOpenChange(false);
 	};
 
-	// Handle Reset All
+	// Handle Reset All (only resets modal draft inputs; API is called only when Apply Filters is clicked)
 	const handleResetAll = () => {
 		setDraftFilters({});
-		if (onResetFilters) onResetFilters();
 	};
 
 	// Count active draft criteria
@@ -513,12 +573,16 @@ export function DynamicFilterModal({
 										variant="outline"
 										className={cn(
 											"text-[9px] font-mono uppercase font-bold rounded-md px-1.5 py-0.5",
-											isStatus
+											isStatus || fieldDef.lockOperator
 												? "bg-primary/10 text-primary border-primary/20"
 												: "text-muted-foreground",
 										)}
 									>
-										{isStatus ? "EQUAL" : criterion.operator}
+										{isStatus
+											? "EQUAL"
+											: fieldDef.lockOperator
+												? fieldDef.defaultOperator || "EQUAL"
+												: criterion.operator}
 									</Badge>
 								</div>
 
@@ -590,7 +654,7 @@ export function DynamicFilterModal({
 												fieldDef.loadOptions
 													? fieldDef.loadOptions
 													: asyncEntity
-														? (q) => loadEntityOptions(asyncEntity, q)
+														? getEntityLoader(asyncEntity)
 														: undefined
 											}
 											onChange={(val, selectedOptions) => {
@@ -1053,65 +1117,90 @@ export function DynamicFilterModal({
 								)}
 
 								{/* 9. TEXT */}
-								{fieldDef.type === "text" && (
-									<div className="flex items-center gap-2">
-										<div className="w-36 shrink-0">
-											<ModernSelect
-												selectSize="sm"
-												value={criterion.operator || "LIKE"}
-												onChange={(op) => {
-													const opVal = op as FilterOperator;
-													updateFieldCriterion(fieldDef.field, {
-														field: fieldDef.field,
-														operator: opVal,
-														value:
-															opVal === "IS_NULL" || opVal === "IS_NOT_NULL"
-																? undefined
-																: criterion.value,
-													});
+								{fieldDef.type === "text" &&
+									(fieldDef.lockOperator ? (
+										<div className="w-full">
+											<ModernInput
+												inputSize="sm"
+												placeholder={
+													fieldDef.placeholder ||
+													`Filter by ${fieldDef.label}...`
+												}
+												value={criterion.value ?? ""}
+												onChange={(e) => {
+													const val = e.target.value;
+													if (!val) clearField(fieldDef.field);
+													else {
+														updateFieldCriterion(fieldDef.field, {
+															field: fieldDef.field,
+															operator: fieldDef.defaultOperator || "EQUAL",
+															value: val,
+														});
+													}
 												}}
-												options={[
-													{ label: "Contains (LIKE)", value: "LIKE" },
-													{ label: "Starts With", value: "STARTS_WITH" },
-													{ label: "Ends With", value: "ENDS_WITH" },
-													{ label: "Exact Match (EQ)", value: "EQUAL" },
-													{ label: "Not Equal (NE)", value: "NOT_EQUAL" },
-													{ label: "Full-Text", value: "FULL_TEXT" },
-													{ label: "Is Null", value: "IS_NULL" },
-													{ label: "Is Not Null", value: "IS_NOT_NULL" },
-												]}
+												clearable={true}
 											/>
 										</div>
-
-										{criterion.operator !== "IS_NULL" &&
-											criterion.operator !== "IS_NOT_NULL" && (
-												<ModernInput
-													placeholder={
-														fieldDef.placeholder ||
-														`Filter by ${fieldDef.label}...`
-													}
-													value={criterion.value ?? ""}
-													onChange={(e) => {
-														const val = e.target.value;
-														if (!val) clearField(fieldDef.field);
-														else {
-															updateFieldCriterion(fieldDef.field, {
-																field: fieldDef.field,
-																operator:
-																	criterion.operator ||
-																	fieldDef.defaultOperator ||
-																	"LIKE",
-																value: val,
-															});
-														}
+									) : (
+										<div className="flex items-center gap-2">
+											<div className="w-36 shrink-0">
+												<ModernSelect
+													selectSize="sm"
+													value={criterion.operator || "LIKE"}
+													onChange={(op) => {
+														const opVal = op as FilterOperator;
+														updateFieldCriterion(fieldDef.field, {
+															field: fieldDef.field,
+															operator: opVal,
+															value:
+																opVal === "IS_NULL" || opVal === "IS_NOT_NULL"
+																	? undefined
+																	: criterion.value,
+														});
 													}}
-													clearable={true}
-													inputSize="sm"
-													className="flex-1"
+													options={[
+														{ label: "Contains (LIKE)", value: "LIKE" },
+														{ label: "Starts With", value: "STARTS_WITH" },
+														{ label: "Ends With", value: "ENDS_WITH" },
+														{ label: "Exact Match (EQ)", value: "EQUAL" },
+														{ label: "Not Equal (NE)", value: "NOT_EQUAL" },
+														{ label: "Full-Text", value: "FULL_TEXT" },
+														{ label: "Is Null", value: "IS_NULL" },
+														{ label: "Is Not Null", value: "IS_NOT_NULL" },
+													]}
 												/>
-											)}
-									</div>
-								)}
+											</div>
+
+											{criterion.operator !== "IS_NULL" &&
+												criterion.operator !== "IS_NOT_NULL" && (
+													<ModernInput
+														placeholder={
+															fieldDef.placeholder ||
+															`Filter by ${fieldDef.label}...`
+														}
+														value={criterion.value ?? ""}
+														onChange={(e) => {
+															const val = e.target.value;
+															if (!val) clearField(fieldDef.field);
+															else {
+																updateFieldCriterion(fieldDef.field, {
+																	field: fieldDef.field,
+																	operator:
+																		criterion.operator ||
+																		fieldDef.defaultOperator ||
+																		"LIKE",
+																	value: val,
+																});
+															}
+														}}
+														clearable={true}
+														inputSize="sm"
+														className="flex-1"
+														containerClassName="flex-1"
+													/>
+												)}
+										</div>
+									))}
 							</div>
 						);
 					})}

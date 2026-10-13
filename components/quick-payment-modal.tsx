@@ -25,7 +25,8 @@ import {
 	Trash2,
 	UploadCloud,
 	X,
-	Zap
+	Zap,
+	Lock,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -104,14 +105,30 @@ export function QuickPaymentModal() {
 		enabled: Boolean(selectedInvoiceId) && isQuickPayOpen,
 	});
 
-	// Selected Invoice info
+	// Check if this modal was opened for a specific invoice / row
+	const isInvoiceLocked = Boolean(quickPayInitialData?.invoiceId);
+
+	// Helper to extract remaining balance / balance due
+	const getInvoiceRemainingBalance = (inv?: Invoice | null): number => {
+		if (!inv) return 0;
+		if (inv.remainingAmount !== undefined && inv.remainingAmount !== null) {
+			return Number(inv.remainingAmount);
+		}
+		const total = Number(inv.totalAmount || 0);
+		const paid = Number(inv.paidAmount || 0);
+		const disc = Number(inv.paymentDiscountAmount || 0);
+		return Math.max(0, total - paid - disc);
+	};
+
+	// Selected Invoice info (prefer detailed single invoice fetch)
 	const selectedInvoice: Invoice | null =
+		(singleInvoiceData as any)?.data ||
+		(singleInvoiceData as any)?.invoice ||
+		(singleInvoiceData?.id ? singleInvoiceData : null) ||
 		invoicesData?.items?.find(
 			(i) => String(i.id) === String(selectedInvoiceId),
 		) ||
-		(singleInvoiceData as any)?.data ||
-		(singleInvoiceData as any)?.invoice ||
-		(singleInvoiceData?.id ? singleInvoiceData : null);
+		null;
 
 	// Pre-fill initial data when opened from Customer Profile, Finance, or Invoices table
 	useEffect(() => {
@@ -121,17 +138,23 @@ export function QuickPaymentModal() {
 			if (quickPayInitialData.invoiceId)
 				setSelectedInvoiceId(String(quickPayInitialData.invoiceId));
 			if (quickPayInitialData.amount !== undefined)
-				setPaymentAmount(quickPayInitialData.amount);
+				setPaymentAmount(Number(quickPayInitialData.amount));
 			if (quickPayInitialData.receiptUrl)
 				setReceiptUrl(quickPayInitialData.receiptUrl);
 			else setReceiptUrl("");
 		} else {
+			setSelectedCustomerId("");
+			setSelectedInvoiceId("");
+			setPaymentAmount(0);
+			setDiscountAmount("");
+			setDiscountReason("");
+			setShowDiscountSection(false);
 			setReference(`PAY-${Math.floor(100000 + Math.random() * 900000)}`);
 			setReceiptUrl("");
 		}
 	}, [quickPayInitialData, isQuickPayOpen]);
 
-	// Automatically sync Customer when invoice is selected or resolved
+	// Automatically sync Customer and set payment amount from remaining balance
 	useEffect(() => {
 		if (!selectedInvoice) return;
 
@@ -155,23 +178,24 @@ export function QuickPaymentModal() {
 			setSelectedCustomerId(custId);
 		}
 
-		const rem =
-			selectedInvoice.remainingAmount !== undefined
-				? selectedInvoice.remainingAmount
-				: Math.max(
-						0,
-						(selectedInvoice.totalAmount || 0) -
-							(selectedInvoice.paidAmount || 0) -
-							(selectedInvoice.paymentDiscountAmount || 0),
-					);
+		const rem = getInvoiceRemainingBalance(selectedInvoice);
+		const targetDue = rem > 0 ? rem : Number(selectedInvoice.totalAmount || 0);
 
-		if (
-			rem > 0 &&
-			(paymentAmount === 0 || quickPayInitialData?.amount === undefined)
-		) {
-			setPaymentAmount(rem);
-		}
-	}, [selectedInvoice, selectedCustomerId, quickPayInitialData, paymentAmount]);
+		// Prioritize remaining balance / balance due instead of totalAmount
+		setPaymentAmount((prev) => {
+			if (
+				prev === 0 ||
+				prev === Number(selectedInvoice.totalAmount) ||
+				prev > targetDue ||
+				(quickPayInitialData?.amount !== undefined &&
+					quickPayInitialData.amount === Number(selectedInvoice.totalAmount) &&
+					rem > 0)
+			) {
+				return targetDue;
+			}
+			return prev || targetDue;
+		});
+	}, [selectedInvoice, selectedCustomerId, quickPayInitialData]);
 
 	// Handle invoice selection auto-fill
 	const handleSelectInvoice = (invId: string) => {
@@ -184,37 +208,41 @@ export function QuickPaymentModal() {
 			(i) => String(i.id) === String(invId),
 		);
 		if (inv) {
-			const rem =
-				inv.remainingAmount !== undefined
-					? inv.remainingAmount
-					: Math.max(
-							0,
-							(inv.totalAmount || 0) -
-								(inv.paidAmount || 0) -
-								(inv.paymentDiscountAmount || 0),
-						);
-			setPaymentAmount(rem > 0 ? rem : inv.totalAmount || 0);
+			const rem = getInvoiceRemainingBalance(inv);
+			setPaymentAmount(rem > 0 ? rem : Number(inv.totalAmount || 0));
 			const custId = String(inv.customerId || inv.customer?.id || "");
 			if (custId) setSelectedCustomerId(custId);
 		}
 	};
 
 	const currentTotalAmount = selectedInvoice?.totalAmount || paymentAmount || 0;
-	const maxAllowablePay =
-		selectedInvoice?.remainingAmount !== undefined
-			? Number(selectedInvoice.remainingAmount)
-			: selectedInvoice
-				? Math.max(
-						0,
-						(selectedInvoice.totalAmount || 0) -
-							(selectedInvoice.paidAmount || 0) -
-							(selectedInvoice.paymentDiscountAmount || 0),
-					)
-				: currentTotalAmount;
+	const maxAllowablePay = useMemo(() => {
+		if (!selectedInvoice) return paymentAmount || 0;
+		const rem = getInvoiceRemainingBalance(selectedInvoice);
+		return rem > 0 ? rem : currentTotalAmount;
+	}, [selectedInvoice, paymentAmount, currentTotalAmount]);
+
+	// Check if a payment discount was already applied on previous payments
+	const hasPreviousDiscount = useMemo(() => {
+		if (!selectedInvoice) return false;
+		if (Number(selectedInvoice.paymentDiscountAmount || 0) > 0) return true;
+		if (
+			Array.isArray((selectedInvoice as any).payments) &&
+			(selectedInvoice as any).payments.some(
+				(p: any) => Number(p.discountAmount || 0) > 0,
+			)
+		) {
+			return true;
+		}
+		return false;
+	}, [selectedInvoice]);
 
 	// Early Payment Discount Availability Detection
 	const earlyDiscountInfo = useMemo(() => {
 		if (!selectedInvoice) return null;
+
+		// If discount was already applied on previous payment, do not show/allow again
+		if (hasPreviousDiscount) return null;
 
 		const discountDeadline = selectedInvoice.discountDeadline;
 		const earlyPct = Number(
@@ -234,7 +262,7 @@ export function QuickPaymentModal() {
 
 		const calculatedSavings =
 			Math.round(((maxAllowablePay * earlyPct) / 100) * 100) / 100;
-		const netDue = Math.max(0, maxAllowablePay - calculatedSavings);
+		const netDue = Math.round((maxAllowablePay - calculatedSavings) * 100) / 100;
 
 		return {
 			percentage: earlyPct,
@@ -244,7 +272,13 @@ export function QuickPaymentModal() {
 			termName:
 				selectedInvoice.paymentTerm?.name || `${earlyPct}% Early Discount`,
 		};
-	}, [selectedInvoice, maxAllowablePay]);
+	}, [selectedInvoice, maxAllowablePay, hasPreviousDiscount]);
+
+	const isEarlyDiscountApplied = Boolean(
+		earlyDiscountInfo &&
+			discountAmount !== "" &&
+			Number(discountAmount) === earlyDiscountInfo.savings,
+	);
 
 	// 1-Click Apply Early Discount Handler
 	const handleApplyEarlyDiscount = () => {
@@ -259,6 +293,15 @@ export function QuickPaymentModal() {
 		toast.success(
 			`Applied $${earlyDiscountInfo.savings.toFixed(2)} (${earlyDiscountInfo.percentage}%) early cash discount!`,
 		);
+	};
+
+	// Remove Early Discount Handler
+	const handleRemoveDiscount = () => {
+		setDiscountAmount("");
+		setDiscountReason("");
+		setPaymentAmount(maxAllowablePay);
+		setShowDiscountSection(false);
+		toast.info("Discount removed");
 	};
 
 	// Resolved Effective Discount & Remaining Balance
@@ -430,6 +473,9 @@ export function QuickPaymentModal() {
 						}
 						searchable
 						required
+						disabled={isInvoiceLocked}
+						helperText={isInvoiceLocked ? "Locked to selected invoice" : undefined}
+						leftIcon={isInvoiceLocked ? <Lock className="size-4 text-slate-400" /> : undefined}
 					/>
 
 					<ModernSelect
@@ -444,17 +490,23 @@ export function QuickPaymentModal() {
 						value={selectedInvoiceId}
 						onChange={handleSelectInvoice}
 						options={
-							invoicesData?.items?.map((inv) => ({
-								value: String(inv.id),
-								label: `${inv.invoiceNo || inv.invoiceNumber || String(inv.id).slice(0, 8)} (${inv.currency || "$"} ${inv.totalAmount})`,
-								description: `Due: ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"} | Status: ${inv.status}${
-									inv.earlyDiscountPct
-										? ` | ⚡ ${inv.earlyDiscountPct}% early discount`
-										: ""
-								}`,
-							})) || []
+							invoicesData?.items?.map((inv) => {
+								const due = getInvoiceRemainingBalance(inv);
+								return {
+									value: String(inv.id),
+									label: `${inv.invoiceNo || inv.invoiceNumber || String(inv.id).slice(0, 8)} (${due > 0 ? `Due: $${due.toFixed(2)}` : "Paid"})`,
+									description: `Total: $${inv.totalAmount} | Due Date: ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}${
+										inv.earlyDiscountPct
+											? ` | ⚡ ${inv.earlyDiscountPct}% early discount`
+											: ""
+									}`,
+								};
+							}) || []
 						}
 						searchable
+						disabled={isInvoiceLocked}
+						helperText={isInvoiceLocked ? "Locked to selected invoice" : undefined}
+						leftIcon={isInvoiceLocked ? <Lock className="size-4 text-slate-400" /> : undefined}
 					/>
 				</div>
 
@@ -482,17 +534,30 @@ export function QuickPaymentModal() {
 							</div>
 						</div>
 
-						<Button
-							type="button"
-							size="sm"
-							onClick={handleApplyEarlyDiscount}
-							className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 px-3 gap-1.5 shrink-0 shadow-xs"
-						>
-							<Zap className="size-3.5 fill-current" />
-							<span>
-								Apply Discount (${earlyDiscountInfo.savings.toFixed(2)})
-							</span>
-						</Button>
+						{isEarlyDiscountApplied ? (
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								onClick={handleRemoveDiscount}
+								className="border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 font-bold text-xs h-8 px-3 gap-1.5 shrink-0 cursor-pointer"
+							>
+								<X className="size-3.5" />
+								<span>Remove Discount</span>
+							</Button>
+						) : (
+							<Button
+								type="button"
+								size="sm"
+								onClick={handleApplyEarlyDiscount}
+								className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 px-3 gap-1.5 shrink-0 shadow-xs cursor-pointer"
+							>
+								<Zap className="size-3.5 fill-current" />
+								<span>
+									Apply Discount (${earlyDiscountInfo.savings.toFixed(2)})
+								</span>
+							</Button>
+						)}
 					</div>
 				)}
 
@@ -541,6 +606,19 @@ export function QuickPaymentModal() {
 
 					{showDiscountSection && (
 						<div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 space-y-3">
+							{hasPreviousDiscount && (
+								<div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-2">
+									<span>ℹ️</span>
+									<span>
+										A settlement discount of{" "}
+										<strong>
+											${Number(selectedInvoice?.paymentDiscountAmount || 0).toFixed(2)}
+										</strong>{" "}
+										was already applied on a previous payment for this invoice.
+									</span>
+								</div>
+							)}
+
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 								<div className="flex items-center gap-2">
 									<ModernInput

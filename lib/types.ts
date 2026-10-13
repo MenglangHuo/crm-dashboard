@@ -1798,7 +1798,12 @@ export interface Payment {
 	reference?: string;
 	bankAccount?: string;
 	notes?: string;
-	receivedBy?: { id: number | string; name?: string } | string | null;
+	receivedBy?: {
+		id: number | string;
+		username?: string;
+		fullName?: string;
+		name?: string;
+	} | string | null;
 	receiptUrl?: string;
 	reconciliationStatus?: "PENDING" | "RECONCILED" | "EXCEPTION" | string;
 	reconciliationReference?: string | null;

@@ -64,11 +64,11 @@ export function decodeJwtPayload(
 export function getClientAccessToken(): string | null {
 	if (typeof window === "undefined") return null;
 	try {
-		const match = document.cookie.match(/(?:^|; )rumluos_access_token=([^;]*)/);
+		const match = document.cookie.match(/(?:^|; )crm_access_token=([^;]*)/);
 		if (match) return decodeURIComponent(match[1]);
 	} catch {}
 	try {
-		const local = localStorage.getItem("rumluos_access_token");
+		const local = localStorage.getItem("crm_access_token");
 		if (local) return local;
 	} catch {}
 	return null;

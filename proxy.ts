@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const ACCESS_COOKIE = "rumluos_access_token";
-const REFRESH_COOKIE = "rumluos_refresh_token";
+const ACCESS_COOKIE = "crm_access_token";
+const REFRESH_COOKIE = "crm_refresh_token";
 const AUTH_PAGES = [
 	"/sign-in",
 	"/forgot-password",

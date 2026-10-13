@@ -104,30 +104,47 @@ export function ModernSearchSelect({
 		);
 	}, [selectedValues, allKnownOptions]);
 
-	// Debounced search trigger (500ms default delay before calling api or filtering)
+	const loadOptionsRef = useRef(loadOptions);
 	useEffect(() => {
-		if (!loadOptions) return;
+		loadOptionsRef.current = loadOptions;
+	}, [loadOptions]);
+
+	const hasLoadedInitialRef = useRef(false);
+
+	// Debounced search trigger (only runs when dropdown is open, avoiding API calls when closed)
+	useEffect(() => {
+		if (!isOpen) return;
+		if (!loadOptionsRef.current) return;
+
+		// If initial options already loaded and query is empty, don't refetch
+		if (!searchQuery.trim() && hasLoadedInitialRef.current && asyncOptions.length > 0) {
+			return;
+		}
 
 		if (debounceTimerRef.current) {
 			clearTimeout(debounceTimerRef.current);
 		}
 
 		setIsLoading(true);
+		const delay = searchQuery.trim() ? debounceMs : 0;
 		debounceTimerRef.current = setTimeout(async () => {
 			try {
-				const results = await loadOptions(searchQuery.trim());
+				const results = await loadOptionsRef.current?.(searchQuery.trim());
 				setAsyncOptions(results || []);
+				if (!searchQuery.trim()) {
+					hasLoadedInitialRef.current = true;
+				}
 			} catch (err) {
 				console.error("ModernSearchSelect async load error:", err);
 			} finally {
 				setIsLoading(false);
 			}
-		}, debounceMs);
+		}, delay);
 
 		return () => {
 			if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 		};
-	}, [searchQuery, loadOptions, debounceMs]);
+	}, [isOpen, searchQuery, debounceMs]);
 
 	// Filter static options if no loadOptions passed
 	const displayedOptions = useMemo(() => {
@@ -211,17 +228,43 @@ export function ModernSearchSelect({
 		if (onSetPrimary) onSetPrimary("");
 	};
 
+	// Size styling to match ModernInput and ModernSelect
+	const sizeStyles = {
+		sm: isMulti
+			? "min-h-9 text-xs px-3 py-1 rounded-lg"
+			: "h-9 min-h-9 text-xs px-3 rounded-lg",
+		md: isMulti
+			? "min-h-11 text-sm px-4 py-2 rounded-lg"
+			: "h-11 min-h-11 text-sm px-4 rounded-lg",
+		lg: isMulti
+			? "min-h-12 text-base px-4 py-2.5 rounded-xl"
+			: "h-12 min-h-12 text-base px-4 rounded-xl",
+	};
+
+	const iconSizeStyles = {
+		sm: "size-3.5",
+		md: "size-4",
+		lg: "size-5",
+	};
+
 	return (
 		<div ref={containerRef} className={cn("w-full space-y-1.5", className)}>
 			{label && (
-				<div className="flex items-center justify-between">
-					<Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-						{label}
-					</Label>
-					{isMulti && selectedValues.length > 0 && (
-						<span className="text-[11px] font-semibold text-slate-400">
-							{selectedValues.length} selected
-						</span>
+				<div className="space-y-0.5">
+					<div className="flex items-center justify-between">
+						<Label className="font-semibold text-xs text-foreground tracking-wide flex items-center gap-1">
+							{label}
+						</Label>
+						{isMulti && selectedValues.length > 0 && (
+							<span className="text-[11px] font-semibold text-slate-400">
+								{selectedValues.length} selected
+							</span>
+						)}
+					</div>
+					{description && (
+						<p className="text-[11px] text-muted-foreground leading-normal">
+							{description}
+						</p>
 					)}
 				</div>
 			)}
@@ -238,18 +281,14 @@ export function ModernSearchSelect({
 				}}
 				className={cn(
 					"w-full border transition-all cursor-pointer flex items-center justify-between gap-2 shadow-2xs outline-none focus:outline-none",
-					selectSize === "sm"
-						? "h-9 min-h-9 text-xs px-3 py-1 rounded-xl bg-slate-50/80 hover:bg-slate-100/60 border-slate-200/80 dark:bg-slate-900/80 dark:border-slate-800 dark:hover:bg-slate-900"
-						: selectSize === "lg"
-							? "min-h-12 text-sm px-4 py-2 rounded-2xl bg-white dark:bg-slate-950 border-slate-200/90 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700"
-							: "min-h-10 text-xs px-3.5 py-1.5 rounded-2xl bg-white dark:bg-slate-950 border-slate-200/90 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700",
+					sizeStyles[selectSize],
+					"border-slate-200/80 bg-slate-50/80 hover:border-slate-300 dark:bg-slate-900/80 dark:border-slate-800 dark:hover:border-slate-700",
 					isOpen &&
-						(selectSize === "sm"
-							? "border-primary ring-2 ring-primary/20 dark:border-primary dark:ring-primary/20"
-							: "border-slate-950 ring-2 ring-slate-950/10 dark:border-slate-100 dark:ring-slate-100/20"),
+						"border-primary ring-2 ring-primary/20 dark:border-primary dark:ring-primary/20",
 					disabled &&
-						"opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-900",
-					error && "border-rose-500 ring-rose-500/20",
+						"pointer-events-none opacity-50 bg-muted/50 cursor-not-allowed",
+					error &&
+						"border-destructive ring-2 ring-destructive/20 dark:border-destructive/60",
 				)}
 			>
 				{/* Selected values or placeholder */}
@@ -257,10 +296,12 @@ export function ModernSearchSelect({
 					{selectedOptionsList.length === 0 ? (
 						<span
 							className={cn(
-								"text-xs select-none truncate",
+								"select-none truncate text-muted-foreground/70",
 								selectSize === "sm"
-									? "text-muted-foreground/70"
-									: "text-slate-400 dark:text-slate-500 py-1",
+									? "text-xs"
+									: selectSize === "lg"
+										? "text-base"
+										: "text-sm",
 							)}
 						>
 							{placeholder}
@@ -276,10 +317,10 @@ export function ModernSearchSelect({
 									key={String(opt.value)}
 									onClick={(e) => e.stopPropagation()}
 									className={cn(
-										"inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl text-xs font-semibold transition-colors border",
+										"inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium transition-colors border",
 										isPrimary
-											? "bg-purple-600 text-white border-purple-500 shadow-2xs font-bold"
-											: "bg-slate-100 dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-700/80",
+											? "bg-purple-600 text-white border-purple-500 shadow-2xs font-semibold"
+											: "bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-700/80",
 									)}
 								>
 									{opt.icon && <span className="shrink-0">{opt.icon}</span>}
@@ -330,8 +371,12 @@ export function ModernSearchSelect({
 					) : (
 						<div
 							className={cn(
-								"flex items-center gap-2 text-xs text-slate-900 dark:text-slate-100 truncate",
-								selectSize === "sm" ? "py-0 font-medium" : "py-1 font-bold",
+								"flex items-center gap-2 text-slate-900 dark:text-slate-100 truncate",
+								selectSize === "sm"
+									? "text-xs font-normal"
+									: selectSize === "lg"
+										? "text-base font-normal"
+										: "text-sm font-normal",
 							)}
 						>
 							{selectedOptionsList[0].icon}
@@ -339,7 +384,7 @@ export function ModernSearchSelect({
 							{selectedOptionsList[0].badge && (
 								<Badge
 									variant="outline"
-									className="text-[10px] py-0 px-1 font-normal shrink-0"
+									className="text-[10px] py-0 px-1.5 font-normal shrink-0"
 								>
 									{selectedOptionsList[0].badge}
 								</Badge>
@@ -389,7 +434,7 @@ export function ModernSearchSelect({
 			{/* Dropdown Popover */}
 			{isOpen && (
 				<div className="relative z-50">
-					<div className="absolute top-1 left-0 right-0 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-slate-950 p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-72 flex flex-col space-y-1.5">
+					<div className="absolute top-1 left-0 right-0 rounded-xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-slate-950 p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-72 flex flex-col space-y-1.5">
 						{/* Search Input Bar */}
 						<div className="relative">
 							<Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
@@ -399,7 +444,7 @@ export function ModernSearchSelect({
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 								placeholder={searchPlaceholder}
-								className="w-full rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 pl-8 pr-7 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-slate-100"
+								className="w-full rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 pl-8 pr-7 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-primary dark:focus:ring-primary"
 							/>
 							{searchQuery && (
 								<button
@@ -438,7 +483,7 @@ export function ModernSearchSelect({
 											key={String(opt.value)}
 											onClick={() => handleToggleOption(opt)}
 											className={cn(
-												"flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors select-none",
+												"flex items-center justify-between px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors select-none",
 												isSelected
 													? "bg-slate-100 dark:bg-slate-900 text-slate-950 dark:text-white font-bold"
 													: "hover:bg-slate-50 dark:hover:bg-slate-900/60 text-slate-700 dark:text-slate-300 font-medium",

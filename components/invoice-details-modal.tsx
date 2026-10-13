@@ -12,7 +12,6 @@ import {
 	Receipt,
 	User,
 	Zap,
-	Printer,
 	QrCode,
 	DollarSign,
 	Copy,
@@ -56,7 +55,6 @@ import {
 import { useQuickActions } from "@/components/quick-action-modal-context";
 import { VoidInvoiceModal } from "@/components/invoices/void-invoice-modal";
 import { RefundInvoiceModal } from "@/components/invoices/refund-invoice-modal";
-import { ChangePaymentTermModal } from "@/components/invoices/change-payment-term-modal";
 import { useTranslation } from "@/lib/i18n/context";
 
 interface InvoiceDetailsModalProps {
@@ -96,12 +94,11 @@ export function InvoiceDetailsModal({
 }: InvoiceDetailsModalProps) {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
-	const { openReceipt, openQuickPay } = useQuickActions();
+	const { openQuickPay } = useQuickActions();
 
 	const [isPayOpen, setIsPayOpen] = useState(false);
 	const [isVoidOpen, setIsVoidOpen] = useState(false);
 	const [isRefundOpen, setIsRefundOpen] = useState(false);
-	const [isChangeTermOpen, setIsChangeTermOpen] = useState(false);
 	const [copiedKey, setCopiedKey] = useState(false);
 	const [amountPaid, setAmountPaid] = useState<number>(0);
 	const [paymentDiscount, setPaymentDiscount] = useState<number | "">("");
@@ -361,7 +358,7 @@ export function InvoiceDetailsModal({
 				onClose={onClose}
 				title={
 					invoice
-						? `${t("sidebar.invoices")} ${invoiceNo}`
+						? `Invoice #${invoiceNo}`
 						: t("invoices.invoiceDetails")
 				}
 				subtitle={
@@ -376,16 +373,16 @@ export function InvoiceDetailsModal({
 				icon={
 					<Receipt className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
 				}
-				size="2xl"
+				size="xl"
 				isLoading={isDetailsLoading}
 				loadingText={t("common.loading")}
 			>
 				{invoice ? (
 					<div className="space-y-4 py-1">
 						{/* Unified Sleek Header & Actions Strip */}
-						<div className="bg-slate-50/90 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-							{/* Left: Invoice Number, Status & Structured Metadata */}
-							<div className="flex flex-col gap-1.5 min-w-0">
+						<div className="bg-slate-50/90 dark:bg-slate-900/60 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2.5">
+							{/* Top Row: Status, Invoice Number, Customer, Delivery & Actions */}
+							<div className="flex flex-wrap items-center justify-between gap-3">
 								<div className="flex items-center gap-2.5 flex-wrap">
 									{renderStatusBadge(invoice.status)}
 									<span className="font-mono text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
@@ -394,21 +391,21 @@ export function InvoiceDetailsModal({
 											size="icon"
 											variant="ghost"
 											onClick={() => copyToClipboard(invoiceNo)}
-											className="h-5 w-5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+											className="h-6 w-6 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
 											title="Copy Invoice Number"
 										>
 											{copiedKey ? (
-												<Check className="h-3 w-3 text-emerald-500" />
+												<Check className="h-3.5 w-3.5 text-emerald-500" />
 											) : (
-												<Copy className="h-3 w-3" />
+												<Copy className="h-3.5 w-3.5" />
 											)}
 										</Button>
 									</span>
 
 									{/* Customer Chip */}
-									<span className="flex items-center gap-1 text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200/80 dark:border-slate-700">
-										<User className="size-3 text-indigo-500 shrink-0" />
-										<span className="truncate max-w-[150px]">
+									<div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
+										<User className="size-3.5 text-indigo-500 shrink-0" />
+										<span className="truncate max-w-[180px]">
 											{customer?.name ||
 												(invoice as any).customerName ||
 												`Customer #${invoice.customerId}`}
@@ -424,206 +421,155 @@ export function InvoiceDetailsModal({
 												)
 											</span>
 										)}
-									</span>
+									</div>
 
 									{/* Delivery Partner */}
 									{(invoice as any)?.delivery?.name && (
-										<span className="flex items-center gap-1 text-[11px] font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-800/50">
-											<Truck className="size-3 text-sky-500 shrink-0" />
+										<div className="flex items-center gap-1.5 text-xs font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800/50">
+											<Truck className="size-3.5 text-sky-500 shrink-0" />
 											<span>{(invoice as any).delivery.name}</span>
-										</span>
+										</div>
 									)}
 								</div>
 
-								{/* Sub-line: Payment Term, Due Date, Issuer, Company */}
-								<div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-									{/* Payment Term Chip */}
-									{invoice.paymentTerm && (
-										<span className="flex items-center gap-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200/80 dark:border-slate-700">
-											<Clock className="size-3 text-indigo-500 shrink-0" />
-											<span>{invoice.paymentTerm.name}</span>
-											{invoice.paymentTerm.dueDays !== undefined && (
-												<span className="text-[10px] text-slate-400 font-normal">
-													(
-													{invoice.paymentTerm.dueDays === 0
-														? "COD"
-														: `Net ${invoice.paymentTerm.dueDays}d`}
-													)
-												</span>
+								{/* Right: Actions Dropdown & Primary Record Payment Button */}
+								<div className="flex items-center gap-2 shrink-0">
+									{/* Primary Button: Record Payment */}
+									{!isTerminal && remainingAmount > 0 && (
+										<Button
+											size="sm"
+											onClick={openPayDialog}
+											className="h-8 px-3 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs rounded-lg cursor-pointer"
+										>
+											<Zap className="size-3.5 fill-current" />
+											<span>{t("invoices.recordPayment")}</span>
+										</Button>
+									)}
+
+									{/* Actions Dropdown Menu */}
+									<DropdownMenu>
+										<DropdownMenuTrigger
+											render={
+												<Button
+													size="sm"
+													variant="outline"
+													className="h-8 px-2.5 text-xs font-bold gap-1.5 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg cursor-pointer"
+												/>
+											}
+										>
+											<SlidersHorizontal className="size-3.5 text-slate-500" />
+											<span>Actions</span>
+											<ChevronDown className="size-3 text-slate-400" />
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="end" className="w-48">
+											{onOpenPayments && (
+												<DropdownMenuItem
+													onClick={() => onOpenPayments(invoice.id)}
+													className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300"
+												>
+													<History className="size-3.5 text-purple-500" />
+													<span>{t("invoices.paymentHistory")}</span>
+												</DropdownMenuItem>
 											)}
-										</span>
-									)}
 
-									{/* Early Incentive Badge */}
-									{invoice.discountDeadline &&
-										earlyPct > 0 &&
-										isEarlyEligible && (
-											<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[10px] py-0 px-1.5 font-mono gap-1">
-												<Zap className="size-2.5 fill-current" />
-												<span>
-													-{earlyPct}% early pay (by{" "}
-													{new Date(
-														invoice.discountDeadline,
-													).toLocaleDateString()}
-													)
-												</span>
-											</Badge>
-										)}
+											{paidAmount === 0 &&
+												invoice.status !== "VOID" &&
+												invoice.status !== "CANCELLED" &&
+												invoice.status !== "REFUNDED" && (
+													<DropdownMenuItem
+														onClick={() => setIsVoidOpen(true)}
+														className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400"
+													>
+														<Ban className="size-3.5 text-rose-500" />
+														<span>{t("invoices.voidInvoice")}</span>
+													</DropdownMenuItem>
+												)}
 
-									{/* Due Date */}
-									{invoice.dueDate && (
-										<span className="text-[11px] font-mono flex items-center gap-1">
-											<span className="text-slate-400">Due:</span>
-											<strong
-												className={
-													!isTerminal &&
-													invoice.status !== "PAID" &&
-													new Date(invoice.dueDate).getTime() <
-														new Date().getTime()
-														? "text-rose-600 dark:text-rose-400 font-bold"
-														: "text-slate-700 dark:text-slate-300"
-												}
-											>
-												{new Date(invoice.dueDate).toLocaleDateString()}
-											</strong>
-										</span>
-									)}
-
-									{/* Issuer */}
-									{(invoice as any)?.attributes?.issuedByUserName && (
-										<span className="text-[11px] text-slate-400">
-											• Issued by:{" "}
-											<strong className="text-slate-600 dark:text-slate-300">
-												{(invoice as any).attributes.issuedByUserName}
-											</strong>
-										</span>
-									)}
-
-									{/* Company */}
-									{(company?.name || (invoice as any).companyName) && (
-										<span className="text-[11px] text-slate-400">
-											• {company?.name || (invoice as any).companyName}
-										</span>
-									)}
+											{(paidAmount > 0 ||
+												invoice.status === "PAID" ||
+												invoice.status === "PARTIAL_PAYMENT") &&
+												invoice.status !== "REFUNDED" &&
+												invoice.status !== "VOID" &&
+												invoice.status !== "CANCELLED" && (
+													<DropdownMenuItem
+														onClick={() => setIsRefundOpen(true)}
+														className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300"
+													>
+														<RotateCcw className="size-3.5 text-purple-500" />
+														<span>{t("invoices.issueCreditNote")}</span>
+													</DropdownMenuItem>
+												)}
+										</DropdownMenuContent>
+									</DropdownMenu>
 								</div>
 							</div>
 
-							{/* Right: Actions Dropdown & Primary Record Payment Button */}
-							<div className="flex items-center gap-2 shrink-0">
-								{/* Primary Button: Record Payment */}
-								{!isTerminal && remainingAmount > 0 && (
-									<Button
-										size="sm"
-										onClick={openPayDialog}
-										className="h-8 px-3 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs rounded-lg"
-									>
-										<Zap className="size-3.5 fill-current" />
-										<span>{t("invoices.recordPayment")}</span>
-									</Button>
+							{/* Bottom Row: Payment Term, Early Incentive, Due Date, Issuer */}
+							<div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
+								{/* Payment Term */}
+								{invoice.paymentTerm && (
+									<div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+										<Clock className="size-3.5 text-slate-400 shrink-0" />
+										<span className="font-semibold">{invoice.paymentTerm.name}</span>
+										{invoice.paymentTerm.dueDays !== undefined && (
+											<span className="text-slate-400 font-normal">
+												({invoice.paymentTerm.dueDays === 0 ? "COD" : `Net ${invoice.paymentTerm.dueDays}d`})
+											</span>
+										)}
+									</div>
 								)}
 
-								{/* Actions Dropdown Menu */}
-								<DropdownMenu>
-									<DropdownMenuTrigger
-										render={
-											<Button
-												size="sm"
-												variant="outline"
-												className="h-8 px-2.5 text-xs font-bold gap-1.5 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg cursor-pointer"
-											/>
-										}
-									>
-										<SlidersHorizontal className="size-3.5 text-slate-500" />
-										<span>Actions</span>
-										<ChevronDown className="size-3 text-slate-400" />
-									</DropdownMenuTrigger>
-									<DropdownMenuContent align="end" className="w-52">
-										{onOpenPayments && (
-											<DropdownMenuItem
-												onClick={() => onOpenPayments(invoice.id)}
-												className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300"
-											>
-												<History className="size-3.5 text-purple-500" />
-												<span>{t("invoices.paymentHistory")}</span>
-											</DropdownMenuItem>
-										)}
+								{/* Early Incentive Badge */}
+								{invoice.discountDeadline &&
+									earlyPct > 0 &&
+									isEarlyEligible && (
+										<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[10px] py-0 px-2 font-mono gap-1 font-semibold">
+											<Zap className="size-2.5 fill-current" />
+											<span>
+												-{earlyPct}% early pay (by{" "}
+												{new Date(
+													invoice.discountDeadline,
+												).toLocaleDateString()}
+												)
+											</span>
+										</Badge>
+									)}
 
-										{paidAmount === 0 && !isTerminal && (
-											<DropdownMenuItem
-												onClick={() => setIsChangeTermOpen(true)}
-												className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300"
-											>
-												<Clock className="size-3.5 text-indigo-500" />
-												<span>{t("invoices.changePaymentTerm")}</span>
-											</DropdownMenuItem>
-										)}
-
-										{paidAmount === 0 &&
-											invoice.status !== "VOID" &&
-											invoice.status !== "CANCELLED" &&
-											invoice.status !== "REFUNDED" && (
-												<DropdownMenuItem
-													onClick={() => setIsVoidOpen(true)}
-													className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400"
-												>
-													<Ban className="size-3.5 text-rose-500" />
-													<span>{t("invoices.voidInvoice")}</span>
-												</DropdownMenuItem>
-											)}
-
-										{(paidAmount > 0 ||
-											invoice.status === "PAID" ||
-											invoice.status === "PARTIAL_PAYMENT") &&
-											invoice.status !== "REFUNDED" &&
-											invoice.status !== "VOID" &&
-											invoice.status !== "CANCELLED" && (
-												<DropdownMenuItem
-													onClick={() => setIsRefundOpen(true)}
-													className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300"
-												>
-													<RotateCcw className="size-3.5 text-purple-500" />
-													<span>{t("invoices.issueCreditNote")}</span>
-												</DropdownMenuItem>
-											)}
-
-										{/* Print Receipt */}
-										<DropdownMenuItem
-											onClick={() => {
-												const invNo =
-													invoice.invoiceNumber ||
-													invoice.invoiceNo ||
-													`#${invoice.id}`;
-												openReceipt({
-													invoiceNo: invNo,
-													customerName:
-														customer?.name || (invoice as any).customerName,
-													customerPhone:
-														(customer as any)?.phoneNumber ||
-														customer?.phone ||
-														(customer as any)?.contact,
-													customerContact:
-														(customer as any)?.contact || customer?.contact,
-													customerGender:
-														(customer as any)?.gender || customer?.gender,
-													amount: invoice.totalAmount,
-													currency: invoice.currency || "USD",
-													date: invoice.issuedAt
-														? new Date(invoice.issuedAt)
-																.toISOString()
-																.split("T")[0]
-														: new Date().toISOString().split("T")[0],
-													status: invoice.status || "UNPAID",
-													description: invoice.notes || invoice.description,
-													invoice: invoice,
-												});
-											}}
-											className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-sky-700 dark:text-sky-300"
+								{/* Due Date */}
+								{invoice.dueDate && (
+									<div className="flex items-center gap-1 font-mono text-[11px]">
+										<span className="text-slate-400">Due:</span>
+										<strong
+											className={
+												!isTerminal &&
+												invoice.status !== "PAID" &&
+												new Date(invoice.dueDate).getTime() <
+													new Date().getTime()
+													? "text-rose-600 dark:text-rose-400 font-bold"
+													: "text-slate-700 dark:text-slate-300 font-semibold"
+											}
 										>
-											<Printer className="size-3.5 text-sky-500" />
-											<span>{t("invoices.printReceipt")}</span>
-										</DropdownMenuItem>
-									</DropdownMenuContent>
-								</DropdownMenu>
+											{new Date(invoice.dueDate).toLocaleDateString()}
+										</strong>
+									</div>
+								)}
+
+								{/* Issuer */}
+								{(invoice as any)?.attributes?.issuedByUserName && (
+									<div className="text-[11px] text-slate-400">
+										• Issued by:{" "}
+										<strong className="text-slate-600 dark:text-slate-300">
+											{(invoice as any).attributes.issuedByUserName}
+										</strong>
+									</div>
+								)}
+
+								{/* Company */}
+								{(company?.name || (invoice as any).companyName) && (
+									<div className="text-[11px] text-slate-400">
+										• {company?.name || (invoice as any).companyName}
+									</div>
+								)}
 							</div>
 						</div>
 
@@ -805,38 +751,59 @@ export function InvoiceDetailsModal({
 							</table>
 						</div>
 
-						{/* Bottom Financial Breakdown & Notes Summary Card (Matching User Screenshot Layout) */}
-						<div className="bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap justify-between items-start gap-4 text-xs">
+						{/* Bottom Financial Breakdown & Notes Summary Card */}
+						<div className="bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex flex-wrap justify-between items-start gap-6 text-xs">
 							{/* Left Side: Notes & Order Reference */}
-							<div className="space-y-1.5 max-w-md">
-								<div className="text-slate-500">
-									{t("invoices.customerNote")}:{" "}
-									<span className="text-slate-800 dark:text-slate-200 font-medium">
-										{invoice.customerNote || invoice.notes || "—"}
-									</span>
-								</div>
-								<div className="text-slate-500">
-									{t("invoices.internalNote")}:{" "}
-									<span className="text-slate-800 dark:text-slate-200 font-medium">
-										{invoice.internalNote || invoice.description || "—"}
-									</span>
-								</div>
+							<div className="space-y-3 max-w-sm flex-1 min-w-[240px]">
 								{order && (order.orderNumber || order.orderNo || order.id) && (
-									<div className="text-slate-500 pt-1 text-[11px]">
-										{t("invoices.salesOrderRef")}:{" "}
-										<strong className="font-mono text-indigo-600 dark:text-indigo-400">
+									<div className="flex items-center gap-2">
+										<span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+											{t("invoices.salesOrderRef")}:
+										</span>
+										<span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/60">
 											{order.orderNumber || order.orderNo || `ORD-${order.id}`}
-										</strong>
+										</span>
 									</div>
 								)}
+
+								{(invoice.customerNote || invoice.notes) && (
+									<div className="space-y-1">
+										<span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+											{t("invoices.customerNote")}
+										</span>
+										<p className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed bg-white dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200/70 dark:border-slate-700/70">
+											{invoice.customerNote || invoice.notes}
+										</p>
+									</div>
+								)}
+
+								{(invoice.internalNote || invoice.description) && (
+									<div className="space-y-1">
+										<span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+											{t("invoices.internalNote")}
+										</span>
+										<p className="text-slate-600 dark:text-slate-400 text-[11px] italic leading-relaxed">
+											{invoice.internalNote || invoice.description}
+										</p>
+									</div>
+								)}
+
+								{!invoice.customerNote &&
+									!invoice.notes &&
+									!invoice.internalNote &&
+									!invoice.description &&
+									!(order && (order.orderNumber || order.orderNo || order.id)) && (
+										<p className="text-slate-400 italic text-[11px]">
+											No additional notes on this invoice.
+										</p>
+									)}
 							</div>
 
-							{/* Right Side: Totals, Paid, Remaining Balance */}
-							<div className="space-y-1.5 text-right min-w-[240px]">
+							{/* Right Side: Financial Ledger */}
+							<div className="space-y-2 text-right min-w-[260px]">
 								<div className="flex justify-between text-slate-600 dark:text-slate-400">
 									<span>
-										{t("invoices.subtotal")} ({items.length} {t("orders.items")}
-										):
+										{t("invoices.subtotal")} ({items.length} {t("orders.items")}):
 									</span>
 									<span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
 										$
@@ -884,7 +851,7 @@ export function InvoiceDetailsModal({
 									</div>
 								)}
 
-								<div className="flex justify-between text-sm font-bold text-slate-900 dark:text-slate-100 pt-2 border-t border-slate-200 dark:border-slate-800">
+								<div className="flex justify-between text-sm font-bold text-slate-900 dark:text-slate-100 pt-2 border-t border-slate-200/80 dark:border-slate-800">
 									<span>{t("invoices.grandTotal")}:</span>
 									<span className="font-mono text-base text-indigo-600 dark:text-indigo-400">
 										$
@@ -905,7 +872,7 @@ export function InvoiceDetailsModal({
 								</div>
 
 								<div
-									className={`flex justify-between text-xs font-black ${remainingAmount > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600"}`}
+									className={`flex justify-between text-xs font-black ${remainingAmount > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}
 								>
 									<span>{t("invoices.remainingOutstanding")}:</span>
 									<span className="font-mono">
@@ -918,7 +885,7 @@ export function InvoiceDetailsModal({
 
 								{((invoice as any).totalCogs !== undefined ||
 									invoice.grossProfit !== undefined) && (
-									<div className="pt-2 border-t border-slate-200/80 dark:border-slate-800 flex flex-col gap-1 text-[11px] text-slate-500">
+									<div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-col gap-1 text-[11px] text-slate-400">
 										<div className="flex justify-between">
 											<span>{t("invoices.totalCogs")}:</span>
 											<span className="font-mono">
@@ -929,7 +896,7 @@ export function InvoiceDetailsModal({
 												)}
 											</span>
 										</div>
-										<div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+										<div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
 											<span className="flex items-center gap-1">
 												<TrendingUp className="h-3 w-3" />{" "}
 												{t("invoices.grossProfit")}:
@@ -1178,24 +1145,6 @@ export function InvoiceDetailsModal({
 					queryClient.invalidateQueries({ queryKey: ["invoices"] });
 					queryClient.invalidateQueries({ queryKey: ["invoices-search-v1"] });
 					queryClient.invalidateQueries({ queryKey: ["payments"] });
-				}}
-			/>
-
-			{/* Change Payment Term Dialog */}
-			<ChangePaymentTermModal
-				invoice={invoice || null}
-				open={isChangeTermOpen}
-				onOpenChange={setIsChangeTermOpen}
-				onSuccess={() => {
-					queryClient.invalidateQueries({ queryKey: ["invoice-details"] });
-					queryClient.invalidateQueries({
-						queryKey: ["invoice-details", invoiceId],
-					});
-					queryClient.invalidateQueries({ queryKey: ["invoices"] });
-					queryClient.invalidateQueries({ queryKey: ["invoices-search-v1"] });
-					queryClient.invalidateQueries({
-						queryKey: ["invoice-payments-modal"],
-					});
 				}}
 			/>
 		</>

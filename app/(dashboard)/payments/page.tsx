@@ -2,7 +2,7 @@
 
 import { MultiInvoicePaymentModal } from "@/components/invoices/multi-invoice-payment-modal";
 import { BulkReconciliationModal } from "@/components/payments/bulk-reconciliation-modal";
-import { PaymentDetailsModal } from "@/components/payments/payment-details-modal";
+import { PaymentDetailsDrawer } from "@/components/payments/payment-details-modal";
 import { useQuickActionDispatch } from "@/components/quick-action-modal-context";
 import {
 	ColumnDef,
@@ -465,6 +465,7 @@ function PaymentsPageContent() {
 				data={paymentsList}
 				columns={columns}
 				actions={rowActions}
+				onRowClick={(row) => setSelectedPaymentDetail(row)}
 				isLoading={isLoading}
 				isError={isError}
 				error={error}
@@ -524,8 +525,8 @@ function PaymentsPageContent() {
 				}}
 			/>
 
-			{/* Payment Details Drawer / Modal */}
-			<PaymentDetailsModal
+			{/* Payment Details Modern Drawer (Opens from right side) */}
+			<PaymentDetailsDrawer
 				open={Boolean(selectedPaymentDetail)}
 				onOpenChange={(open) => !open && setSelectedPaymentDetail(null)}
 				payment={selectedPaymentDetail}

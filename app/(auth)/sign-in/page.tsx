@@ -332,15 +332,15 @@ function SignInForm() {
 
 			if (token) {
 				if (typeof window !== "undefined") {
-					document.cookie = `rumluos_access_token=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax`;
-					localStorage.setItem("rumluos_access_token", token);
+					document.cookie = `crm_access_token=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax`;
+					localStorage.setItem("crm_access_token", token);
 					if (refreshToken) {
-						document.cookie = `rumluos_refresh_token=${encodeURIComponent(refreshToken)}; path=/; max-age=2592000; SameSite=Lax`;
-						localStorage.setItem("rumluos_refresh_token", refreshToken);
+						document.cookie = `crm_refresh_token=${encodeURIComponent(refreshToken)}; path=/; max-age=2592000; SameSite=Lax`;
+						localStorage.setItem("crm_refresh_token", refreshToken);
 					}
 					if (companyId != null) {
-						document.cookie = `rumluos_company_id=${encodeURIComponent(companyId)}; path=/; max-age=2592000; SameSite=Lax`;
-						localStorage.setItem("rumluos_company_id", String(companyId));
+						document.cookie = `crm_company_id=${encodeURIComponent(companyId)}; path=/; max-age=2592000; SameSite=Lax`;
+						localStorage.setItem("crm_company_id", String(companyId));
 					}
 				}
 				await setAuthCookies(token, refreshToken, companyId);

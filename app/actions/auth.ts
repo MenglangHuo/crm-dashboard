@@ -4,9 +4,9 @@ import { cookies } from "next/headers";
 import { decodeToken, encodeToken } from "@/lib/server/api";
 import { resolveProfile } from "@/lib/server/db";
 
-const ACCESS_COOKIE = "rumluos_access_token";
-const REFRESH_COOKIE = "rumluos_refresh_token";
-const COMPANY_COOKIE = "rumluos_company_id";
+const ACCESS_COOKIE = "crm_access_token";
+const REFRESH_COOKIE = "crm_refresh_token";
+const COMPANY_COOKIE = "crm_company_id";
 const ACCESS_TTL = 1000 * 60 * 60;
 
 type RefreshResponse = {

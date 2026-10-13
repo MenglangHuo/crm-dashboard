@@ -15,6 +15,7 @@ import {
 } from "@/components/ui-custom/data-table";
 import { ORDER_DOMAIN_FILTERS } from "@/components/ui-custom/data-table/domain-filter-configs";
 import {
+	FilterCriterion,
 	SearchFilterPayload,
 	buildSearchFilterPayload,
 } from "@/components/ui-custom/data-table/search-filter-types";
@@ -51,7 +52,6 @@ import {
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useCompanyContext } from "@/components/providers/company-context";
-import { useDebounce } from "@/hooks/use-debounce";
 import {
 	StatusFilterDropdown,
 	StatusFilterOption,
@@ -92,9 +92,9 @@ function OrdersPageContent() {
 	} = usePermissions();
 
 	const [search, setSearch] = useState("");
-	const debouncedSearch = useDebounce(search, 300);
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
+	const [activeFilters, setActiveFilters] = useState<FilterCriterion[]>([]);
 	const [searchPayload, setSearchPayload] = useState<SearchFilterPayload>(() =>
 		buildSearchFilterPayload({
 			page: 0,
@@ -135,38 +135,82 @@ function OrdersPageContent() {
 			searchPayload,
 			page,
 			pageSize,
-			debouncedSearch,
 			stageTab,
 		],
 		queryFn: async () => {
-			// Build filter payload
-			const basePayload: any = {
-				...searchPayload,
+			// Extract filters from searchPayload
+			const existingFilters: any[] = [
+				...(searchPayload.filterGroup?.filters || []),
+			];
+
+			// If top search bar has text and not already filtered by orderNumber
+			const trimmedSearch = search.trim();
+			if (trimmedSearch) {
+				const hasOrderNumber = existingFilters.some(
+					(f) => f.field === "orderNumber",
+				);
+				if (!hasOrderNumber) {
+					existingFilters.unshift({
+						field: "orderNumber",
+						operator: "LIKE",
+						value: trimmedSearch,
+					});
+				}
+			}
+
+			// If stageTab selected (DRAFT, POSTED, APPROVED, COMPLETED, VOID)
+			let finalFilters = [...existingFilters];
+			if (stageTab !== "ALL") {
+				finalFilters = [
+					...finalFilters.filter((f: any) => f.field !== "status"),
+					{ field: "status", operator: "EQUAL", value: stageTab },
+				];
+			}
+
+			// Normalize any customer / customerId value to numeric
+			finalFilters = finalFilters.map((f: any) => {
+				if (
+					(f.field === "customer" || f.field === "customerId") &&
+					f.value !== undefined &&
+					!isNaN(Number(f.value))
+				) {
+					return { ...f, value: Number(f.value) };
+				}
+				return f;
+			});
+
+			// Exact request body conforming to specification
+			const cleanPayload: SearchFilterPayload = {
 				page: Math.max(0, page - 1),
 				size: pageSize,
+				sort:
+					searchPayload.sort && searchPayload.sort.length > 0
+						? searchPayload.sort
+						: [{ field: "createdAt", direction: "DESC" }],
+				filterGroup: {
+					operator: "AND",
+					filters: finalFilters,
+				},
 			};
 
-			if (debouncedSearch.trim()) {
-				basePayload.searchValue = debouncedSearch.trim();
-			}
-
-			// If stageTab selected (DRAFT, POSTED, APPROVED, COMPLETED) add stage filter
-			if (stageTab !== "ALL") {
-				const existingFilters = basePayload.filterGroup?.filters || [];
-				basePayload.filterGroup = {
-					operator: "AND",
-					filters: [
-						...existingFilters.filter((f: any) => f.field !== "status"),
-						{ field: "status", operator: "EQUAL", value: stageTab },
-					],
-				};
-			}
-
 			try {
-				const res = await ordersApi.search(basePayload);
+				const res = await ordersApi.search(cleanPayload);
 				return res;
-			} catch {
-				return ordersApi.list({ page, limit: pageSize, search: debouncedSearch });
+			} catch (err: any) {
+				console.error("ordersApi.search failed:", err);
+				if (
+					err?.status === 404 ||
+					err?.status === 405 ||
+					err?.response?.status === 404 ||
+					err?.response?.status === 405
+				) {
+					return ordersApi.list({
+						page,
+						limit: pageSize,
+						search: trimmedSearch || undefined,
+					});
+				}
+				throw err;
 			}
 		},
 		staleTime: 15 * 1000,
@@ -698,6 +742,11 @@ function OrdersPageContent() {
 				}
 				domainFilterFields={ORDER_DOMAIN_FILTERS}
 				domainTitle="Order Filter Studio"
+				activeDomainFilters={activeFilters}
+				onDomainFilterChange={(filters) => {
+					setActiveFilters(filters);
+					setPage(1);
+				}}
 				onSearchFilterChange={(payload) => {
 					setSearchPayload(payload);
 					setPage(1);

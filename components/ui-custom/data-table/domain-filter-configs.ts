@@ -225,6 +225,22 @@ export const USER_DOMAIN_FILTERS: DomainFilterField[] = [
 
 export const ORDER_DOMAIN_FILTERS: DomainFilterField[] = [
 	{
+		field: "orderNumber",
+		label: "Order Number",
+		type: "text",
+		defaultOperator: "EQUAL",
+		lockOperator: true,
+		placeholder: "e.g. ORD-2026...",
+	},
+	{
+		field: "customer",
+		label: "Customer",
+		type: "search-select",
+		asyncEntity: "customer",
+		defaultOperator: "EQUAL",
+		placeholder: "Search & select customer...",
+	},
+	{
 		field: "paymentStatus",
 		label: "Payment Status",
 		type: "select",
@@ -252,26 +268,6 @@ export const ORDER_DOMAIN_FILTERS: DomainFilterField[] = [
 				badgeColor: "bg-purple-500/10 text-purple-600",
 			},
 		],
-	},
-	{
-		field: "stockVerificationStatus",
-		label: "Warehouse Physical Verification",
-		type: "select",
-		isStatus: true,
-		defaultOperator: "EQUAL",
-		options: [
-			{ label: "Not Verified Yet (0%)", value: "NOT_YET" },
-			{ label: "Partial Check (>0%)", value: "PARTIAL_CHECK" },
-			{ label: "Checked All (100%)", value: "CHECKED_ALL" },
-		],
-	},
-	{
-		field: "customerId",
-		label: "Customer",
-		type: "search-select",
-		asyncEntity: "customer",
-		defaultOperator: "EQUAL",
-		placeholder: "Search & select customer...",
 	},
 	{
 		field: "totalAmount",
@@ -581,12 +577,98 @@ export const DELIVERY_DOMAIN_FILTERS: DomainFilterField[] = [
 
 export const INVOICE_DOMAIN_FILTERS: DomainFilterField[] = [
 	{
-		field: "customerId",
+		field: "invoiceNumber",
+		label: "Invoice Number",
+		type: "text",
+		defaultOperator: "SW",
+		lockOperator: true,
+		placeholder: "e.g. INV-2026...",
+	},
+	{
+		field: "customer",
 		label: "Customer / Borrower",
 		type: "search-select",
 		asyncEntity: "customer",
 		defaultOperator: "EQUAL",
 		placeholder: "Search & select customer...",
+	},
+	{
+		field: "status",
+		label: "Invoice Status",
+		type: "select",
+		isStatus: true,
+		defaultOperator: "EQUAL",
+		options: [
+			{
+				label: "Draft",
+				value: "DRAFT",
+				badgeColor: "bg-slate-500/10 text-slate-600",
+			},
+			{
+				label: "Unpaid",
+				value: "UNPAID",
+				badgeColor: "bg-amber-500/10 text-amber-600",
+			},
+			{
+				label: "Partially Paid",
+				value: "PARTIAL_PAYMENT",
+				badgeColor: "bg-sky-500/10 text-sky-600",
+			},
+			{
+				label: "Paid",
+				value: "PAID",
+				badgeColor: "bg-emerald-500/10 text-emerald-600",
+			},
+			{
+				label: "Overdue",
+				value: "OVERDUE",
+				badgeColor: "bg-rose-500/10 text-rose-600",
+			},
+			{
+				label: "Cancelled",
+				value: "CANCELLED",
+				badgeColor: "bg-gray-500/10 text-gray-600",
+			},
+			{
+				label: "Refunded",
+				value: "REFUNDED",
+				badgeColor: "bg-purple-500/10 text-purple-600",
+			},
+			{
+				label: "Void",
+				value: "VOID",
+				badgeColor: "bg-zinc-500/10 text-zinc-600",
+			},
+		],
+	},
+	{
+		field: "paymentStatus",
+		label: "Payment Status",
+		type: "select",
+		isStatus: true,
+		defaultOperator: "EQUAL",
+		options: [
+			{
+				label: "Unpaid / Pending",
+				value: "PENDING",
+				badgeColor: "bg-amber-500/10 text-amber-600",
+			},
+			{
+				label: "Partially Paid",
+				value: "PARTIALLY_PAID",
+				badgeColor: "bg-sky-500/10 text-sky-600",
+			},
+			{
+				label: "Paid in Full",
+				value: "PAID",
+				badgeColor: "bg-emerald-500/10 text-emerald-600",
+			},
+			{
+				label: "Refunded",
+				value: "REFUNDED",
+				badgeColor: "bg-purple-500/10 text-purple-600",
+			},
+		],
 	},
 	{
 		field: "totalAmount",
@@ -597,8 +679,8 @@ export const INVOICE_DOMAIN_FILTERS: DomainFilterField[] = [
 		placeholder: "e.g. 100",
 	},
 	{
-		field: "createdAt",
-		label: "Creation Date Range",
+		field: "orderDate",
+		label: "Order Date",
 		type: "date-range",
 		defaultOperator: "BETWEEN",
 	},

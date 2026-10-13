@@ -420,7 +420,7 @@ export const profileApi = {
 		if (typeof window !== "undefined") {
 			try {
 				localStorage.setItem(
-					"rumluos_user_profile",
+					"crm_user_profile",
 					JSON.stringify(profileResult),
 				);
 			} catch {}
@@ -431,7 +431,7 @@ export const profileApi = {
 	getCachedProfile: (): any => {
 		if (typeof window === "undefined") return undefined;
 		try {
-			const cached = localStorage.getItem("rumluos_user_profile");
+			const cached = localStorage.getItem("crm_user_profile");
 			return cached ? JSON.parse(cached) : undefined;
 		} catch {
 			return undefined;
@@ -532,8 +532,8 @@ function buildReportQueryParams(
 	if (companyId === undefined || companyId === null || companyId === "") {
 		if (typeof window !== "undefined") {
 			const stored =
-				localStorage.getItem("rumluos_company_id") ||
-				document.cookie.match(/(?:^|; )rumluos_company_id=([^;]*)/)?.[1];
+				localStorage.getItem("crm_company_id") ||
+				document.cookie.match(/(?:^|; )crm_company_id=([^;]*)/)?.[1];
 			if (stored) companyId = stored;
 		}
 	}
@@ -2249,7 +2249,7 @@ export const customersApi = {
 	findNearby: (req: NearbySearchRequest, companyId?: string | number) => {
 		let compId = companyId;
 		if (!compId && typeof window !== "undefined") {
-			compId = localStorage.getItem("rumluos_company_id") || undefined;
+			compId = localStorage.getItem("crm_company_id") || undefined;
 		}
 		return api
 			.post<CustomerNearbyResult[]>("/customers/nearby", req, {
@@ -2266,7 +2266,7 @@ export const customersApi = {
 	) => {
 		let compId = companyId;
 		if (!compId && typeof window !== "undefined") {
-			compId = localStorage.getItem("rumluos_company_id") || undefined;
+			compId = localStorage.getItem("crm_company_id") || undefined;
 		}
 		return api
 			.post<CustomerVisitRecord>(`/customers/${id}/visit`, req || {}, {
@@ -2283,7 +2283,7 @@ export const customersApi = {
 	) => {
 		let compId = companyId;
 		if (!compId && typeof window !== "undefined") {
-			compId = localStorage.getItem("rumluos_company_id") || undefined;
+			compId = localStorage.getItem("crm_company_id") || undefined;
 		}
 		return api
 			.get<Paged<CustomerVisitRecord>>(`/customers/${id}/visits`, {

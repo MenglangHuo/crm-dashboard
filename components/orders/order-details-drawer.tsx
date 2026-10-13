@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ordersApi, fileUrl } from "@/lib/api/endpoints";
+import { ordersApi, safeImageUrl, fileUrl } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";
 import { usePermissions } from "@/hooks/use-permissions";
 import { toast } from "sonner";
@@ -10,7 +10,6 @@ import { Order, OrderItem } from "@/lib/types";
 import {
 	ModernModal,
 	ModernModalFooter,
-	ModernModalCancelButton,
 } from "@/components/ui-custom/modal";
 import { OrderStatusStepper } from "@/components/orders/order-status-stepper";
 import { WarehouseVerifyModal } from "@/components/orders/warehouse-verify-modal";
@@ -21,6 +20,13 @@ import { OrderTimelineDrawer } from "@/components/orders/order-timeline-drawer";
 import { PosOrderStudioModal } from "@/components/orders/pos-order-studio-modal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+	DropdownMenu,
+	DropdownMenuTrigger,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
 	ModernTabs,
 	ModernTabsList,
@@ -53,7 +59,11 @@ import {
 	MapPin,
 	UserCheck,
 	Ban,
-	Copy,
+	ChevronDown,
+	Clock,
+	SlidersHorizontal,
+	FileText,
+	Maximize2,
 } from "lucide-react";
 
 interface OrderDetailsDrawerProps {
@@ -62,25 +72,43 @@ interface OrderDetailsDrawerProps {
 	onOpenChange: (open: boolean) => void;
 }
 
-function SafeItemImage({ src, alt }: { src?: string; alt: string }) {
+// Prominent Product Image Component with Lightbox Affordance
+function SafeProductThumbnail({
+	src,
+	alt,
+	onPreview,
+}: {
+	src?: string;
+	alt: string;
+	onPreview?: (url: string, title: string) => void;
+}) {
 	const [error, setError] = useState(false);
-	const fullUrl = src ? fileUrl(src) : undefined;
+	const fullUrl = src ? safeImageUrl(src) : undefined;
 
 	if (!fullUrl || error) {
 		return (
-			<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 shrink-0">
-				<Package className="h-5 w-5" />
+			<div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800/80 text-slate-400 shrink-0 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs">
+				<Package className="h-6 w-6 stroke-[1.25] text-slate-400/90" />
 			</div>
 		);
 	}
 
 	return (
-		<img
-			src={fullUrl}
-			alt={alt}
-			onError={() => setError(true)}
-			className="h-10 w-10 rounded-xl object-cover border border-slate-200 dark:border-slate-800 shrink-0"
-		/>
+		<div
+			className="group/img relative h-14 w-14 rounded-xl overflow-hidden border border-slate-200/90 dark:border-slate-700/80 shadow-2xs shrink-0 cursor-pointer bg-slate-50 dark:bg-slate-900"
+			onClick={() => onPreview?.(fullUrl, alt)}
+			title="Click to zoom product image"
+		>
+			<img
+				src={fullUrl}
+				alt={alt}
+				onError={() => setError(true)}
+				className="h-full w-full object-cover transition-transform duration-200 group-hover/img:scale-105"
+			/>
+			<div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white">
+				<Maximize2 className="h-4 w-4 drop-shadow-xs" />
+			</div>
+		</div>
 	);
 }
 
@@ -117,8 +145,13 @@ export function OrderDetailsDrawer({
 	const [isRejectOpen, setIsRejectOpen] = useState(false);
 	const [isTimelineOpen, setIsTimelineOpen] = useState(false);
 	const [isPosStudioOpen, setIsPosStudioOpen] = useState(false);
-	const [isCloneStudioOpen, setIsCloneStudioOpen] = useState(false);
 	const [activeTab, setActiveTab] = useState<string>("orderitems");
+
+	// Image Lightbox Preview State
+	const [previewImage, setPreviewImage] = useState<{
+		url: string;
+		title: string;
+	} | null>(null);
 
 	const { data: order, isLoading } = useQuery({
 		queryKey: ["order-detail", orderId],
@@ -322,16 +355,26 @@ export function OrderDetailsDrawer({
 			? order.addonsItems
 			: order?.addons) || [];
 
+	const isDualApproved = Boolean(
+		order?.status === "APPROVED" ||
+			order?.status === "COMPLETED" ||
+			(order?.stockkeeperApproved && order?.saleManagerApproved),
+	);
+
+	const orderSubtitle = order
+		? `Created ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : ""} • ${order.customerName || order.customer?.name || "Walk-in Customer"} • ${order.warehouseName || "Main Warehouse"}`
+		: "Detailed view of order items, verification, and action lifecycle.";
+
 	return (
 		<>
 			<ModernModal
-				isOpen={open && !isPosStudioOpen && !isCloneStudioOpen}
+				isOpen={open && !isPosStudioOpen}
 				onClose={() => {
 					onOpenChange(false);
 					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
 				}}
-				title={`Order Inspector: ${order?.orderNumber || order?.orderNo || `#${orderId}`}`}
-				subtitle="Detailed view of order items, physical verification, dual approvals, and action lifecycle."
+				title={`Order ${order?.orderNumber || order?.orderNo || `#${orderId}`}`}
+				subtitle={orderSubtitle}
 				icon={<Eye className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
 				size="xl"
 				glassmorphism={true}
@@ -341,17 +384,22 @@ export function OrderDetailsDrawer({
 				loadingText="Fetching order details..."
 				footer={
 					<ModernModalFooter className="flex items-center justify-between w-full">
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => setIsTimelineOpen(true)}
-							className="rounded-xl text-xs gap-1.5 border-slate-300 font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300"
-						>
-							<History className="h-3.5 w-3.5 text-indigo-600" /> Full Audit
-							Timeline
-						</Button>
-
+						{/* Left: Secondary Utility Actions */}
 						<div className="flex items-center gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setIsTimelineOpen(true)}
+								className="h-9 rounded-xl text-xs gap-1.5 border-slate-300 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+							>
+								<History className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+								<span>Audit Timeline</span>
+							</Button>
+						</div>
+
+						{/* Right: Stage-driven Primary Actions & Dropdown */}
+						<div className="flex items-center gap-2">
+							{/* DRAFT STAGE ACTIONS */}
 							{order && order.status === "DRAFT" && (
 								<>
 									{canCreateOrder && (
@@ -361,7 +409,7 @@ export function OrderDetailsDrawer({
 												size="sm"
 												variant="outline"
 												onClick={() => setIsPosStudioOpen(true)}
-												className="h-9 px-3.5 rounded-xl border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 font-bold text-xs shadow-2xs gap-1.5"
+												className="h-9 px-3 rounded-xl border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 font-semibold text-xs gap-1.5"
 											>
 												<ShoppingCart className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
 												<span>Open in POS Studio</span>
@@ -373,7 +421,7 @@ export function OrderDetailsDrawer({
 												variant="outline"
 												onClick={() => updateMutation.mutate()}
 												disabled={updateMutation.isPending}
-												className="h-9 px-4 rounded-xl border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 font-bold text-xs shadow-2xs gap-1.5 transition-all"
+												className="h-9 px-3.5 rounded-xl border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 font-semibold text-xs gap-1.5"
 											>
 												{updateMutation.isPending ? (
 													<Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -385,13 +433,14 @@ export function OrderDetailsDrawer({
 										</>
 									)}
 
+									{/* Primary Post CTA */}
 									{canPostOrder && (
 										<Button
 											type="button"
 											size="sm"
 											onClick={() => postMutation.mutate(order.id)}
 											disabled={postMutation.isPending}
-											className="h-9 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold text-xs shadow-md gap-1.5 transition-all"
+											className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs gap-1.5 transition-all"
 										>
 											{postMutation.isPending ? (
 												<Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -401,30 +450,193 @@ export function OrderDetailsDrawer({
 											<span>Post Order (Reserve Stock)</span>
 										</Button>
 									)}
+
+									{/* Secondary / Destructive Dropdown for DRAFT */}
+									{canVoidOrder && !isSale && (
+										<DropdownMenu>
+											<DropdownMenuTrigger
+												render={
+													<Button
+														size="sm"
+														variant="outline"
+														className="h-9 px-2.5 text-xs font-semibold gap-1 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl"
+													/>
+												}
+											>
+												<SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
+												<ChevronDown className="h-3 w-3 text-slate-400" />
+											</DropdownMenuTrigger>
+											<DropdownMenuContent align="end" className="w-48">
+												<DropdownMenuItem
+													onClick={() => setIsVoidOpen(true)}
+													className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400"
+												>
+													<Ban className="h-3.5 w-3.5" />
+													<span>Void Order</span>
+												</DropdownMenuItem>
+											</DropdownMenuContent>
+										</DropdownMenu>
+									)}
 								</>
 							)}
 
-							{order && canCreateOrder && (
-								<Button
-									type="button"
-									size="sm"
-									variant="outline"
-									onClick={() => setIsCloneStudioOpen(true)}
-									className="h-9 px-3.5 rounded-xl border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 font-bold text-xs shadow-2xs gap-1.5"
-									title="Create a new sales order cloned from this order"
-								>
-									<Copy className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-									<span>Clone Order</span>
-								</Button>
+							{/* POSTED STAGE ACTIONS */}
+							{order && order.status === "POSTED" && (
+								<>
+									{!order.saleManagerApproved ? (
+										<Button
+											size="sm"
+											disabled={isSale || !canApproveSale}
+											onClick={() => {
+												setApprovalScope("SALE_MANAGER");
+												setIsApproveOpen(true);
+											}}
+											className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs gap-1.5 disabled:opacity-50"
+										>
+											<UserCheck className="h-3.5 w-3.5" />
+											<span>Approve as Sale Manager</span>
+										</Button>
+									) : !order.stockkeeperApproved ? (
+										<Button
+											size="sm"
+											disabled={isSale || !canVerifyStock}
+											onClick={() => setIsVerifyOpen(true)}
+											className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs gap-1.5 disabled:opacity-50"
+										>
+											<Boxes className="h-3.5 w-3.5" />
+											<span>Verify Stock Items</span>
+										</Button>
+									) : null}
+
+									{/* More Actions Dropdown for POSTED */}
+									<DropdownMenu>
+										<DropdownMenuTrigger
+											render={
+												<Button
+													size="sm"
+													variant="outline"
+													className="h-9 px-3 text-xs font-semibold gap-1.5 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl"
+												/>
+											}
+										>
+											<SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
+											<span>More actions</span>
+											<ChevronDown className="h-3 w-3 text-slate-400" />
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="end" className="w-56">
+											{canApproveSpecial && !isSale && (
+												<DropdownMenuItem
+													onClick={() => {
+														setApprovalScope("AUTO");
+														setIsApproveOpen(true);
+													}}
+													className="cursor-pointer gap-2 py-1.5 text-xs font-medium"
+												>
+													<ShieldCheck className="h-3.5 w-3.5 text-indigo-600" />
+													<span>Smart Bypass Approval</span>
+												</DropdownMenuItem>
+											)}
+
+											{canUnpostOrder && (
+												<DropdownMenuItem
+													disabled={isSale}
+													onClick={() => setIsUnpostOpen(true)}
+													className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+												>
+													<RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+													<span>Unpost to Draft</span>
+												</DropdownMenuItem>
+											)}
+
+											{canVoidOrder && !isSale && (
+												<>
+													<DropdownMenuSeparator />
+													<DropdownMenuItem
+														onClick={() => setIsVoidOpen(true)}
+														className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400"
+													>
+														<Ban className="h-3.5 w-3.5" />
+														<span>Void Order</span>
+													</DropdownMenuItem>
+												</>
+											)}
+										</DropdownMenuContent>
+									</DropdownMenu>
+								</>
 							)}
 
+							{/* APPROVED STAGE ACTIONS */}
+							{order && order.status === "APPROVED" && (
+								<>
+									{canIssueInvoice && (
+										<Button
+											size="sm"
+											onClick={() => setIsInvoiceOpen(true)}
+											className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs gap-1.5"
+										>
+											<Receipt className="h-3.5 w-3.5" />
+											<span>Issue Invoice</span>
+										</Button>
+									)}
+
+									<DropdownMenu>
+										<DropdownMenuTrigger
+											render={
+												<Button
+													size="sm"
+													variant="outline"
+													className="h-9 px-3 text-xs font-semibold gap-1.5 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl"
+												/>
+											}
+										>
+											<SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
+											<span>More actions</span>
+											<ChevronDown className="h-3 w-3 text-slate-400" />
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="end" className="w-56">
+											{canUnapproveOrder && (
+												<DropdownMenuItem
+													onClick={() => setIsUnapproveOpen(true)}
+													className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+												>
+													<RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+													<span>Reset Signoffs (To Draft)</span>
+												</DropdownMenuItem>
+											)}
+
+											{canRejectOrder && (
+												<>
+													<DropdownMenuSeparator />
+													<DropdownMenuItem
+														onClick={() => setIsRejectOpen(true)}
+														className="cursor-pointer gap-2 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400"
+													>
+														<XCircle className="h-3.5 w-3.5" />
+														<span>Reject to Posted</span>
+													</DropdownMenuItem>
+												</>
+											)}
+										</DropdownMenuContent>
+									</DropdownMenu>
+								</>
+							)}
+
+							{/* COMPLETED STAGE BADGE */}
+							{order && order.status === "COMPLETED" && (
+								<Badge className="h-9 px-3.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 text-xs font-bold gap-1.5">
+									<CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+									<span>Invoiced & Completed</span>
+								</Badge>
+							)}
+
+							{/* VOID STAGE ACTIONS */}
 							{order && order.status === "VOID" && canVoidOrder && (
 								<Button
 									type="button"
 									size="sm"
 									variant="outline"
 									onClick={() => setIsMoveToDraftOpen(true)}
-									className="h-9 px-4 rounded-xl border-indigo-300 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 font-bold text-xs shadow-2xs gap-1.5 transition-all"
+									className="h-9 px-4 rounded-xl border-indigo-300 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 font-bold text-xs shadow-2xs gap-1.5"
 								>
 									<RotateCcw className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
 									<span>Move to Draft</span>
@@ -435,8 +647,8 @@ export function OrderDetailsDrawer({
 				}
 			>
 				{order && (
-					<div className="space-y-4 py-1">
-						{/* Stepper Lifecycle Header */}
+					<div className="space-y-3 py-1">
+						{/* Ultra-Compact Lifecycle Tracker (Conserves maximum vertical screen) */}
 						<OrderStatusStepper
 							order={order}
 							onOpenFullTimeline={() => setIsTimelineOpen(true)}
@@ -448,7 +660,7 @@ export function OrderDetailsDrawer({
 									if (canApproveSpecial) {
 										setApprovalScope("AUTO");
 										setIsApproveOpen(true);
-									} else if (canApproveSale) {
+									} else if (canApproveSale && !order.saleManagerApproved) {
 										setApprovalScope("SALE_MANAGER");
 										setIsApproveOpen(true);
 									} else if (canVerifyStock) {
@@ -460,307 +672,60 @@ export function OrderDetailsDrawer({
 							}}
 						/>
 
-						{/* Stage Action Controls Toolbar */}
-						<div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
-							<div className="flex items-center gap-2">
-								<span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-									Stage Actions:
-								</span>
-								<Badge
-									variant="outline"
-									className="text-[10px] font-mono font-semibold py-0.5 border-slate-300 dark:border-slate-700"
-								>
-									{order.status === "DRAFT" && "📦 Stock: Untouched"}
-									{order.status === "POSTED" &&
-										"🔒 Stock: Reserved (Allocated)"}
-									{order.status === "APPROVED" &&
-										"🔒 Stock: Reserved (Dual-Signed)"}
-									{order.status === "COMPLETED" && "💰 Stock: Sold (Deducted)"}
-									{order.status === "REFUNDED" &&
-										"🔄 Stock: Restocked (Returned)"}
-									{order.status === "CANCELLED" && "🚫 Stock: Released"}
-									{order.status === "VOID" && "🚫 Stock: Released"}
-								</Badge>
-							</div>
-
-							<div className="flex flex-wrap items-center gap-2">
-								{/* DRAFT -> Actions */}
-								{order.status === "DRAFT" && (
-									<>
-										{canCreateOrder && (
-											<Button
-												size="sm"
-												onClick={() => setIsPosStudioOpen(true)}
-												className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-xl font-bold shadow-xs gap-1.5"
-											>
-												<ShoppingCart className="h-3.5 w-3.5" /> Edit in POS
-												Ordering Studio
-											</Button>
-										)}
-										{canVoidOrder && (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => setIsVoidOpen(true)}
-												className="text-xs rounded-xl border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 font-medium gap-1"
-											>
-												<Ban className="h-3.5 w-3.5" /> Void Order
-											</Button>
-										)}
-									</>
-								)}
-
-								{/* POSTED Stage Actions */}
-								{order.status === "POSTED" && (
-									<>
-										{/* Step 1: Sale Manager Approve */}
-										{(canApproveSale || isSale) && (
-											<Button
-												size="sm"
-												variant={!order.saleManagerApproved ? "default" : "outline"}
-												disabled={isSale || !canApproveSale || Boolean(order.saleManagerApproved)}
-												onClick={() => {
-													setApprovalScope("SALE_MANAGER");
-													setIsApproveOpen(true);
-												}}
-												className={`text-xs rounded-xl font-semibold gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed ${
-													!order.saleManagerApproved
-														? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs animate-pulse"
-														: "border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300"
-												}`}
-												title={
-													isSale
-														? "Sale Manager Approve (Restricted for Sale role)"
-														: order.saleManagerApproved
-															? "Sale Manager has already approved this order"
-															: undefined
-												}
-											>
-												<UserCheck className="h-3.5 w-3.5" />
-												{order.saleManagerApproved
-													? "✓ Sale Manager Approved"
-													: "1. Sale Manager Approve"}
-											</Button>
-										)}
-
-										{/* Step 2: Stockkeeper Physical Verification */}
-										{(canVerifyStock || isSale) && (
-											<Button
-												size="sm"
-												variant={order.saleManagerApproved && !order.stockkeeperApproved ? "default" : "outline"}
-												disabled={isSale || !canVerifyStock || !order.saleManagerApproved}
-												onClick={() => setIsVerifyOpen(true)}
-												className={`text-xs rounded-xl font-semibold gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed ${
-													order.saleManagerApproved && !order.stockkeeperApproved
-														? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-														: "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300"
-												}`}
-												title={
-													!order.saleManagerApproved
-														? "Sale Manager must approve the order before stock verification can begin"
-														: isSale
-															? "Stockkeeper Physical Verification (Restricted for Sale role)"
-															: undefined
-												}
-											>
-												<Boxes className="h-3.5 w-3.5" />
-												{order.stockkeeperApproved
-													? "✓ Items Verified"
-													: "2. Physical Verification"}
-											</Button>
-										)}
-
-										{(canApproveSpecial || isSale) && (
-											<Button
-												size="sm"
-												disabled={isSale || !canApproveSpecial}
-												onClick={() => {
-													setApprovalScope("AUTO");
-													setIsApproveOpen(true);
-												}}
-												className="bg-slate-800 hover:bg-slate-900 text-white text-xs rounded-xl font-semibold shadow-xs gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-												title={
-													isSale
-														? "Smart Dual-Approve (Restricted for Sale role)"
-														: undefined
-												}
-											>
-												<ShieldCheck className="h-3.5 w-3.5" /> Smart Bypass
-											</Button>
-										)}
-
-										{(canUnpostOrder || isSale) && (
-											<Button
-												size="sm"
-												variant="outline"
-												disabled={isSale || !canUnpostOrder}
-												onClick={() => setIsUnpostOpen(true)}
-												className="text-xs rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 font-medium gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-												title={
-													isSale
-														? "Unpost to Draft (Restricted for Sale role)"
-														: undefined
-												}
-											>
-												<RotateCcw className="h-3.5 w-3.5" /> Unpost to Draft
-											</Button>
-										)}
-
-										{canVoidOrder && !isSale && (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => setIsVoidOpen(true)}
-												className="text-xs rounded-xl border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 font-medium gap-1"
-											>
-												<Ban className="h-3.5 w-3.5" /> Void Order
-											</Button>
-										)}
-									</>
-								)}
-
-								{/* APPROVED Stage Actions */}
-								{order.status === "APPROVED" && (
-									<>
-										{canIssueInvoice && (
-											<Button
-												size="sm"
-												onClick={() => setIsInvoiceOpen(true)}
-												className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-xl font-semibold shadow-xs gap-1.5"
-											>
-												<Receipt className="h-3.5 w-3.5" /> Issue Invoice
-												(Accountant)
-											</Button>
-										)}
-
-										{canUnapproveOrder && (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => setIsUnapproveOpen(true)}
-												className="text-xs rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 font-semibold gap-1.5"
-												title="Reset all approval signoffs and return order to Draft"
-											>
-												<RotateCcw className="h-3.5 w-3.5" /> Reset Signoffs (To
-												Draft)
-											</Button>
-										)}
-
-										{canRejectOrder && (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => setIsRejectOpen(true)}
-												className="text-xs rounded-xl border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 font-medium gap-1.5"
-											>
-												<XCircle className="h-3.5 w-3.5" /> Reject to Posted
-											</Button>
-										)}
-									</>
-								)}
-
-								{/* COMPLETED Stage Info */}
-								{order.status === "COMPLETED" && (
-									<Badge className="bg-emerald-600 text-white text-xs py-1 px-3">
-										✓ Invoiced & Completed
-									</Badge>
-								)}
-
-								{/* REFUNDED Stage Info */}
-								{order.status === "REFUNDED" && (
-									<Badge className="bg-purple-600 text-white text-xs py-1 px-3">
-										✓ Credit Note Refunded
-									</Badge>
-								)}
-
-								{/* VOID Stage Actions */}
-								{order.status === "VOID" && (
-									<>
-										{canVoidOrder && (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => setIsMoveToDraftOpen(true)}
-												className="text-xs rounded-xl border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 font-semibold gap-1.5"
-											>
-												<RotateCcw className="h-3.5 w-3.5" /> Move to Draft
-											</Button>
-										)}
-									</>
-								)}
-							</div>
-						</div>
-
-						{/* Re-approval Notice if Stockkeeper adjusted quantities */}
-						{order.status === "POSTED" &&
-							!order.saleManagerApproved &&
-							(order.stockVerificationStatus === "PARTIAL_CHECK" ||
-								(order.verifiedItemCount ?? 0) > 0) && (
-								<div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl p-3.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-3 shadow-2xs">
-									<AlertCircle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
-									<div className="space-y-1">
-										<div className="font-bold text-slate-900 dark:text-slate-100">
-											Action Required: Awaiting Sale Manager Re-Approval
-										</div>
-										<div className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-											Stockkeeper adjusted item quantities due to stock shortage.
-											The Sale Manager must review and re-approve the updated totals, or Unpost the order to DRAFT for modification.
-										</div>
-									</div>
-								</div>
-							)}
-
-						{/* Modern Tabs Section */}
+						{/* Main Content Focused on Product Items */}
 						<ModernTabs value={activeTab} onValueChange={setActiveTab}>
-							<ModernTabsList variant="glass" size="md">
-								<ModernTabsTrigger
-									value="orderitems"
-									icon={<ShoppingCart className="h-4 w-4" />}
-									badge={
-										addons.length > 0
-											? `${items.length} (+${addons.length})`
-											: items.length
-									}
-									badgeColor="purple"
-								>
-									Order Items
-								</ModernTabsTrigger>
+							<div className="flex items-center justify-between pb-2">
+								<ModernTabsList variant="glass" size="sm" className="h-8 p-0.5">
+									<ModernTabsTrigger
+										value="orderitems"
+										icon={<ShoppingCart className="h-3.5 w-3.5" />}
+										badge={
+											addons.length > 0
+												? `${items.length} (+${addons.length})`
+												: items.length
+										}
+										badgeColor="indigo"
+										className="text-xs px-3 py-1"
+									>
+										Product Items
+									</ModernTabsTrigger>
 
-								<ModernTabsTrigger
-									value="customer-warehouse"
-									icon={<User className="h-4 w-4" />}
-								>
-									Customer & Warehouse
-								</ModernTabsTrigger>
+									<ModernTabsTrigger
+										value="customer-warehouse"
+										icon={<User className="h-3.5 w-3.5" />}
+										className="text-xs px-3 py-1"
+									>
+										Customer & Delivery
+									</ModernTabsTrigger>
 
-								<ModernTabsTrigger
-									value="dual-approved"
-									icon={<ShieldCheck className="h-4 w-4" />}
-									badge={order.isFullyApproved ? "Approved" : "Pending"}
-									badgeColor={order.isFullyApproved ? "emerald" : "amber"}
-								>
-									Dual Approved
-								</ModernTabsTrigger>
-							</ModernTabsList>
+									<ModernTabsTrigger
+										value="dual-approved"
+										icon={<ShieldCheck className="h-3.5 w-3.5" />}
+										badge={isDualApproved ? "Approved" : "Pending"}
+										badgeColor={isDualApproved ? "emerald" : "amber"}
+										className="text-xs px-3 py-1"
+									>
+										Signoffs
+									</ModernTabsTrigger>
+								</ModernTabsList>
+							</div>
 
-							{/* Tab 1: Order Items Table & Financial Breakdown */}
-							<ModernTabsContent value="orderitems" className="pt-3 space-y-3">
+							{/* TAB 1: HERO VIEW - Product Items with Prominent Thumbnails */}
+							<ModernTabsContent value="orderitems" className="space-y-3">
 								<div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
 									<table className="w-full text-left text-xs">
-										<thead className="bg-slate-100/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-800">
+										<thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-200/80 dark:border-slate-800">
 											<tr>
-												<th className="p-3">Product Item</th>
-												<th className="p-3 w-20">Unit</th>
-												<th className="p-3 w-20 text-center">Qty</th>
-												<th className="p-3 w-24 text-right">Unit Price</th>
+												<th className="p-3 min-w-[260px]">Product Item</th>
+												<th className="p-3 w-20 text-center">Unit</th>
+												<th className="p-3 w-24 text-center">Qty</th>
+												<th className="p-3 w-28 text-right">Unit Price</th>
 												<th className="p-3 w-24 text-right">Discount</th>
-												<th className="p-3 w-28 text-right">Line Total</th>
-												<th className="p-3 w-32 text-center">
-													Stock Verification
-												</th>
+												<th className="p-3 w-32 text-right">Line Total</th>
+												<th className="p-3 w-32 text-center">Stock Check</th>
 											</tr>
 										</thead>
-										<tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+										<tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
 											{items.length > 0 ? (
 												items.map((item: OrderItem, idx: number) => {
 													const qty = Number(item.quantity) || 1;
@@ -770,48 +735,52 @@ export function OrderDetailsDrawer({
 														Number(item.totalAmount || item.totalPrice) ||
 														qty * price;
 
+													const rawImage =
+														(item as any).imageUrl ||
+														(item as any).productImageUrl ||
+														(item as any).product?.imageUrl ||
+														(item as any).thumbnail ||
+														(item as any).image;
+
 													return (
 														<tr
 															key={item.id || idx}
-															className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+															className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
 														>
-															{/* Product Thumbnail & Details */}
+															{/* Product Thumbnail & Details (HERO FOCUS) */}
 															<td className="p-3">
-																<div className="flex items-center gap-3">
-																	<SafeItemImage
-																		src={
-																			(item as any).imageUrl ||
-																			(item as any).productImageUrl
-																		}
+																<div className="flex items-center gap-3.5">
+																	<SafeProductThumbnail
+																		src={rawImage}
 																		alt={item.productName || "Product"}
+																		onPreview={(url, title) =>
+																			setPreviewImage({ url, title })
+																		}
 																	/>
-																	<div className="min-w-0">
-																		<div className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
+																	<div className="min-w-0 space-y-0.5">
+																		<div className="font-bold text-slate-900 dark:text-slate-100 text-sm truncate">
 																			{item.productName || `Item #${item.id}`}
 																		</div>
-																		<div className="text-[11px] font-mono text-slate-400">
-																			SKU:{" "}
-																			<strong className="text-slate-600 dark:text-slate-300">
-																				{item.sku || "—"}
-																			</strong>
-																		</div>
 																		{item.availableStock !== undefined && (
-																			<div className="text-[10px] font-mono mt-0.5 flex items-center gap-1.5">
-																				<span className="text-slate-400">Stock:</span>
-																				<strong
-																					className={
+																			<div className="flex items-center gap-1.5 pt-0.5 text-xs">
+																				<span
+																					className={`inline-flex items-center gap-1 text-[11px] font-medium ${
 																						item.availableStock < qty
-																							? "text-rose-600 dark:text-rose-400 font-bold"
-																							: "text-emerald-600 dark:text-emerald-400 font-bold"
-																					}
+																							? "text-rose-600 dark:text-rose-400 font-semibold"
+																							: "text-emerald-600 dark:text-emerald-400"
+																					}`}
 																				>
-																					{item.availableStock} avail
-																				</strong>
-																				{item.availableStock < qty && (
-																					<span className="text-[9px] px-1 py-0.2 rounded bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-semibold">
-																						Shortage
-																					</span>
-																				)}
+																					<span
+																						className={`h-1.5 w-1.5 rounded-full ${
+																							item.availableStock < qty
+																								? "bg-rose-500 animate-pulse"
+																								: "bg-emerald-500"
+																						}`}
+																					/>
+																					{item.availableStock} in stock
+																					{item.availableStock < qty &&
+																						" (Shortage)"}
+																				</span>
 																			</div>
 																		)}
 																	</div>
@@ -819,17 +788,14 @@ export function OrderDetailsDrawer({
 															</td>
 
 															{/* Unit */}
-															<td className="p-3 font-medium text-slate-600 dark:text-slate-400">
-																<Badge
-																	variant="secondary"
-																	className="text-[10px] px-1.5 py-0 font-mono"
-																>
+															<td className="p-3 text-center">
+																<span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
 																	{item.unitName || "PCS"}
-																</Badge>
+																</span>
 															</td>
 
 															{/* Quantity */}
-															<td className="p-3 text-center font-mono font-bold text-slate-900 dark:text-slate-100">
+															<td className="p-3 text-center">
 																{order.status === "DRAFT" && canCreateOrder ? (
 																	<input
 																		type="number"
@@ -842,15 +808,17 @@ export function OrderDetailsDrawer({
 																				Number(e.target.value),
 																			)
 																		}
-																		className="w-16 h-7 text-center rounded border border-indigo-300 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-950/40 font-mono text-xs font-bold outline-none focus:ring-1 focus:ring-indigo-500"
+																		className="w-14 h-8 text-center rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs font-bold text-slate-900 dark:text-slate-100 shadow-2xs outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all mx-auto block"
 																	/>
 																) : (
-																	qty
+																	<span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-xs">
+																		{qty}
+																	</span>
 																)}
 															</td>
 
 															{/* Unit Price */}
-															<td className="p-3 text-right font-mono text-slate-700 dark:text-slate-300">
+															<td className="p-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400 text-xs font-medium">
 																$
 																{price.toLocaleString(undefined, {
 																	minimumFractionDigits: 2,
@@ -858,51 +826,56 @@ export function OrderDetailsDrawer({
 															</td>
 
 															{/* Discount */}
-															<td className="p-3 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">
+															<td className="p-3 text-right">
 																{order.status === "DRAFT" && canCreateOrder ? (
-																	<div className="flex items-center justify-end gap-1">
-																		<input
-																			type="number"
-																			step="0.01"
-																			min="0"
-																			value={item.discount}
-																			onChange={(e) =>
-																				handleEditableItemChange(
-																					idx,
-																					"discount",
-																					Number(e.target.value),
-																				)
-																			}
-																			className="w-16 h-7 text-right px-1 rounded border border-amber-300 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/40 font-mono text-xs font-bold outline-none focus:ring-1 focus:ring-amber-500"
-																		/>
-																		<select
-																			value={item.discountType || "FLAT"}
-																			onChange={(e) =>
-																				handleEditableItemChange(
-																					idx,
-																					"discountType",
-																					e.target.value,
-																				)
-																			}
-																			className="h-7 text-[10px] font-bold rounded border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 outline-none"
-																		>
-																			<option value="FLAT">$</option>
-																			<option value="PERCENTAGE">%</option>
-																		</select>
+																	<div className="inline-flex items-center justify-end">
+																		<div className="flex items-center h-8 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xs overflow-hidden focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+																			<input
+																				type="number"
+																				step="0.01"
+																				min="0"
+																				value={item.discount || ""}
+																				placeholder="0"
+																				onChange={(e) =>
+																					handleEditableItemChange(
+																						idx,
+																						"discount",
+																						Number(e.target.value),
+																					)
+																				}
+																				className="w-12 h-full text-right px-1.5 font-mono text-xs font-medium text-slate-900 dark:text-slate-100 bg-transparent outline-none tabular-nums"
+																			/>
+																			<select
+																				value={item.discountType || "FLAT"}
+																				onChange={(e) =>
+																					handleEditableItemChange(
+																						idx,
+																						"discountType",
+																						e.target.value,
+																					)
+																				}
+																				className="h-full px-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+																			>
+																				<option value="FLAT">$</option>
+																				<option value="PERCENTAGE">%</option>
+																			</select>
+																		</div>
 																	</div>
 																) : disc > 0 ? (
-																	<span>
+																	<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-mono">
 																		{item.discountType === "PERCENTAGE"
-																			? `${disc}%`
-																			: `-$${disc}`}
+																			? `${disc}% off`
+																			: `-$${disc.toFixed(2)}`}
 																	</span>
 																) : (
-																	<span className="text-slate-400">—</span>
+																	<span className="text-slate-400 font-mono text-xs">
+																		—
+																	</span>
 																)}
 															</td>
 
 															{/* Line Total */}
-															<td className="p-3 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs">
+															<td className="p-3 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-slate-100 text-xs">
 																$
 																{total.toLocaleString(undefined, {
 																	minimumFractionDigits: 2,
@@ -912,17 +885,19 @@ export function OrderDetailsDrawer({
 															{/* Stock Verification Status Badge */}
 															<td className="p-3 text-center">
 																{item.isVerified ? (
-																	<Badge className="bg-emerald-600 text-white text-[10px] gap-1 py-0.5">
-																		<CheckCircle2 className="h-3 w-3" />{" "}
-																		Verified ({item.verifiedQuantity ?? qty})
-																	</Badge>
-																) : (
 																	<Badge
 																		variant="outline"
-																		className="text-slate-400 border-slate-300 text-[10px] py-0.5"
+																		className="bg-emerald-50/70 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] gap-1 py-0.5"
 																	>
-																		Not Verified
+																		<CheckCircle2 className="h-3 w-3 text-emerald-600" />
+																		<span>
+																			Verified ({item.verifiedQuantity ?? qty})
+																		</span>
 																	</Badge>
+																) : (
+																	<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+																		Unverified
+																	</span>
 																)}
 															</td>
 														</tr>
@@ -942,19 +917,21 @@ export function OrderDetailsDrawer({
 									</table>
 								</div>
 
-								{/* Add-Ons Table (If Order Contains Add-Ons or AddonsItems) */}
+								{/* Add-Ons Table (Complimentary Gifts / Add-ons) */}
 								{addons && addons.length > 0 && (
 									<div className="space-y-1.5 pt-1">
 										<div className="text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
-											<Gift className="h-3.5 w-3.5 text-purple-600" />{" "}
-											Complimentary Add-Ons & Gifts ({addons.length})
+											<Gift className="h-3.5 w-3.5 text-purple-600" />
+											<span>
+												Complimentary Gifts & Add-Ons ({addons.length})
+											</span>
 										</div>
 										<div className="overflow-x-auto rounded-2xl border border-purple-200/80 dark:border-purple-900/60 bg-purple-50/20 dark:bg-purple-950/20 shadow-2xs">
 											<table className="w-full text-left text-xs">
 												<thead className="bg-purple-100/50 dark:bg-purple-900/40 text-purple-900 dark:text-purple-200 font-bold border-b border-purple-200 dark:border-purple-800">
 													<tr>
 														<th className="p-2.5">Add-On Item</th>
-														<th className="p-2.5 w-24">Unit</th>
+														<th className="p-2.5 w-24 text-center">Unit</th>
 														<th className="p-2.5 w-20 text-center">Qty</th>
 														<th className="p-2.5 w-28 text-right">
 															Unit Price
@@ -972,18 +949,24 @@ export function OrderDetailsDrawer({
 														const aTotal =
 															Number(addon.totalAmount || addon.totalPrice) ||
 															aQty * aPrice;
+														const aRawImg =
+															addon.imageUrl ||
+															addon.productImageUrl ||
+															addon.product?.imageUrl;
+
 														return (
 															<tr
 																key={addon.id || aIdx}
 																className="hover:bg-purple-100/30 dark:hover:bg-purple-900/30"
 															>
 																<td className="p-2.5">
-																	<div className="flex items-center gap-2">
-																		<SafeItemImage
-																			src={
-																				addon.imageUrl || addon.productImageUrl
-																			}
+																	<div className="flex items-center gap-2.5">
+																		<SafeProductThumbnail
+																			src={aRawImg}
 																			alt={addon.productName || "Addon"}
+																			onPreview={(url, title) =>
+																				setPreviewImage({ url, title })
+																			}
 																		/>
 																		<div>
 																			<div className="font-bold text-purple-950 dark:text-purple-200 text-xs">
@@ -992,12 +975,11 @@ export function OrderDetailsDrawer({
 																					addon.description ||
 																					`Add-on #${addon.id || aIdx + 1}`}
 																			</div>
-																			<div className="text-[10px] font-mono text-purple-600 dark:text-purple-400">
-																				SKU: {addon.sku || "—"}
-																			</div>
 																			{addon.availableStock !== undefined && (
 																				<div className="text-[9px] font-mono mt-0.5 flex items-center gap-1">
-																					<span className="text-purple-400">Stock:</span>
+																					<span className="text-purple-400">
+																						Stock:
+																					</span>
 																					<strong
 																						className={
 																							addon.availableStock < aQty
@@ -1012,7 +994,7 @@ export function OrderDetailsDrawer({
 																		</div>
 																	</div>
 																</td>
-																<td className="p-2.5">
+																<td className="p-2.5 text-center">
 																	<Badge
 																		variant="secondary"
 																		className="text-[10px] px-1.5 py-0 font-mono bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200"
@@ -1035,18 +1017,14 @@ export function OrderDetailsDrawer({
 																</td>
 																<td className="p-2.5 text-center">
 																	{addon.isVerified ? (
-																		<Badge className="bg-emerald-600 text-white text-[10px] gap-1 py-0.5">
-																			<CheckCircle2 className="h-3 w-3" />{" "}
-																			Verified ({addon.verifiedQuantity ?? aQty}
-																			)
-																		</Badge>
+																		<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+																			<CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+																			Verified ({addon.verifiedQuantity ?? aQty})
+																		</span>
 																	) : (
-																		<Badge
-																			variant="outline"
-																			className="text-slate-400 border-slate-300 text-[10px] py-0.5"
-																		>
-																			Not Verified
-																		</Badge>
+																		<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+																			Unverified
+																		</span>
 																	)}
 																</td>
 															</tr>
@@ -1058,27 +1036,50 @@ export function OrderDetailsDrawer({
 									</div>
 								)}
 
-								{/* Financial Summary & Order Notes */}
-								<div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap justify-between items-start gap-4 text-xs">
-									<div className="space-y-1.5 max-w-md">
-										<div className="text-slate-500">
-											Customer Note:{" "}
-											<span className="text-slate-800 dark:text-slate-200 font-medium">
-												{order.customerNote || "—"}
-											</span>
+								{/* Financial Summary & Order Notes (Receipt Card) */}
+								<div className="bg-slate-50/80 dark:bg-slate-900/60 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 grid grid-cols-1 md:grid-cols-12 gap-3 text-xs items-center">
+									{/* Notes Section (Compact & Professional) */}
+									<div className="md:col-span-6 space-y-1.5">
+										<div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
+											<FileText className="h-3 w-3" />
+											<span>Order Notes</span>
 										</div>
-										<div className="text-slate-500">
-											Internal Note:{" "}
-											<span className="text-slate-800 dark:text-slate-200 font-medium">
-												{order.internalNote || "—"}
-											</span>
-										</div>
+
+										{order.customerNote || order.internalNote ? (
+											<div className="space-y-1.5">
+												{order.customerNote && (
+													<div className="p-2 rounded-lg bg-white dark:bg-slate-800/90 border border-slate-200/60 dark:border-slate-700/60 text-[11px]">
+														<span className="font-bold text-indigo-600 dark:text-indigo-400 mr-1.5">
+															Customer:
+														</span>
+														<span className="text-slate-700 dark:text-slate-300 font-medium">
+															{order.customerNote}
+														</span>
+													</div>
+												)}
+												{order.internalNote && (
+													<div className="p-2 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 text-[11px]">
+														<span className="font-bold text-amber-700 dark:text-amber-400 mr-1.5">
+															Internal:
+														</span>
+														<span className="text-amber-900 dark:text-amber-200 font-medium">
+															{order.internalNote}
+														</span>
+													</div>
+												)}
+											</div>
+										) : (
+											<div className="px-2.5 py-2 rounded-lg bg-white/60 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 italic">
+												No customer or internal notes attached.
+											</div>
+										)}
 									</div>
 
-									<div className="space-y-1 text-right min-w-[220px]">
+									{/* Financial Breakdown Receipt */}
+									<div className="md:col-span-6 space-y-1 text-right md:pl-4 md:border-l md:border-slate-200/80 md:dark:border-slate-800 flex flex-col justify-center">
 										<div className="flex justify-between text-slate-600 dark:text-slate-400">
 											<span>Subtotal ({items.length} items):</span>
-											<span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
+											<span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100">
 												$
 												{(
 													Number(order.subtotal || order.totalAmount) || 0
@@ -1092,7 +1093,7 @@ export function OrderDetailsDrawer({
 											0 && (
 											<div className="flex justify-between text-amber-600 dark:text-amber-400">
 												<span>Order Discount:</span>
-												<span className="font-mono font-semibold">
+												<span className="font-mono tabular-nums font-semibold">
 													-$
 													{(
 														Number(order.discountAmount || order.discount) || 0
@@ -1104,9 +1105,9 @@ export function OrderDetailsDrawer({
 										)}
 
 										{(Number(order.shippingAmount) || 0) > 0 && (
-											<div className="flex justify-between text-purple-600 dark:text-purple-400">
+											<div className="flex justify-between text-slate-600 dark:text-slate-400">
 												<span>Shipping Fee:</span>
-												<span className="font-mono font-semibold">
+												<span className="font-mono tabular-nums font-semibold">
 													+$
 													{(Number(order.shippingAmount) || 0).toLocaleString(
 														undefined,
@@ -1117,9 +1118,9 @@ export function OrderDetailsDrawer({
 										)}
 
 										{(Number(order.taxAmount) || 0) > 0 && (
-											<div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+											<div className="flex justify-between text-slate-600 dark:text-slate-400">
 												<span>Tax Fee:</span>
-												<span className="font-mono font-semibold">
+												<span className="font-mono tabular-nums font-semibold">
 													+$
 													{(Number(order.taxAmount) || 0).toLocaleString(
 														undefined,
@@ -1129,9 +1130,11 @@ export function OrderDetailsDrawer({
 											</div>
 										)}
 
-										<div className="flex justify-between text-sm font-bold text-slate-900 dark:text-slate-100 pt-2 border-t border-slate-200 dark:border-slate-800">
-											<span>Total Amount:</span>
-											<span className="font-mono text-base text-indigo-600 dark:text-indigo-400">
+										<div className="flex justify-between items-baseline pt-2 mt-1 border-t border-slate-200 dark:border-slate-800">
+											<span className="font-bold text-slate-900 dark:text-slate-100">
+												Total Amount:
+											</span>
+											<span className="font-mono tabular-nums text-lg font-bold text-slate-900 dark:text-slate-50">
 												$
 												{(Number(order.totalAmount) || 0).toLocaleString(
 													undefined,
@@ -1143,147 +1146,193 @@ export function OrderDetailsDrawer({
 								</div>
 							</ModernTabsContent>
 
-							{/* Tab 2: Customer & Warehouse & Logistics */}
+							{/* TAB 2: Customer & Delivery (Optional Data) */}
 							<ModernTabsContent
 								value="customer-warehouse"
-								className="pt-3 space-y-4"
+								className="pt-2 space-y-4"
 							>
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-									<div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 shadow-2xs">
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									{/* Customer Profile Card */}
+									<div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 shadow-2xs">
 										<div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-slate-100 pb-2 border-b border-slate-100 dark:border-slate-800">
-											<User className="h-4 w-4 text-indigo-600" /> Customer
-											Profile & Destination
+											<User className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+											<span>Customer Profile & Destination</span>
 										</div>
-										<div className="text-xs space-y-1.5 text-slate-600 dark:text-slate-400 pt-1">
-											<div>
-												Name:{" "}
-												<strong className="text-slate-900 dark:text-slate-100">
+										<div className="text-xs space-y-2 text-slate-600 dark:text-slate-400 pt-0.5">
+											<div className="flex justify-between">
+												<span className="text-slate-400">Name:</span>
+												<strong className="text-slate-900 dark:text-slate-100 font-semibold">
 													{order.customerName || order.customer?.name || "—"}
 												</strong>
 											</div>
-											<div>Phone: {order.customer?.phone || "—"}</div>
-											<div>Email: {order.customer?.email || "—"}</div>
+											<div className="flex justify-between">
+												<span className="text-slate-400">Phone:</span>
+												<span className="font-mono text-slate-700 dark:text-slate-300">
+													{order.customer?.phone || "—"}
+												</span>
+											</div>
+											<div className="flex justify-between">
+												<span className="text-slate-400">Email:</span>
+												<span className="text-slate-700 dark:text-slate-300">
+													{order.customer?.email || "—"}
+												</span>
+											</div>
 											{order.shippingAddress?.customerAddress && (
-												<div>
-													Destination Region:{" "}
-													<strong className="text-indigo-600 dark:text-indigo-400">
+												<div className="flex justify-between">
+													<span className="text-slate-400">Destination:</span>
+													<strong className="text-indigo-600 dark:text-indigo-400 font-semibold">
 														{order.shippingAddress.customerAddress}
 													</strong>
 												</div>
 											)}
 											<div>
-												Street / Home Info:{" "}
-												{order.shippingAddress?.homeInfo ||
-													order.customer?.address ||
-													"—"}
+												<span className="text-slate-400">Street / Info:</span>
+												<div className="mt-0.5 font-medium text-slate-800 dark:text-slate-200">
+													{order.shippingAddress?.homeInfo ||
+														order.customer?.address ||
+														"—"}
+												</div>
 											</div>
 										</div>
 									</div>
 
-									<div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 shadow-2xs">
+									{/* Fulfillment & Logistics Card */}
+									<div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 shadow-2xs">
 										<div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-slate-100 pb-2 border-b border-slate-100 dark:border-slate-800">
-											<Building2 className="h-4 w-4 text-indigo-600" />{" "}
-											Fulfillment & Logistics Carrier
+											<Building2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+											<span>Fulfillment & Logistics Carrier</span>
 										</div>
-										<div className="text-xs space-y-1.5 text-slate-600 dark:text-slate-400 pt-1">
-											<div>
-												Warehouse:{" "}
-												<strong className="text-slate-900 dark:text-slate-100">
+										<div className="text-xs space-y-2 text-slate-600 dark:text-slate-400 pt-0.5">
+											<div className="flex justify-between">
+												<span className="text-slate-400">Warehouse:</span>
+												<strong className="text-slate-900 dark:text-slate-100 font-semibold">
 													{order.warehouseName ||
 														`Warehouse #${order.warehouseId || 1}`}
 												</strong>
 											</div>
+
 											{order.delivery && (
-												<div>
-													Delivery Carrier:{" "}
-													<strong className="text-purple-600 dark:text-purple-400">
-														{order.delivery.name} (
-														{order.delivery.deliveryType || "Carrier"})
-													</strong>
-													{order.delivery.lat !== undefined && order.delivery.lat !== null && (
-														<span className="ml-2 font-mono text-[11px] text-slate-500">
-															[{order.delivery.lat}, {order.delivery.lng}]
-														</span>
-													)}
+												<div className="flex justify-between items-center">
+													<span className="text-slate-400">Delivery:</span>
+													<div className="text-right">
+														<strong className="text-purple-600 dark:text-purple-400 font-semibold">
+															{order.delivery.name} (
+															{order.delivery.deliveryType || "Carrier"})
+														</strong>
+														{order.delivery.lat !== undefined &&
+															order.delivery.lat !== null && (
+																<span className="block font-mono text-[10px] text-slate-400">
+																	[{order.delivery.lat}, {order.delivery.lng}]
+																</span>
+															)}
+													</div>
 												</div>
 											)}
+
 											{order.paymentTerm && (
 												<div>
-													Payment Term:{" "}
-													<strong className="text-indigo-600 dark:text-indigo-400">
-														{order.paymentTerm.name} ({order.paymentTerm.dueDays === 0 ? "Immediate / COD" : `Due in ${order.paymentTerm.dueDays}d`}
-														{Array.isArray(order.paymentTerm.conditions) && order.paymentTerm.conditions.length > 0
-															? ` • ${order.paymentTerm.conditions.length} tier(s)`
-															: order.paymentTerm.discountPercentage
-																? `, -${order.paymentTerm.discountPercentage}%`
-																: ""})
-													</strong>
-													{Array.isArray(order.paymentTerm.conditions) && order.paymentTerm.conditions.length > 0 && (
-														<div className="mt-1 flex flex-wrap gap-1">
-															{order.paymentTerm.conditions.map((c: any, i: number) => (
-																<span
-																	key={i}
-																	className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
-																>
-																	{c.discountDays === 0 ? "Immediate" : `≤${c.discountDays}d`}: {c.discount}%
-																</span>
-															))}
-														</div>
-													)}
+													<div className="flex justify-between">
+														<span className="text-slate-400">Payment Term:</span>
+														<strong className="text-indigo-600 dark:text-indigo-400 font-semibold">
+															{order.paymentTerm.name} (
+															{order.paymentTerm.dueDays === 0
+																? "Immediate / COD"
+																: `Due in ${order.paymentTerm.dueDays}d`}
+															{Array.isArray(order.paymentTerm.conditions) &&
+															order.paymentTerm.conditions.length > 0
+																? ` • ${order.paymentTerm.conditions.length} tier(s)`
+																: order.paymentTerm.discountPercentage
+																	? `, -${order.paymentTerm.discountPercentage}%`
+																	: ""}
+															)
+														</strong>
+													</div>
+													{Array.isArray(order.paymentTerm.conditions) &&
+														order.paymentTerm.conditions.length > 0 && (
+															<div className="mt-1 flex flex-wrap gap-1">
+																{order.paymentTerm.conditions.map(
+																	(c: any, i: number) => (
+																		<span
+																			key={i}
+																			className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+																		>
+																			{c.discountDays === 0
+																				? "Immediate"
+																				: `≤${c.discountDays}d`}
+																			: {c.discount}%
+																		</span>
+																	),
+																)}
+															</div>
+														)}
 												</div>
 											)}
-											<div>
-												Staff Representative:{" "}
-												{order.staffInfo
-													? `${order.staffInfo.firstname || ""} ${order.staffInfo.lastname || ""}`
-													: "Sales Representative"}
+
+											<div className="flex justify-between">
+												<span className="text-slate-400">Sales Staff:</span>
+												<span className="text-slate-900 dark:text-slate-100 font-medium">
+													{order.staffInfo
+														? `${order.staffInfo.firstname || ""} ${order.staffInfo.lastname || ""}`
+														: "Sales Representative"}
+												</span>
 											</div>
-											<div>
-												Staff Contact: {order.staffInfo?.primaryPhone || "—"}
+
+											<div className="flex justify-between">
+												<span className="text-slate-400">Staff Phone:</span>
+												<span className="font-mono text-slate-700 dark:text-slate-300">
+													{order.staffInfo?.primaryPhone || "—"}
+												</span>
 											</div>
 										</div>
 									</div>
 								</div>
 							</ModernTabsContent>
 
-							{/* Tab 3: Dual Approved Matrix */}
-							<ModernTabsContent
-								value="dual-approved"
-								className="pt-3 space-y-4"
-							>
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+							{/* TAB 3: Signoffs & Approvals (Optional Data) */}
+							<ModernTabsContent value="dual-approved" className="pt-2 space-y-4">
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 									{/* Card 1: Sale Manager Pricing Approval */}
 									<div
-										className={`p-4 rounded-2xl border ${order.saleManagerApproved ? "bg-emerald-50/40 border-emerald-300/80 dark:bg-emerald-950/20" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"} space-y-2 shadow-2xs`}
+										className={`p-4 rounded-2xl border transition-all ${
+											order.saleManagerApproved
+												? "bg-emerald-50/40 border-emerald-300/80 dark:bg-emerald-950/20"
+												: "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+										} space-y-3 shadow-2xs`}
 									>
 										<div className="flex items-center justify-between text-xs font-bold">
-											<span>1. Sale Manager Pricing Approval</span>
+											<span className="text-slate-900 dark:text-slate-100">
+												1. Sale Manager Pricing Approval
+											</span>
 											{order.saleManagerApproved ? (
 												<CheckCircle2 className="h-4 w-4 text-emerald-600" />
 											) : (
-												<Loader2 className="h-4 w-4 text-amber-500 animate-spin" />
+												<Clock className="h-4 w-4 text-amber-500" />
 											)}
 										</div>
-										<div className="text-xs text-slate-600 dark:text-slate-400">
-											Status:{" "}
-											<strong
-												className={
-													order.saleManagerApproved
-														? "text-emerald-700 dark:text-emerald-400"
-														: "text-amber-600"
-												}
-											>
-												{order.saleManagerApproved
-													? "Pricing Approved"
-													: "Pending Manager Approval"}
-											</strong>
-										</div>
-										{order.saleManagerApprovedAt && (
-											<div className="text-[11px] font-mono text-slate-400">
-												Approved at:{" "}
-												{new Date(order.saleManagerApprovedAt).toLocaleString()}
+
+										<div className="text-xs space-y-1">
+											<div className="text-slate-600 dark:text-slate-400">
+												Status:{" "}
+												<strong
+													className={
+														order.saleManagerApproved
+															? "text-emerald-700 dark:text-emerald-400"
+															: "text-amber-600"
+													}
+												>
+													{order.saleManagerApproved
+														? "Pricing Approved"
+														: "Pending Manager Approval"}
+												</strong>
 											</div>
-										)}
+											{order.saleManagerApprovedAt && (
+												<div className="text-[11px] font-mono text-slate-400">
+													Approved at:{" "}
+													{new Date(order.saleManagerApprovedAt).toLocaleString()}
+												</div>
+											)}
+										</div>
+
 										{!order.saleManagerApproved &&
 											order.status === "POSTED" && (
 												<div className="pt-2">
@@ -1294,15 +1343,10 @@ export function OrderDetailsDrawer({
 															setApprovalScope("SALE_MANAGER");
 															setIsApproveOpen(true);
 														}}
-														className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-xl font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
-														title={
-															isSale
-																? "Sale Manager Approval (Restricted for Sale role)"
-																: undefined
-														}
+														className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-xl font-bold shadow-xs disabled:opacity-50"
 													>
-														<UserCheck className="h-3.5 w-3.5 mr-1.5" /> Approve
-														as Sale Manager
+														<UserCheck className="h-3.5 w-3.5 mr-1.5" />
+														<span>Approve as Sale Manager</span>
 													</Button>
 												</div>
 											)}
@@ -1310,65 +1354,72 @@ export function OrderDetailsDrawer({
 
 									{/* Card 2: Stockkeeper Physical Verification */}
 									<div
-										className={`p-4 rounded-2xl border ${order.stockkeeperApproved ? "bg-emerald-50/40 border-emerald-300/80 dark:bg-emerald-950/20" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"} space-y-2 shadow-2xs`}
+										className={`p-4 rounded-2xl border transition-all ${
+											order.stockkeeperApproved
+												? "bg-emerald-50/40 border-emerald-300/80 dark:bg-emerald-950/20"
+												: "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+										} space-y-3 shadow-2xs`}
 									>
 										<div className="flex items-center justify-between text-xs font-bold">
-											<span>2. Stockkeeper Physical Verification</span>
+											<span className="text-slate-900 dark:text-slate-100">
+												2. Stockkeeper Physical Verification
+											</span>
 											{order.stockkeeperApproved ? (
 												<CheckCircle2 className="h-4 w-4 text-emerald-600" />
 											) : order.saleManagerApproved ? (
-												<Loader2 className="h-4 w-4 text-blue-500" />
+												<Boxes className="h-4 w-4 text-blue-500" />
 											) : (
 												<span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">
 													LOCKED
 												</span>
 											)}
 										</div>
-										<div className="text-xs text-slate-600 dark:text-slate-400">
-											Status:{" "}
-											<strong
-												className={
-													order.stockkeeperApproved
-														? "text-emerald-700 dark:text-emerald-400"
+
+										<div className="text-xs space-y-1">
+											<div className="text-slate-600 dark:text-slate-400">
+												Status:{" "}
+												<strong
+													className={
+														order.stockkeeperApproved
+															? "text-emerald-700 dark:text-emerald-400"
+															: order.saleManagerApproved
+																? "text-blue-600 dark:text-blue-400"
+																: "text-slate-400"
+													}
+												>
+													{order.stockkeeperApproved
+														? "Verified & Approved"
 														: order.saleManagerApproved
-															? "text-blue-600 dark:text-blue-400"
-															: "text-slate-400"
-												}
-											>
-												{order.stockkeeperApproved
-													? "Verified & Approved"
-													: order.saleManagerApproved
-														? "Ready for Item Verification"
-														: "Locked (Awaiting Sale Manager)"}
-											</strong>
-										</div>
-										{order.stockkeeperApprovedAt && (
-											<div className="text-[11px] font-mono text-slate-400">
-												Approved at:{" "}
-												{new Date(order.stockkeeperApprovedAt).toLocaleString()}
+															? "Ready for Item Verification"
+															: "Locked (Awaiting Sale Manager)"}
+												</strong>
 											</div>
-										)}
+											{order.stockkeeperApprovedAt && (
+												<div className="text-[11px] font-mono text-slate-400">
+													Approved at:{" "}
+													{new Date(order.stockkeeperApprovedAt).toLocaleString()}
+												</div>
+											)}
+										</div>
+
 										{!order.stockkeeperApproved &&
 											order.status === "POSTED" && (
 												<div className="pt-2">
 													<Button
 														size="sm"
 														variant="outline"
-														disabled={isSale || !canVerifyStock || !order.saleManagerApproved}
-														onClick={() => setIsVerifyOpen(true)}
-														className="w-full text-xs rounded-xl border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-														title={
-															!order.saleManagerApproved
-																? "Sale Manager must approve this order before physical verification can begin"
-																: isSale
-																	? "Stockkeeper Verification (Restricted for Sale role)"
-																	: undefined
+														disabled={
+															isSale || !canVerifyStock || !order.saleManagerApproved
 														}
+														onClick={() => setIsVerifyOpen(true)}
+														className="w-full text-xs rounded-xl border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 font-bold disabled:opacity-50"
 													>
 														<Boxes className="h-3.5 w-3.5 mr-1.5" />
-														{order.saleManagerApproved
-															? "Open Item Verification"
-															: "Locked (Awaiting Manager)"}
+														<span>
+															{order.saleManagerApproved
+																? "Open Item Verification"
+																: "Locked (Awaiting Manager)"}
+														</span>
 													</Button>
 												</div>
 											)}
@@ -1379,6 +1430,33 @@ export function OrderDetailsDrawer({
 					</div>
 				)}
 			</ModernModal>
+
+			{/* Full-resolution Product Image Lightbox Modal */}
+			{previewImage && (
+				<ModernModal
+					isOpen={Boolean(previewImage)}
+					onClose={() => setPreviewImage(null)}
+					title={previewImage.title || "Product Image Preview"}
+					subtitle="High-resolution product photo inspection"
+					size="md"
+					glassmorphism={true}
+				>
+					<div className="flex flex-col items-center justify-center p-3">
+						<div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 shadow-md p-1">
+							<img
+								src={previewImage.url}
+								alt={previewImage.title}
+								className="max-h-[60vh] max-w-full rounded-xl object-contain mx-auto"
+							/>
+						</div>
+						<div className="mt-3 text-center">
+							<div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+								{previewImage.title}
+							</div>
+						</div>
+					</div>
+				</ModernModal>
+			)}
 
 			{/* Sub Modals */}
 			<PosOrderStudioModal
@@ -1393,15 +1471,6 @@ export function OrderDetailsDrawer({
 				}}
 			/>
 
-			<PosOrderStudioModal
-				open={isCloneStudioOpen}
-				onOpenChange={setIsCloneStudioOpen}
-				clonedOrder={order || null}
-				onSuccess={() => {
-					queryClient.invalidateQueries({ queryKey: ["orders-search"] });
-					onOpenChange(false);
-				}}
-			/>
 
 			<WarehouseVerifyModal
 				order={order || null}

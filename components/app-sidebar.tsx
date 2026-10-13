@@ -628,7 +628,7 @@ export function AppSidebar() {
 								</span>
 							</div>
 							<span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200/50 dark:border-emerald-800/50">
-								v1.2 Pro
+								v1.0.0
 							</span>
 						</div>
 

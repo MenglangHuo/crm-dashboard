@@ -108,15 +108,15 @@ function deleteCookie(name: string) {
 
 export function clearClientSession() {
 	if (typeof window === "undefined") return;
-	deleteCookie("rumluos_access_token");
-	deleteCookie("rumluos_refresh_token");
-	deleteCookie("rumluos_company_id");
-	deleteCookie("rumluos_is_system_admin");
+	deleteCookie("crm_access_token");
+	deleteCookie("crm_refresh_token");
+	deleteCookie("crm_company_id");
+	deleteCookie("crm_is_system_admin");
 	try {
-		localStorage.removeItem("rumluos_access_token");
-		localStorage.removeItem("rumluos_refresh_token");
-		localStorage.removeItem("rumluos_company_id");
-		localStorage.removeItem("rumluos_is_system_admin");
+		localStorage.removeItem("crm_access_token");
+		localStorage.removeItem("crm_refresh_token");
+		localStorage.removeItem("crm_company_id");
+		localStorage.removeItem("crm_is_system_admin");
 	} catch {}
 }
 
@@ -127,10 +127,10 @@ export function clearClientSession() {
 async function performRefreshToken(): Promise<boolean> {
 	if (typeof window === "undefined") return false;
 
-	let refreshToken = readCookie("rumluos_refresh_token");
+	let refreshToken = readCookie("crm_refresh_token");
 	if (!refreshToken) {
 		try {
-			refreshToken = localStorage.getItem("rumluos_refresh_token");
+			refreshToken = localStorage.getItem("crm_refresh_token");
 		} catch {}
 	}
 
@@ -166,21 +166,21 @@ async function performRefreshToken(): Promise<boolean> {
 				const companyId = payload?.company?.id;
 
 				if (newAccessToken) {
-					writeCookie("rumluos_access_token", newAccessToken, 604800); // 7 days
+					writeCookie("crm_access_token", newAccessToken, 604800); // 7 days
 					if (newRefreshToken) {
-						writeCookie("rumluos_refresh_token", newRefreshToken, 2592000); // 30 days
+						writeCookie("crm_refresh_token", newRefreshToken, 2592000); // 30 days
 					}
 					if (companyId != null) {
-						writeCookie("rumluos_company_id", String(companyId), 2592000);
+						writeCookie("crm_company_id", String(companyId), 2592000);
 					}
 
 					try {
-						localStorage.setItem("rumluos_access_token", newAccessToken);
+						localStorage.setItem("crm_access_token", newAccessToken);
 						if (newRefreshToken) {
-							localStorage.setItem("rumluos_refresh_token", newRefreshToken);
+							localStorage.setItem("crm_refresh_token", newRefreshToken);
 						}
 						if (companyId != null) {
-							localStorage.setItem("rumluos_company_id", String(companyId));
+							localStorage.setItem("crm_company_id", String(companyId));
 						}
 					} catch {}
 
@@ -228,16 +228,16 @@ export const api = axios.create({
 // Attach Authorization header if access token cookie is set, X-Company-Id header, and companyId to request params
 api.interceptors.request.use((config) => {
 	if (typeof window !== "undefined") {
-		const token = readCookie("rumluos_access_token");
+		const token = readCookie("crm_access_token");
 		if (token) {
 			config.headers.Authorization = `Bearer ${token}`;
 		}
 		const companyId =
-			readCookie("rumluos_company_id") ||
-			localStorage.getItem("rumluos_company_id");
+			readCookie("crm_company_id") ||
+			localStorage.getItem("crm_company_id");
 		const isSystemAdmin =
-			readCookie("rumluos_is_system_admin") === "true" ||
-			localStorage.getItem("rumluos_is_system_admin") === "true";
+			readCookie("crm_is_system_admin") === "true" ||
+			localStorage.getItem("crm_is_system_admin") === "true";
 
 		if (companyId) {
 			config.headers["X-Company-Id"] = companyId;
@@ -304,8 +304,8 @@ api.interceptors.response.use(
 
 			if (refreshed) {
 				const token =
-					readCookie("rumluos_access_token") ||
-					localStorage.getItem("rumluos_access_token");
+					readCookie("crm_access_token") ||
+					localStorage.getItem("crm_access_token");
 				if (token) {
 					originalRequest.headers.Authorization = `Bearer ${token}`;
 				}

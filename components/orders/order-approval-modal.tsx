@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ordersApi } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -13,18 +13,8 @@ import {
 	ModernModalCancelButton,
 	ModernModalSubmitButton,
 } from "@/components/ui-custom/modal";
-import {
-	ModernSelect,
-	ModernTextarea,
-} from "@/components/ui-custom/form-controls";
-import { Badge } from "@/components/ui/badge";
-import {
-	ShieldCheck,
-	CheckCircle2,
-	Clock,
-	UserCheck,
-	Shield,
-} from "lucide-react";
+import { ModernTextarea } from "@/components/ui-custom/form-controls";
+import { ShieldCheck, UserCheck } from "lucide-react";
 
 interface OrderApprovalModalProps {
 	order: Order | null;
@@ -47,17 +37,15 @@ export function OrderApprovalModal({
 	initialApprovalType = "AUTO",
 }: OrderApprovalModalProps) {
 	const queryClient = useQueryClient();
-	const { isAdmin, canApproveSale, canVerifyStock, canApproveSpecial } =
-		usePermissions();
+	const { canApproveSale, canApproveSpecial } = usePermissions();
 
 	const defaultScope = React.useMemo(() => {
 		if (initialApprovalType && initialApprovalType !== "AUTO")
 			return initialApprovalType;
 		if (canApproveSpecial) return "AUTO";
-		if (canApproveSale && !canVerifyStock) return "SALE_MANAGER";
-		if (canVerifyStock && !canApproveSale) return "STOCKKEEPER";
+		if (canApproveSale) return "SALE_MANAGER";
 		return "AUTO";
-	}, [initialApprovalType, canApproveSpecial, canApproveSale, canVerifyStock]);
+	}, [initialApprovalType, canApproveSpecial, canApproveSale]);
 
 	const [approvalType, setApprovalType] = useState<string>(defaultScope);
 	const [reason, setReason] = useState<string>("");
@@ -81,7 +69,7 @@ export function OrderApprovalModal({
 			toast.success(
 				isFully
 					? "Order dual-approval complete! Order is now APPROVED and ready for Accountant invoicing."
-					: "Approval sign-off recorded successfully!",
+					: "Sale Manager pricing approval recorded successfully!",
 			);
 			queryClient.invalidateQueries({ queryKey: ["orders"] });
 			queryClient.invalidateQueries({ queryKey: ["orders-search"] });
@@ -106,67 +94,14 @@ export function OrderApprovalModal({
 		});
 	};
 
-	const approvalOptions: { value: string; label: string }[] = [];
-
-	if (canApproveSpecial) {
-		approvalOptions.push(
-			{ value: "AUTO", label: "⚡ AUTO (Auto-Detect Role from User Token)" },
-			{
-				value: "SPECIAL",
-				label: "🚨 SPECIAL (Super Admin 1-Click Dual Approval Bypass)",
-			},
-			{ value: "SALE_MANAGER", label: "🏷️ Sale Manager Pricing Approval Only" },
-			{
-				value: "STOCKKEEPER",
-				label: "📦 Stockkeeper Item Verification Signoff Only",
-			},
-		);
-	} else {
-		if (canApproveSale && canVerifyStock) {
-			approvalOptions.push(
-				{ value: "AUTO", label: "⚡ AUTO (Auto-Detect Role from User Token)" },
-				{ value: "SALE_MANAGER", label: "🏷️ Sale Manager Pricing Approval" },
-				{
-					value: "STOCKKEEPER",
-					label: "📦 Stockkeeper Item Verification Signoff",
-				},
-			);
-		} else if (canApproveSale) {
-			approvalOptions.push({
-				value: "SALE_MANAGER",
-				label: "🏷️ Sale Manager Pricing Approval Only",
-			});
-		} else if (canVerifyStock) {
-			approvalOptions.push({
-				value: "STOCKKEEPER",
-				label: "📦 Stockkeeper Item Verification Signoff Only",
-			});
-		} else {
-			approvalOptions.push({
-				value: "AUTO",
-				label: "⚡ AUTO (Auto-Detect Role from User Token)",
-			});
-		}
-	}
-
-	const isSaleManagerMode = approvalType === "SALE_MANAGER";
-
 	return (
 		<ModernModal
 			isOpen={open}
 			onClose={() => onOpenChange(false)}
-			title={
-				isSaleManagerMode
-					? "Sale Manager Pricing Approval"
-					: "Smart Order Dual-Approval"
-			}
-			subtitle={`Process sign-off flags for Order ${order.orderNumber || order.orderNo || `#${order.id}`}`}
+			title="Sale Manager Pricing Approval"
+			subtitle={`Review and authorize Order ${order.orderNumber || order.orderNo || `#${order.id}`}`}
 			icon={
-				isSaleManagerMode ? (
-					<UserCheck className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-				) : (
-					<ShieldCheck className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-				)
+				<UserCheck className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
 			}
 			size="md"
 			glassmorphism={true}
@@ -179,101 +114,66 @@ export function OrderApprovalModal({
 						onClick={() => handleApprove()}
 						isLoading={approveMutation.isPending}
 						loadingText="Recording Approval..."
-						icon={
-							isSaleManagerMode ? (
-								<UserCheck className="h-4 w-4" />
-							) : (
-								<ShieldCheck className="h-4 w-4" />
-							)
-						}
+						icon={<UserCheck className="h-4 w-4" />}
 					>
-						{isSaleManagerMode ? "Approve Pricing" : "Confirm Approval"}
+						Approve Order
 					</ModernModalSubmitButton>
 				</ModernModalFooter>
 			}
 		>
 			<form onSubmit={handleApprove} className="space-y-4">
-				{/* Dual Approval Status Grid */}
-				<div className="grid grid-cols-2 gap-3">
-					<div
-						className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
-							order.stockkeeperApproved
-								? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50"
-								: "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
-						}`}
-					>
-						<div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
-							<span>Stockkeeper Check</span>
-							{order.stockkeeperApproved ? (
-								<CheckCircle2 className="h-4 w-4 text-emerald-600" />
-							) : (
-								<Clock className="h-4 w-4 text-amber-500" />
-							)}
-						</div>
-						<div className="mt-2">
-							<Badge
-								variant="outline"
-								className={`text-[10px] font-semibold ${
-									order.stockkeeperApproved
-										? "bg-emerald-600 text-white border-emerald-600"
-										: "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300"
-								}`}
-							>
-								{order.stockkeeperApproved
-									? "Verified & Approved"
-									: "Pending Check"}
-							</Badge>
+				{/* Quick Order Snapshot */}
+				<div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
+					<div className="space-y-0.5">
+						<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+							Order Total
+						</span>
+						<div className="text-base font-bold text-slate-900 dark:text-white">
+							$
+							{(Number(order.totalAmount) || 0).toLocaleString("en-US", {
+								minimumFractionDigits: 2,
+								maximumFractionDigits: 2,
+							})}
 						</div>
 					</div>
-
-					<div
-						className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
-							order.saleManagerApproved
-								? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50"
-								: "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
-						}`}
-					>
-						<div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
-							<span>Sale Manager Pricing</span>
-							{order.saleManagerApproved ? (
-								<CheckCircle2 className="h-4 w-4 text-emerald-600" />
-							) : (
-								<Clock className="h-4 w-4 text-amber-500" />
-							)}
-						</div>
-						<div className="mt-2">
-							<Badge
-								variant="outline"
-								className={`text-[10px] font-semibold ${
-									order.saleManagerApproved
-										? "bg-emerald-600 text-white border-emerald-600"
-										: "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300"
-								}`}
-							>
-								{order.saleManagerApproved
-									? "Pricing Approved"
-									: "Pending Pricing"}
-							</Badge>
+					<div className="text-right space-y-0.5">
+						<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+							Customer
+						</span>
+						<div className="text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[200px] truncate">
+							{order.customer?.name || order.customerName || "Walk-in Customer"}
 						</div>
 					</div>
 				</div>
 
-				{/* Approval Scope */}
-				<ModernSelect
-					label="Approval Scope / Mode"
-					options={approvalOptions}
-					value={approvalType}
-					onChange={setApprovalType}
-				/>
+				{/* Sale Manager Review Guidance Note */}
+				<div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100/90 dark:border-indigo-900/50 flex items-start gap-3">
+					<div className="p-2 rounded-xl bg-indigo-100/80 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
+						<ShieldCheck className="h-4 w-4" />
+					</div>
+					<div className="space-y-1">
+						<h4 className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+							Sale Manager Review & Authorization
+						</h4>
+						<p className="text-xs text-indigo-800/80 dark:text-indigo-300/80 leading-relaxed">
+							Please verify customer pricing, applied discounts, and commercial
+							terms before confirming. Approving authorizes commercial release
+							and advances this order to warehouse stock verification.
+						</p>
+					</div>
+				</div>
 
-				{/* Remarks */}
-				<ModernTextarea
-					label="Approval Remarks (Optional)"
-					value={reason}
-					onChange={(e) => setReason(e.target.value)}
-					placeholder="Comments or approval reference notes..."
-					rows={2}
-				/>
+				{/* Remarks Section */}
+				<div className="space-y-1.5">
+					<ModernTextarea
+						label="Approval Remarks"
+						value={reason}
+						onChange={(e) => setReason(e.target.value)}
+						placeholder="e.g., Verified unit pricing and approved 5% promotional discount. Ready for warehouse processing."
+						rows={3}
+						helperText="Add any authorization notes, customer agreement references, or instructions for the warehouse team."
+					/>
+				</div>
 			</form>
 		</ModernModal>
 	);

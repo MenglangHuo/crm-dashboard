@@ -111,12 +111,56 @@ export interface DomainFilterField {
 	icon?: React.ReactNode;
 	description?: string;
 	allowOperators?: FilterOperator[]; // Allowed operator overrides for this field
+	lockOperator?: boolean; // When true, locks to defaultOperator and hides operator select dropdown
 }
 
 export interface DomainFilterConfig {
 	domainKey: string;
 	domainTitle: string;
 	fields: DomainFilterField[];
+}
+
+function formatDateValue(val: any, isEnd: boolean = false): any {
+	if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val.trim())) {
+		return `${val.trim()}T${isEnd ? "23:59:59" : "00:00:00"}`;
+	}
+	return val;
+}
+
+function normalizeFilterValue(
+	field: string,
+	val: any,
+	isEnd: boolean = false,
+): any {
+	if (val === undefined || val === null || val === "") return undefined;
+	const lowerField = field.toLowerCase();
+	const isDateField =
+		lowerField.includes("date") ||
+		lowerField.endsWith("at") ||
+		(typeof val === "string" && /^\d{4}-\d{2}-\d{2}/.test(val.trim()));
+
+	if (isDateField) {
+		return formatDateValue(val, isEnd);
+	}
+
+	if (
+		(lowerField === "customer" ||
+			lowerField === "customerid" ||
+			lowerField === "totalamount" ||
+			lowerField === "totaldiscountamount" ||
+			lowerField === "price" ||
+			lowerField === "stock" ||
+			lowerField === "amount" ||
+			lowerField === "cost" ||
+			lowerField === "quantity") &&
+		typeof val === "string" &&
+		val.trim() !== "" &&
+		!isNaN(Number(val))
+	) {
+		return Number(val);
+	}
+
+	return val;
 }
 
 /**
@@ -136,13 +180,17 @@ export function buildSearchFilterPayload(options: {
 	if (options.searchValue && options.searchValue.trim()) {
 		const targetField = options.searchField || "search";
 		const op: FilterOperator =
-			targetField === "text"
+			targetField === "invoiceNumber"
 				? "SW"
-				: targetField === "search"
-					? "FULL_TEXT"
-					: options.searchField
-						? "LIKE"
-						: "FULL_TEXT";
+				: targetField === "orderNumber"
+					? "LIKE"
+					: targetField === "text"
+						? "SW"
+						: targetField === "search"
+							? "FULL_TEXT"
+							: options.searchField
+								? "LIKE"
+								: "FULL_TEXT";
 
 		filters.push({
 			field: targetField,
@@ -155,7 +203,12 @@ export function buildSearchFilterPayload(options: {
 	if (options.activeFilters && options.activeFilters.length > 0) {
 		options.activeFilters.forEach((f) => {
 			// Don't duplicate top search field if already provided
-			if (f.field === "search" && options.searchValue?.trim()) return;
+			if (
+				(f.field === "search" || f.field === options.searchField) &&
+				options.searchValue?.trim()
+			) {
+				return;
+			}
 
 			// Sanitize filter before pushing
 			if (
@@ -168,40 +221,49 @@ export function buildSearchFilterPayload(options: {
 					operator: f.operator,
 					values: f.values,
 				});
-			} else if (
-				f.operator === "BETWEEN" &&
-				(f.value !== "" || f.valueTo !== "")
-			) {
-				filters.push({
-					field: f.field,
-					operator: f.operator,
-					value: f.value !== "" && f.value !== undefined ? f.value : undefined,
-					valueTo:
-						f.valueTo !== "" && f.valueTo !== undefined ? f.valueTo : undefined,
-				});
+			} else if (f.operator === "BETWEEN") {
+				const hasMin =
+					f.value !== "" && f.value !== undefined && f.value !== null;
+				const hasMax =
+					f.valueTo !== "" && f.valueTo !== undefined && f.valueTo !== null;
+
+				if (hasMin || hasMax) {
+					const criterion: FilterCriterion = {
+						field: f.field,
+						operator: "BETWEEN",
+					};
+					if (hasMin) {
+						criterion.value = normalizeFilterValue(f.field, f.value, false);
+					}
+					if (hasMax) {
+						criterion.valueTo = normalizeFilterValue(f.field, f.valueTo, true);
+					}
+					filters.push(criterion);
+				}
 			} else if (f.operator === "IS_NULL" || f.operator === "IS_NOT_NULL") {
 				filters.push({ field: f.field, operator: f.operator });
 			} else if (f.value !== "" && f.value !== undefined && f.value !== null) {
+				const isUpperBound =
+					f.operator === "LESS_THAN" || f.operator === "LESS_THAN_OR_EQUAL";
 				filters.push({
 					field: f.field,
 					operator: f.operator,
-					value: f.value,
+					value: normalizeFilterValue(f.field, f.value, isUpperBound),
 				});
 			}
 		});
 	}
 
 	return {
-		filterGroup: {
-			operator: "AND",
-			filters,
-			groups: [],
-		},
+		page: options.page ?? 0,
+		size: options.size ?? 10,
 		sort:
 			options.sortState && options.sortState.length > 0
 				? options.sortState
 				: [{ field: "createdAt", direction: "DESC" }],
-		page: options.page ?? 0,
-		size: options.size ?? 10,
+		filterGroup: {
+			operator: "AND",
+			filters,
+		},
 	};
 }
