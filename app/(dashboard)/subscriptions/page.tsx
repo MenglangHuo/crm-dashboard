@@ -12,11 +12,7 @@ import {
 	Crown,
 	RefreshCw,
 	Building2,
-	ShieldAlert,
 	Lock,
-	ChevronDown,
-	Search,
-	Check,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -35,12 +31,6 @@ import {
 	ModernTabsTrigger,
 	ModernTabsContent,
 } from "@/components/ui-custom/modern-tabs";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 import { SubscribeTab } from "@/components/subscriptions/subscribe-tab";
 import { CompanyMonitorTab } from "@/components/subscriptions/company-monitor-tab";
@@ -63,7 +53,6 @@ function SubscriptionsContent() {
 	} = useCompanyContext();
 
 	const [activeTab, setActiveTab] = useState<string>("subscribe");
-	const [companySearch, setCompanySearch] = useState("");
 
 	const queryClient = useQueryClient();
 
@@ -135,21 +124,6 @@ function SubscriptionsContent() {
 		staleTime: 0,
 	});
 
-	// Selected company object for display
-	const currentCompany = companies.find(
-		(c) => String(c.id) === String(selectedCompanyId),
-	);
-
-	const filteredCompanies = companies.filter((c) => {
-		if (!companySearch.trim()) return true;
-		const term = companySearch.toLowerCase();
-		return (
-			c.name?.toLowerCase().includes(term) ||
-			(c as any).code?.toLowerCase().includes(term) ||
-			String(c.id).includes(term)
-		);
-	});
-
 	return (
 		<div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
 			{/* Top Header & Breadcrumbs */}
@@ -207,117 +181,6 @@ function SubscriptionsContent() {
 
 				{/* Header Badges & Actions */}
 				<div className="flex flex-wrap items-center gap-2.5">
-					{/* System Admin Company Selector Filter */}
-					{isSystemAdmin && (
-						<DropdownMenu>
-							<DropdownMenuTrigger
-								render={
-									<Button
-										variant="outline"
-										size="sm"
-										className="flex h-9 items-center gap-2 rounded-xl border border-slate-200/90 bg-white px-3 text-xs font-semibold text-slate-800 shadow-2xs hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
-									/>
-								}
-							>
-								<Building2 className="size-3.5 text-primary shrink-0" />
-								<span className="max-w-[140px] truncate">
-									{currentCompany?.name ||
-										(selectedCompanyId
-											? `Company #${selectedCompanyId}`
-											: t("subscriptions.selectCompany", "Select Company"))}
-								</span>
-								<ChevronDown className="size-3 text-slate-400 shrink-0" />
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="w-64 p-1.5">
-								<div className="p-1.5 pb-2">
-									<div className="relative">
-										<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-slate-400" />
-										<input
-											type="text"
-											placeholder={t(
-												"subscriptions.filterCompanies",
-												"Filter companies...",
-											)}
-											value={companySearch}
-											onChange={(e) => setCompanySearch(e.target.value)}
-											className="w-full h-8 pl-7.5 pr-2 text-xs rounded-lg bg-slate-100 dark:bg-slate-800 border-none outline-none focus:ring-1 focus:ring-primary"
-										/>
-									</div>
-								</div>
-								<div className="max-h-56 overflow-y-auto space-y-0.5">
-									<DropdownMenuItem
-										onClick={() => handleSelectCompany(null)}
-										className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg cursor-pointer border-b border-slate-100 dark:border-slate-800 mb-1"
-									>
-										<div className="flex items-center gap-2 truncate">
-											<Building2 className="size-3 text-primary shrink-0" />
-											<span
-												className={
-													!selectedCompanyId
-														? "font-bold text-primary"
-														: "text-slate-600 dark:text-slate-300"
-												}
-											>
-												{t(
-													"subscriptions.allCompaniesGlobal",
-													"All Companies (Global)",
-												)}
-											</span>
-										</div>
-										{!selectedCompanyId && (
-											<Check className="size-3.5 text-primary shrink-0" />
-										)}
-									</DropdownMenuItem>
-									{filteredCompanies.map((comp) => {
-										const isSelected =
-											String(comp.id) === String(selectedCompanyId);
-										return (
-											<DropdownMenuItem
-												key={comp.id}
-												onClick={() => handleSelectCompany(String(comp.id))}
-												className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg cursor-pointer"
-											>
-												<div className="flex items-center gap-2 truncate">
-													<Building2 className="size-3 text-slate-400 shrink-0" />
-													<span
-														className={
-															isSelected
-																? "font-bold text-primary truncate"
-																: "truncate"
-														}
-													>
-														{comp.name}
-													</span>
-												</div>
-												{isSelected && (
-													<Check className="size-3.5 text-primary shrink-0" />
-												)}
-											</DropdownMenuItem>
-										);
-									})}
-									{filteredCompanies.length === 0 && (
-										<div className="py-3 text-center text-xs text-slate-400">
-											{t(
-												"subscriptions.noCompaniesFound",
-												"No companies found",
-											)}
-										</div>
-									)}
-								</div>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					)}
-
-					{isSystemAdmin && (
-						<Badge
-							variant="outline"
-							className="gap-1.5 rounded-xl border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
-						>
-							<ShieldAlert className="size-3.5 text-amber-600" />
-							<span>{t("subscriptions.adminMode", "Admin Mode")}</span>
-						</Badge>
-					)}
-
 					<Button
 						variant="outline"
 						size="sm"

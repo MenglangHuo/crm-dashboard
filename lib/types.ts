@@ -56,6 +56,7 @@ export interface Role {
 	permissionIds?: string[];
 	excludedPermissionIds?: string[];
 	isSystem?: boolean;
+	isSystemDefault?: boolean;
 	createdAt?: string;
 	updatedAt?: string | null;
 }

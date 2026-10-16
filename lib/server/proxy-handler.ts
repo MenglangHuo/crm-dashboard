@@ -68,6 +68,10 @@ export async function proxyToBackend(req: NextRequest) {
 		// Remove encoding headers that fetch handles automatically
 		resHeaders.delete("content-encoding");
 		resHeaders.delete("content-length");
+		// Ensure API responses are never cached by the browser or intermediate proxies
+		resHeaders.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+		resHeaders.set("Pragma", "no-cache");
+		resHeaders.set("Expires", "0");
 
 		const responseBody = await res.arrayBuffer();
 

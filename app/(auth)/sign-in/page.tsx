@@ -9,7 +9,7 @@ import * as z from "zod";
 import { useTheme } from "next-themes";
 import { authApi } from "@/lib/api/endpoints";
 import { setAuthCookies } from "@/app/actions/auth";
-import { getErrorMessage } from "@/lib/api/client";
+import { clearClientSession, getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
 import {
 	Eye,
@@ -270,6 +270,11 @@ function SignInForm() {
 		},
 	});
 
+	// Clear lingering previous session & cached profile on arrival to sign-in page
+	useEffect(() => {
+		clearClientSession();
+	}, []);
+
 	// Auto-fill username and notify if redirected from company registration or password reset
 	useEffect(() => {
 		if (queryUsername) {
@@ -331,6 +336,7 @@ function SignInForm() {
 			}
 
 			if (token) {
+				clearClientSession();
 				if (typeof window !== "undefined") {
 					document.cookie = `crm_access_token=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax`;
 					localStorage.setItem("crm_access_token", token);

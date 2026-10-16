@@ -91,6 +91,7 @@ export async function clearAuthCookies() {
 	cookieStore.delete(ACCESS_COOKIE);
 	cookieStore.delete(REFRESH_COOKIE);
 	cookieStore.delete(COMPANY_COOKIE);
+	cookieStore.delete("crm_is_system_admin");
 }
 
 export async function refreshAuthCookies() {

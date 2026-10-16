@@ -11,7 +11,6 @@ import {
 	PlanTier,
 	BillingCycle,
 	IntervalUnit,
-	FeatureItem,
 } from "@/types/subscription";
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
@@ -19,24 +18,19 @@ import {
 	Layers,
 	Plus,
 	Search,
-	CheckCircle2,
 	Trash2,
 	Edit,
 	DollarSign,
 	Users,
-	Shield,
 	Crown,
 	Sparkles,
 	Eye,
 	EyeOff,
 	Check,
-	Zap,
 	Tag,
-	AlertCircle,
-	TrendingUp,
 	Clock,
 	ChevronDown,
-	ChevronRight,
+	X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -59,12 +53,6 @@ import {
 	ModernTextarea,
 	ModernSelect,
 } from "@/components/ui-custom/form-controls";
-import {
-	ModernTabs,
-	ModernTabsList,
-	ModernTabsTrigger,
-	ModernTabsContent,
-} from "@/components/ui-custom/modern-tabs";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/context";
 
@@ -230,6 +218,29 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 		queryFn: () => featuresApi.list(),
 	});
 
+	// Feature selection search & filter in modal
+	const [featureSearch, setFeatureSearch] = useState("");
+	const [featureFilter, setFeatureFilter] = useState<
+		"ALL" | "SELECTED" | "UNSELECTED"
+	>("ALL");
+
+	const filteredModalFeatures = useMemo(() => {
+		const term = featureSearch.trim().toLowerCase();
+		return allFeatures.filter((feat) => {
+			const isSelected = planForm.featureIds.some(
+				(id) => String(id) === String(feat.id),
+			);
+			if (featureFilter === "SELECTED" && !isSelected) return false;
+			if (featureFilter === "UNSELECTED" && isSelected) return false;
+			if (!term) return true;
+			return (
+				feat.name?.toLowerCase().includes(term) ||
+				feat.code?.toLowerCase().includes(term) ||
+				(feat.description && feat.description.toLowerCase().includes(term))
+			);
+		});
+	}, [allFeatures, featureSearch, featureFilter, planForm.featureIds]);
+
 	// Mutations
 	const createPlanMutation = useMutation({
 		mutationFn: (data: PlanRequest) => plansApi.create(data),
@@ -356,35 +367,42 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 	// Handlers
 	const handleOpenCreatePlan = () => {
 		setEditingPlan(null);
+		const initialTier: PlanTier = "STARTER";
+		const isFreeTrial = (initialTier as string) === "FREE_TRIAL";
 		setPlanForm({
 			code: "",
 			name: "",
 			displayName: "",
 			description: "",
 			maxUsers: 10,
-			trial: false,
-			publiclyVisible: true,
-			tier: "STARTER",
+			trial: isFreeTrial,
+			publiclyVisible: !isFreeTrial,
+			tier: initialTier,
 			featureIds: allFeatures.slice(0, 3).map((f) => f.id),
 			sortOrder: plansData.length,
 		});
+		setFeatureSearch("");
+		setFeatureFilter("ALL");
 		setIsPlanModalOpen(true);
 	};
 
 	const handleOpenEditPlan = (plan: PlanDetail) => {
 		setEditingPlan(plan);
+		const isFreeTrial = plan.tier === "FREE_TRIAL";
 		setPlanForm({
 			code: plan.code,
 			name: plan.name,
 			displayName: plan.displayName || plan.name,
 			description: plan.description || "",
 			maxUsers: plan.maxUsers,
-			trial: plan.trial,
-			publiclyVisible: plan.publiclyVisible,
+			trial: isFreeTrial,
+			publiclyVisible: !isFreeTrial,
 			tier: plan.tier,
 			featureIds: (plan.features || []).map((f) => f.id),
 			sortOrder: plan.sortOrder ?? 0,
 		});
+		setFeatureSearch("");
+		setFeatureFilter("ALL");
 		setIsPlanModalOpen(true);
 	};
 
@@ -395,13 +413,20 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 			return;
 		}
 
+		const isFreeTrial = planForm.tier === "FREE_TRIAL";
+		const payload: PlanRequest = {
+			...planForm,
+			trial: isFreeTrial,
+			publiclyVisible: !isFreeTrial,
+		};
+
 		if (editingPlan) {
 			updatePlanMutation.mutate({
 				id: editingPlan.id,
-				data: planForm,
+				data: payload,
 			});
 		} else {
-			createPlanMutation.mutate(planForm);
+			createPlanMutation.mutate(payload);
 		}
 	};
 
@@ -1168,16 +1193,12 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 			{/* Main Content View */}
 			{subView === "PLANS" ? (
 				<DataTable
+					hideHeader
 					columns={planColumns}
 					data={filteredPlans}
 					isLoading={isLoadingPlans}
 					customRowActions={planRowActions}
 					onEditRow={(row) => handleOpenEditPlan(row)}
-					onCreateNew={handleOpenCreatePlan}
-					createButtonLabel={t(
-						"subscriptions.plansTab.newPlanButton",
-						"New Plan",
-					)}
 					expandedRowIds={expandedPlanIds}
 					onToggleExpandRow={(rowId) => toggleExpandPlan(rowId)}
 					renderSubComponent={renderPlanPricesTree}
@@ -1201,17 +1222,13 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 				/>
 			) : (
 				<DataTable
+					hideHeader
 					columns={priceColumns}
 					data={flatPrices}
 					isLoading={isLoadingPrices}
 					customRowActions={priceRowActions}
 					onEditRow={(row) => handleOpenEditPrice(row.price)}
 					onDeleteRow={(row) => deletePriceMutation.mutate(row.price.id)}
-					onCreateNew={() => handleOpenCreatePrice()}
-					createButtonLabel={t(
-						"subscriptions.plansTab.addPriceTagButton",
-						"Add Price Tag",
-					)}
 					emptyState={
 						<div className="flex flex-col items-center justify-center py-8 text-center">
 							<DollarSign className="size-8 text-slate-400 mb-2 opacity-50" />
@@ -1236,6 +1253,8 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 			<ModernModal
 				open={isPlanModalOpen}
 				onOpenChange={setIsPlanModalOpen}
+				size="xl"
+				className="sm:max-w-4xl"
 				title={
 					editingPlan
 						? t(
@@ -1254,7 +1273,7 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 				icon={<Crown className="size-5 text-purple-600" />}
 			>
 				<form onSubmit={handleSavePlan} className="space-y-4 py-2">
-					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+					<div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
 						<ModernInput
 							label={t(
 								"subscriptions.plansTab.planModal.codeLabel",
@@ -1295,7 +1314,7 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 						/>
 					</div>
 
-					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+					<div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
 						<ModernInput
 							label={t(
 								"subscriptions.plansTab.planModal.displayNameLabel",
@@ -1320,17 +1339,22 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 								"Tier Level",
 							)}
 							value={planForm.tier}
-							onChange={(val) =>
-								setPlanForm((prev) => ({ ...prev, tier: val as PlanTier }))
-							}
+							onChange={(val) => {
+								const tier = val as PlanTier;
+								const isFreeTrial = tier === "FREE_TRIAL";
+								setPlanForm((prev) => ({
+									...prev,
+									tier,
+									trial: isFreeTrial,
+									publiclyVisible: !isFreeTrial,
+								}));
+							}}
 							options={TIER_OPTIONS.map((tItem) => ({
 								label: t(tItem.labelKey, tItem.defaultLabel),
 								value: tItem.value,
 							}))}
 						/>
-					</div>
 
-					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 						<ModernInput
 							label={t(
 								"subscriptions.plansTab.planModal.maxUsersLabel",
@@ -1351,52 +1375,60 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 								"Maximum allowed team members on this plan",
 							)}
 						/>
+					</div>
 
-						<div className="flex flex-col gap-2 pt-2">
-							<label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-								{t("subscriptions.plansTab.planModal.flagsLabel", "Plan Flags")}
-							</label>
-							<div className="flex items-center gap-4">
-								<label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-									<input
-										type="checkbox"
-										checked={planForm.publiclyVisible}
-										onChange={(e) =>
-											setPlanForm((prev) => ({
-												...prev,
-												publiclyVisible: e.target.checked,
-											}))
-										}
-										className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
-									/>
-									<span>
+					{/* Tier Automated Behavior Indicator */}
+					<div className="rounded-xl border px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors bg-slate-50/70 border-slate-200/80 dark:bg-slate-900/40 dark:border-slate-800">
+						<div className="flex items-center gap-2">
+							{planForm.tier === "FREE_TRIAL" ? (
+								<>
+									<div className="size-2 rounded-full bg-sky-500 animate-pulse" />
+									<span className="font-semibold text-sky-700 dark:text-sky-300">
 										{t(
-											"subscriptions.plansTab.planModal.publicPricing",
-											"Public Pricing Page",
+											"subscriptions.plansTab.planModal.freeTrialModeLabel",
+											"Free Trial Mode Active",
 										)}
 									</span>
-								</label>
-								<label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-									<input
-										type="checkbox"
-										checked={planForm.trial}
-										onChange={(e) =>
-											setPlanForm((prev) => ({
-												...prev,
-												trial: e.target.checked,
-											}))
-										}
-										className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
-									/>
-									<span>
+									<span className="text-slate-400">•</span>
+									<span className="text-slate-500 dark:text-slate-400">
 										{t(
-											"subscriptions.plansTab.planModal.freeTrialTier",
-											"Free Trial Tier",
+											"subscriptions.plansTab.planModal.freeTrialModeDesc",
+											"Free tier is enabled by default with private evaluation pricing.",
 										)}
 									</span>
-								</label>
-							</div>
+								</>
+							) : (
+								<>
+									<div className="size-2 rounded-full bg-emerald-500" />
+									<span className="font-semibold text-emerald-700 dark:text-emerald-300">
+										{t(
+											"subscriptions.plansTab.planModal.paidTierModeLabel",
+											"Commercial Tier Active",
+										)}
+									</span>
+									<span className="text-slate-400">•</span>
+									<span className="text-slate-500 dark:text-slate-400">
+										{t(
+											"subscriptions.plansTab.planModal.paidTierModeDesc",
+											"Public pricing active, standard commercial subscription applied.",
+										)}
+									</span>
+								</>
+							)}
 						</div>
+						<Badge
+							variant="outline"
+							className={cn(
+								"text-[10px] font-mono font-bold",
+								planForm.tier === "FREE_TRIAL"
+									? "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300"
+									: "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
+							)}
+						>
+							{planForm.tier === "FREE_TRIAL"
+								? t("subscriptions.plansTab.planModal.freeTierBadge", "FREE TIER (0)")
+								: t("subscriptions.plansTab.planModal.publicPricingBadge", "PUBLIC PRICING")}
+						</Badge>
 					</div>
 
 					<ModernTextarea
@@ -1415,86 +1447,265 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 						rows={2}
 					/>
 
-					{/* Feature Checklist */}
-					<div className="space-y-2 pt-1">
-						<div className="flex items-center justify-between">
-							<label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-								{t(
-									"subscriptions.plansTab.planModal.includedFeaturesChecklist",
-									"Included Features Checklist ({{count}} selected)",
-									{ count: planForm.featureIds.length },
-								)}
-							</label>
-							<button
-								type="button"
-								onClick={() =>
-									setPlanForm((prev) => ({
-										...prev,
-										featureIds:
-											prev.featureIds.length === allFeatures.length
-												? []
-												: allFeatures.map((f) => f.id),
-									}))
-								}
-								className="text-xs text-primary font-semibold hover:underline"
-							>
-								{planForm.featureIds.length === allFeatures.length
-									? t(
-											"subscriptions.plansTab.planModal.deselectAll",
-											"Deselect All",
-										)
-									: t(
-											"subscriptions.plansTab.planModal.selectAll",
-											"Select All",
-										)}
-							</button>
-						</div>
+					{/* Redesigned Included Features Checklist */}
+					<div className="space-y-3 pt-2 border-t border-slate-200/80 dark:border-slate-800">
+						<div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+							<div className="flex items-center gap-2">
+								<label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+									{t(
+										"subscriptions.plansTab.planModal.includedFeaturesChecklist",
+										"Included Features Checklist ({{count}} selected)",
+										{ count: planForm.featureIds.length },
+									)}
+								</label>
+								<Badge
+									variant="outline"
+									className="text-[10px] font-bold bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300"
+								>
+									{planForm.featureIds.length} / {allFeatures.length}
+								</Badge>
+							</div>
 
-						<div className="max-h-48 overflow-y-auto space-y-1.5 rounded-xl border border-slate-200/80 bg-slate-50/50 p-2.5 dark:border-slate-800 dark:bg-slate-900/50">
-							{allFeatures.map((feat) => {
-								const isSelected = planForm.featureIds.some(
-									(id) => String(id) === String(feat.id),
-								);
-								return (
-									<div
-										key={feat.id}
-										onClick={() => {
+							{/* Quick bulk actions */}
+							<div className="flex items-center gap-2 text-xs">
+								<button
+									type="button"
+									onClick={() => {
+										if (featureSearch.trim()) {
+											const filteredIds = filteredModalFeatures.map(
+												(f) => f.id,
+											);
 											setPlanForm((prev) => {
-												const exists = prev.featureIds.some(
-													(id) => String(id) === String(feat.id),
-												);
+												const combined = new Set([
+													...prev.featureIds,
+													...filteredIds,
+												]);
 												return {
 													...prev,
-													featureIds: exists
-														? prev.featureIds.filter(
-																(id) => String(id) !== String(feat.id),
-															)
-														: [...prev.featureIds, feat.id],
+													featureIds: Array.from(combined),
 												};
 											});
-										}}
-										className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${
-											isSelected
-												? "bg-primary/10 border border-primary/30 text-primary font-medium dark:bg-primary/20"
-												: "bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100"
-										}`}
+										} else {
+											setPlanForm((prev) => ({
+												...prev,
+												featureIds: allFeatures.map((f) => f.id),
+											}));
+										}
+									}}
+									className="font-semibold text-primary hover:underline cursor-pointer"
+								>
+									{featureSearch.trim()
+										? t(
+												"subscriptions.plansTab.planModal.selectFiltered",
+												"Select Filtered ({{count}})",
+												{ count: filteredModalFeatures.length },
+											)
+										: t(
+												"subscriptions.plansTab.planModal.selectAll",
+												"Select All",
+											)}
+								</button>
+								<span className="text-slate-300 dark:text-slate-700">•</span>
+								<button
+									type="button"
+									onClick={() => {
+										if (featureSearch.trim()) {
+											const filteredIds = new Set(
+												filteredModalFeatures.map((f) => String(f.id)),
+											);
+											setPlanForm((prev) => ({
+												...prev,
+												featureIds: prev.featureIds.filter(
+													(id) => !filteredIds.has(String(id)),
+												),
+											}));
+										} else {
+											setPlanForm((prev) => ({
+												...prev,
+												featureIds: [],
+											}));
+										}
+									}}
+									className="font-semibold text-slate-500 hover:text-rose-600 hover:underline cursor-pointer"
+								>
+									{t(
+										"subscriptions.plansTab.planModal.clearSelection",
+										"Clear",
+									)}
+								</button>
+							</div>
+						</div>
+
+						{/* Search Bar & Filter Tabs */}
+						<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+							<div className="relative flex-1">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+								<Input
+									value={featureSearch}
+									onChange={(e) => setFeatureSearch(e.target.value)}
+									placeholder={t(
+										"subscriptions.plansTab.planModal.searchFeaturesPlaceholder",
+										"Search features by code, name, or description...",
+									)}
+									className="h-8.5 pl-8.5 pr-8 text-xs rounded-xl bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900"
+								/>
+								{featureSearch && (
+									<button
+										type="button"
+										onClick={() => setFeatureSearch("")}
+										className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
 									>
-										<div className="flex items-center gap-2">
+										<X className="size-3.5" />
+									</button>
+								)}
+							</div>
+
+							<div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl shrink-0">
+								<button
+									type="button"
+									onClick={() => setFeatureFilter("ALL")}
+									className={cn(
+										"px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all cursor-pointer",
+										featureFilter === "ALL"
+											? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold"
+											: "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+									)}
+								>
+									{t("common.all", "All")} ({allFeatures.length})
+								</button>
+								<button
+									type="button"
+									onClick={() => setFeatureFilter("SELECTED")}
+									className={cn(
+										"px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all cursor-pointer",
+										featureFilter === "SELECTED"
+											? "bg-white dark:bg-slate-700 text-primary dark:text-purple-300 shadow-2xs font-bold"
+											: "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+									)}
+								>
+									{t("subscriptions.plansTab.planModal.filterSelected", "Selected")} ({planForm.featureIds.length})
+								</button>
+								<button
+									type="button"
+									onClick={() => setFeatureFilter("UNSELECTED")}
+									className={cn(
+										"px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all cursor-pointer",
+										featureFilter === "UNSELECTED"
+											? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold"
+											: "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+									)}
+								>
+									{t("subscriptions.plansTab.planModal.filterUnselected", "Unselected")} ({allFeatures.length - planForm.featureIds.length})
+								</button>
+							</div>
+						</div>
+
+						{/* Feature Cards Grid */}
+						<div className="max-h-72 overflow-y-auto pr-1 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 p-2.5">
+							{filteredModalFeatures.length === 0 ? (
+								<div className="py-8 text-center text-xs text-slate-400 flex flex-col items-center justify-center">
+									<Search className="size-6 text-slate-300 dark:text-slate-600 mb-2 opacity-60" />
+									<p className="font-semibold text-slate-700 dark:text-slate-300">
+										{t(
+											"subscriptions.plansTab.planModal.noFeaturesFound",
+											"No matching features found",
+										)}
+									</p>
+									<p className="text-[11px] text-slate-400 mt-0.5">
+										{featureSearch
+											? `No features match "${featureSearch}"`
+											: "No features in this filter category"}
+									</p>
+									{(featureSearch || featureFilter !== "ALL") && (
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											onClick={() => {
+												setFeatureSearch("");
+												setFeatureFilter("ALL");
+											}}
+											className="mt-2 text-xs h-7 text-primary cursor-pointer"
+										>
+											{t(
+												"subscriptions.plansTab.planModal.resetFeatureSearch",
+												"Reset Search & Filters",
+											)}
+										</Button>
+									)}
+								</div>
+							) : (
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+									{filteredModalFeatures.map((feat) => {
+										const isSelected = planForm.featureIds.some(
+											(id) => String(id) === String(feat.id),
+										);
+										return (
 											<div
-												className={`size-4 rounded flex items-center justify-center border ${isSelected ? "bg-primary border-primary text-white" : "border-slate-400"}`}
+												key={feat.id}
+												onClick={() => {
+													setPlanForm((prev) => {
+														const exists = prev.featureIds.some(
+															(id) => String(id) === String(feat.id),
+														);
+														return {
+															...prev,
+															featureIds: exists
+																? prev.featureIds.filter(
+																		(id) =>
+																			String(id) !== String(feat.id),
+																	)
+																: [...prev.featureIds, feat.id],
+														};
+													});
+												}}
+												className={cn(
+													"group relative flex items-start gap-2.5 p-2.5 rounded-xl border text-left cursor-pointer transition-all select-none",
+													isSelected
+														? "bg-purple-50/80 border-purple-300 dark:bg-purple-950/30 dark:border-purple-800/80 shadow-2xs ring-1 ring-purple-400/20"
+														: "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/80 dark:hover:bg-slate-850",
+												)}
 											>
-												{isSelected && <Check className="size-3 stroke-[3]" />}
+												<div
+													className={cn(
+														"mt-0.5 size-4.5 rounded-md flex items-center justify-center border transition-all shrink-0",
+														isSelected
+															? "bg-primary border-primary text-primary-foreground shadow-2xs"
+															: "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:border-slate-400",
+													)}
+												>
+													{isSelected && (
+														<Check className="size-3 stroke-[3]" />
+													)}
+												</div>
+
+												<div className="flex-1 min-w-0">
+													<div className="flex items-center gap-1.5 flex-wrap">
+														<span
+															className={cn(
+																"text-xs font-bold truncate",
+																isSelected
+																	? "text-primary dark:text-purple-300"
+																	: "text-slate-900 dark:text-slate-100",
+															)}
+														>
+															{feat.name}
+														</span>
+														<span className="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60 shrink-0">
+															{feat.code}
+														</span>
+													</div>
+													{feat.description && (
+														<p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
+															{feat.description}
+														</p>
+													)}
+												</div>
 											</div>
-											<span className="font-mono text-xs font-semibold">
-												{feat.code}
-											</span>
-											<span className="text-xs text-slate-500 font-normal">
-												— {feat.name}
-											</span>
-										</div>
-									</div>
-								);
-							})}
+										);
+									})}
+								</div>
+							)}
 						</div>
 					</div>
 

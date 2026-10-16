@@ -342,7 +342,9 @@ export const authApi = {
 // ---- Profile -------------------------------------------------
 export const profileApi = {
 	me: async (): Promise<any> => {
-		const res = await api.get<any>("/me");
+		const res = await api.get<any>("/me", {
+			headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+		});
 		const d = res.data?.data || res.data;
 		const up = d?.userProfile || d?.systemAdminProfile || d;
 		const company = d?.company || up?.company;
@@ -431,11 +433,24 @@ export const profileApi = {
 	getCachedProfile: (): any => {
 		if (typeof window === "undefined") return undefined;
 		try {
+			const hasToken =
+				Boolean(localStorage.getItem("crm_access_token")) ||
+				document.cookie.includes("crm_access_token");
+			if (!hasToken) {
+				localStorage.removeItem("crm_user_profile");
+				return undefined;
+			}
 			const cached = localStorage.getItem("crm_user_profile");
 			return cached ? JSON.parse(cached) : undefined;
 		} catch {
 			return undefined;
 		}
+	},
+	clearCachedProfile: () => {
+		if (typeof window === "undefined") return;
+		try {
+			localStorage.removeItem("crm_user_profile");
+		} catch {}
 	},
 	update: async (body: any) => {
 		const payload = {

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { clearClientSession } from "@/lib/api/client";
-import { fileUrl, profileApi } from "@/lib/api/endpoints";
+import { authApi, fileUrl, profileApi } from "@/lib/api/endpoints";
 import { useTranslation } from "@/lib/i18n/context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -125,15 +125,17 @@ export function Header() {
 
 	const handleLogout = async () => {
 		try {
+			await authApi.signOut().catch(() => {});
 			clearClientSession();
 			queryClient.clear();
 			await clearAuthCookies();
 			toast.success(t("header.signedOutSuccess"));
-			router.push("/sign-in");
+			window.location.href = "/sign-in";
 		} catch {
 			clearClientSession();
 			queryClient.clear();
-			router.push("/sign-in");
+			await clearAuthCookies();
+			window.location.href = "/sign-in";
 		}
 	};
 

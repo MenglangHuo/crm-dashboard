@@ -2,9 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider";
-import { profileApi } from "@/lib/api/endpoints";
-import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Toaster } from "sonner";
 
 import dynamic from "next/dynamic";
@@ -51,20 +49,6 @@ import { OneSignalProvider } from "@/components/providers/onesignal-provider";
 import { I18nProvider } from "@/lib/i18n/context";
 import type { Locale } from "@/types/i18n";
 
-function ProfileCacheInitializer() {
-	const queryClient = useQueryClient();
-	useEffect(() => {
-		const cached = profileApi.getCachedProfile();
-		if (cached) {
-			queryClient.setQueryData(
-				["profile"],
-				(existing: any) => existing || cached,
-			);
-		}
-	}, [queryClient]);
-	return null;
-}
-
 export function Providers({
 	initialLocale,
 	children,
@@ -94,7 +78,6 @@ export function Providers({
 			<CustomThemeProvider>
 				<I18nProvider initialLocale={initialLocale}>
 					<QueryClientProvider client={queryClient}>
-						<ProfileCacheInitializer />
 						<OneSignalProvider>
 							<QuickActionProvider>
 								{children}

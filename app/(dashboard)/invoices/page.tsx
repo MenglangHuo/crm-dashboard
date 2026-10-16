@@ -102,11 +102,6 @@ function InvoicesPageContent() {
 	// Advanced Filter Studio State
 	const [activeFilters, setActiveFilters] = useState<FilterCriterion[]>([]);
 
-	// Master Data Queries
-	const { data: customersData } = useQuery({
-		queryKey: ["customers-list-invoices-page"],
-		queryFn: () => customersApi.list({ limit: 100 }),
-	});
 
 	// Advanced Search Payload for POST /v1/invoices/search
 	const searchPayload = useMemo(() => {
@@ -488,19 +483,17 @@ function InvoicesPageContent() {
 			id: "customer",
 			header: t("invoices.customer"),
 			accessorFn: (inv) => {
-				if (inv.customer?.name) return inv.customer.name;
-				const c = customersData?.items.find(
-					(cust) => String(cust.id) === String(inv.customerId),
+				return (
+					inv.customer?.name ||
+					(inv as any).customerName ||
+					(inv.customerId ? `Customer #${inv.customerId}` : "Walk-in")
 				);
-				return c ? c.name : String(inv.customerId || "Walk-in");
 			},
 			cell: ({ row }) => {
 				const custName =
 					row.customer?.name ||
-					customersData?.items.find(
-						(c) => String(c.id) === String(row.customerId),
-					)?.name ||
-					`Customer #${row.customerId}`;
+					(row as any).customerName ||
+					(row.customerId ? `Customer #${row.customerId}` : "Walk-in");
 
 				return (
 					<div className="font-semibold text-xs text-foreground flex items-center gap-1 py-0.5">
@@ -767,15 +760,22 @@ function InvoicesPageContent() {
 		{
 			label: t("invoices.printReceipt"),
 			icon: <Printer className="h-3.5 w-3.5 text-sky-500" />,
-			onClick: (inv) => {
-				const c =
-					customersData?.items.find(
-						(cust) => String(cust.id) === String(inv.customerId),
-					) || inv.customer;
+			onClick: async (inv) => {
+				let c = inv.customer;
+				if (!c?.name && inv.customerId) {
+					try {
+						c = await customersApi.get(inv.customerId);
+					} catch (err) {
+						console.warn("Failed to fetch customer for receipt", err);
+					}
+				}
 				const invNo = inv.invoiceNumber || inv.invoiceNo || `#${inv.id}`;
 				openReceipt({
 					invoiceNo: invNo,
-					customerName: c?.name || (inv as any).customerName,
+					customerName:
+						c?.name ||
+						(inv as any).customerName ||
+						(inv.customerId ? `Customer #${inv.customerId}` : "Walk-in"),
 					customerPhone:
 						(c as any)?.phoneNumber ||
 						(c as any)?.phone ||

@@ -310,14 +310,14 @@ export function AppSidebar() {
 
 	const handleSignOut = async () => {
 		try {
-			await authApi.signOut();
+			await authApi.signOut().catch(() => {});
 		} catch {
 			// ignore
 		}
 		clearClientSession();
 		queryClient.clear();
 		await clearAuthCookies();
-		router.push("/sign-in");
+		window.location.href = "/sign-in";
 	};
 
 	// Administrator visible ONLY when user login as ROLE_SYSTEM_ADMIN / platform system admin

@@ -165,12 +165,12 @@ export function RoleMatrixModal({
 									<span>Role ID: #{role.id}</span>
 								</div>
 							</div>
-							{role.isSystem && (
+							{(role.isSystemDefault || role.isSystem) && (
 								<Badge
 									variant="secondary"
 									className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
 								>
-									System Managed
+									System Default
 								</Badge>
 							)}
 						</div>

@@ -10,6 +10,7 @@
 import axios, { AxiosError } from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
 import { refreshAuthCookies } from "@/app/actions/auth";
+import { logoutOneSignalUser } from "@/lib/onesignal";
 import type { ApiResponse } from "@/lib/types";
 
 export class ApiError extends Error {
@@ -117,6 +118,10 @@ export function clearClientSession() {
 		localStorage.removeItem("crm_refresh_token");
 		localStorage.removeItem("crm_company_id");
 		localStorage.removeItem("crm_is_system_admin");
+		localStorage.removeItem("crm_user_profile");
+	} catch {}
+	try {
+		logoutOneSignalUser();
 	} catch {}
 }
 
@@ -228,10 +233,15 @@ export const api = axios.create({
 // Attach Authorization header if access token cookie is set, X-Company-Id header, and companyId to request params
 api.interceptors.request.use((config) => {
 	if (typeof window !== "undefined") {
-		const token = readCookie("crm_access_token");
+		const token =
+			readCookie("crm_access_token") ||
+			localStorage.getItem("crm_access_token");
 		if (token) {
 			config.headers.Authorization = `Bearer ${token}`;
 		}
+		config.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+		config.headers["Pragma"] = "no-cache";
+
 		const companyId =
 			readCookie("crm_company_id") ||
 			localStorage.getItem("crm_company_id");

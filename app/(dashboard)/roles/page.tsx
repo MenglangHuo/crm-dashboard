@@ -36,6 +36,7 @@ import {
 	ArrowUpDown,
 	ChevronDown,
 	Copy,
+	Lock,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -336,6 +337,10 @@ export default function RolesPage() {
 		}
 	};
 
+	const isEditingSystemDefault = Boolean(
+		editingRole && (editingRole.isSystemDefault || editingRole.isSystem),
+	);
+
 	const onSubmit = (values: z.infer<typeof formSchema>) => {
 		const formattedPermissions = formatRolePermissionsPayload(
 			values.permissionIds || [],
@@ -344,8 +349,12 @@ export default function RolesPage() {
 		);
 
 		const payload = {
-			name: values.name,
-			displayName: values.displayName || values.name,
+			name:
+				isEditingSystemDefault && editingRole ? editingRole.name : values.name,
+			displayName:
+				isEditingSystemDefault && editingRole
+					? editingRole.displayName || editingRole.name
+					: values.displayName || values.name,
 			description: values.description || "",
 			permissions: formattedPermissions,
 		};
@@ -419,12 +428,13 @@ export default function RolesPage() {
 								{row.displayName || row.name}
 							</span>
 							{renderPriorityBadge(row.priority)}
-							{row.isSystem && (
+							{(row.isSystemDefault || row.isSystem) && (
 								<Badge
 									variant="secondary"
-									className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+									className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 gap-1"
 								>
-									System
+									<Lock className="size-2.5" />
+									System Default
 								</Badge>
 							)}
 						</div>
@@ -642,9 +652,20 @@ export default function RolesPage() {
 														<ShieldCheck className="size-5" />
 													</div>
 													<div>
-														<h3 className="font-bold text-sm text-foreground leading-tight">
-															{role.displayName || role.name}
-														</h3>
+														<div className="flex items-center gap-2 flex-wrap">
+															<h3 className="font-bold text-sm text-foreground leading-tight">
+																{role.displayName || role.name}
+															</h3>
+															{(role.isSystemDefault || role.isSystem) && (
+																<Badge
+																	variant="secondary"
+																	className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 gap-1"
+																>
+																	<Lock className="size-2.5" />
+																	System Default
+																</Badge>
+															)}
+														</div>
 														<span className="font-mono text-[11px] text-primary font-semibold">
 															{role.name}
 														</span>
@@ -743,9 +764,26 @@ export default function RolesPage() {
 													type="button"
 													variant="ghost"
 													size="sm"
-													onClick={() => deleteMutation.mutate(role.id)}
-													className="h-8 px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-													title="Delete Role"
+													onClick={() => {
+														if (role.isSystemDefault || role.isSystem) {
+															toast.error(
+																"System default roles cannot be deleted.",
+															);
+															return;
+														}
+														deleteMutation.mutate(role.id);
+													}}
+													disabled={role.isSystemDefault || role.isSystem}
+													className={cn(
+														"h-8 px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40",
+														(role.isSystemDefault || role.isSystem) &&
+															"opacity-40 cursor-not-allowed hover:bg-transparent text-slate-400 dark:text-slate-600",
+													)}
+													title={
+														role.isSystemDefault || role.isSystem
+															? "System default roles cannot be deleted"
+															: "Delete Role"
+													}
 												>
 													<Trash2 className="size-3.5" />
 												</Button>
@@ -781,7 +819,13 @@ export default function RolesPage() {
 					isLoading={isLoading}
 					onRowClick={(r) => setSelectedRoleId(r.id)}
 					onEditRow={(r) => openEdit(r)}
-					onDeleteRow={(r) => deleteMutation.mutate(r.id)}
+					onDeleteRow={(r) => {
+						if (r.isSystemDefault || r.isSystem) {
+							toast.error("System default roles cannot be deleted.");
+							return;
+						}
+						deleteMutation.mutate(r.id);
+					}}
 					customRowActions={customActions}
 				/>
 			)}
@@ -812,7 +856,9 @@ export default function RolesPage() {
 				}
 				subtitle={
 					editingRole
-						? t("roles.roleDetailsSubtitle")
+						? isEditingSystemDefault
+							? "System default role. Role identifier and name are protected from modification; permissions and description can be customized."
+							: t("roles.roleDetailsSubtitle")
 						: clonedFromRole
 							? `Cloning permission matrix and hierarchy rank from "${clonedFromRole.displayName || clonedFromRole.name}". Review and customize before creating.`
 							: t("roles.roleDetailsSubtitle")
@@ -861,6 +907,20 @@ export default function RolesPage() {
 					onSubmit={form.handleSubmit((values: any) => onSubmit(values))}
 					className="space-y-6"
 				>
+					{isEditingSystemDefault && (
+						<div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 flex items-center justify-between gap-3 text-xs shadow-2xs">
+							<div className="flex items-center gap-2">
+								<Lock className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
+								<span className="text-amber-950 dark:text-amber-200">
+									<strong>System Default Role:</strong> The role identifier and name cannot be modified. You can customize assigned permissions and description.
+								</span>
+							</div>
+							<Badge className="bg-amber-600 text-white text-[10px] shrink-0 font-bold">
+								System Default
+							</Badge>
+						</div>
+					)}
+
 					{clonedFromRole && (
 						<div className="p-3 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 flex items-center justify-between gap-3 text-xs shadow-2xs">
 							<div className="flex items-center gap-2">
@@ -882,11 +942,39 @@ export default function RolesPage() {
 							{...form.register("name")}
 							error={form.formState.errors.name?.message}
 							required
+							disabled={isEditingSystemDefault}
+							leftIcon={
+								isEditingSystemDefault ? (
+									<Lock className="size-4 text-amber-500" />
+								) : undefined
+							}
+							helperText={
+								isEditingSystemDefault ? (
+									<span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1 text-[11px]">
+										<Lock className="size-3 shrink-0" />
+										System default role identifier cannot be modified
+									</span>
+								) : undefined
+							}
 						/>
 						<ModernInput
 							label={t("roles.displayNameInput")}
 							placeholder="e.g. Real Estate Loan Officer"
 							{...form.register("displayName")}
+							disabled={isEditingSystemDefault}
+							leftIcon={
+								isEditingSystemDefault ? (
+									<Lock className="size-4 text-amber-500" />
+								) : undefined
+							}
+							helperText={
+								isEditingSystemDefault ? (
+									<span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1 text-[11px]">
+										<Lock className="size-3 shrink-0" />
+										System default display name cannot be modified
+									</span>
+								) : undefined
+							}
 						/>
 					</div>
 

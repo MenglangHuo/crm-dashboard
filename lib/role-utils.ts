@@ -334,6 +334,7 @@ export function normalizeRole(raw: any): Role {
 			permissions: {},
 			permissionIds: [],
 			isSystem: false,
+			isSystemDefault: false,
 			createdAt: "",
 		};
 	}
@@ -342,7 +343,17 @@ export function normalizeRole(raw: any): Role {
 	const displayName = raw.displayName || formatRoleName(name);
 	const description = String(raw.description || "").trim();
 	const priority = typeof raw.priority === "number" ? raw.priority : 99;
-	const isSystem = Boolean(raw.isSystem === true);
+	const isSystemDefault = Boolean(
+		raw.isSystemDefault === true ||
+		raw.isSystemDefault === "true" ||
+		raw.system_default === true ||
+		raw.system_default === "true" ||
+		raw.is_system_default === true ||
+		raw.is_system_default === "true" ||
+		raw.isSystem === true ||
+		raw.isSystem === "true"
+	);
+	const isSystem = isSystemDefault;
 
 	let permissionsMap: RolePermissionsMap = {};
 	const derivedPermissionIds = extractRolePermissionIds(raw);
@@ -416,6 +427,7 @@ export function normalizeRole(raw: any): Role {
 			? raw.excludedPermissionIds
 			: [],
 		isSystem,
+		isSystemDefault,
 		createdAt: raw.createdAt || "",
 		updatedAt: raw.updatedAt || null,
 	};
