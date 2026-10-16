@@ -70,7 +70,7 @@ export function normalizeUploadResult(
 		(fileKey
 			? fileKey.startsWith("http") || fileKey.startsWith("/")
 				? fileKey
-				: `/api/v1/storage/object/${encodeURIComponent(fileKey)}`
+				: `/api/public/files/${encodeURIComponent(fileKey)}`
 			: "");
 	const imageUrl = item.imageUrl || url;
 	const mimeType =
@@ -136,14 +136,13 @@ export class ApiFileUploader implements IFileUploader {
 
 		const isPublic = Boolean(options?.isPublic);
 		const primaryEndpoint = isPublic ? "/public/files/upload" : "/files/upload";
-		const fallbackEndpoint = isPublic ? "/v1/public/files/upload" : "/v1/files/upload";
+		const fallbackEndpoint = isPublic ? "/files/upload" : "/public/files/upload";
 
 		try {
 			const res = await api.post<ServerFileResponse | any>(
 				primaryEndpoint,
 				formData,
 				{
-					headers: { "Content-Type": "multipart/form-data" },
 					onUploadProgress: (progressEvent) => {
 						if (progressEvent.total && options?.onProgress) {
 							const percent = Math.round(
@@ -157,13 +156,12 @@ export class ApiFileUploader implements IFileUploader {
 
 			return normalizeUploadResult(res.data, file, "LOCAL");
 		} catch (err: any) {
-			// If 404 or prefix issue, attempt with fallback endpoint directly
-			if (err?.status === 404 || err?.response?.status === 404) {
+			// If primary endpoint fails, attempt fallback endpoint
+			try {
 				const fallbackRes = await api.post<ServerFileResponse | any>(
 					fallbackEndpoint,
 					formData,
 					{
-						headers: { "Content-Type": "multipart/form-data" },
 						onUploadProgress: (progressEvent) => {
 							if (progressEvent.total && options?.onProgress) {
 								const percent = Math.round(
@@ -175,8 +173,9 @@ export class ApiFileUploader implements IFileUploader {
 					},
 				);
 				return normalizeUploadResult(fallbackRes.data, file, "LOCAL");
+			} catch (fallbackErr: any) {
+				throw fallbackErr || err;
 			}
-			throw err;
 		}
 	}
 
@@ -214,15 +213,14 @@ export class ApiFileUploader implements IFileUploader {
 			? "/public/files/batch-uploads"
 			: "/files/batch-uploads";
 		const fallbackEndpoint = isPublic
-			? "/v1/public/files/batch-uploads"
-			: "/v1/files/batch-uploads";
+			? "/files/batch-uploads"
+			: "/public/files/batch-uploads";
 
 		try {
 			const res = await api.post<ServerFileResponse[] | any>(
 				primaryEndpoint,
 				formData,
 				{
-					headers: { "Content-Type": "multipart/form-data" },
 					onUploadProgress: (progressEvent) => {
 						if (progressEvent.total && options?.onProgress) {
 							const percent = Math.round(
@@ -244,12 +242,11 @@ export class ApiFileUploader implements IFileUploader {
 				normalizeUploadResult(item, files[idx] || files[0], "LOCAL"),
 			);
 		} catch (err: any) {
-			if (err?.status === 404 || err?.response?.status === 404) {
+			try {
 				const fallbackRes = await api.post<ServerFileResponse[] | any>(
 					fallbackEndpoint,
 					formData,
 					{
-						headers: { "Content-Type": "multipart/form-data" },
 						onUploadProgress: (progressEvent) => {
 							if (progressEvent.total && options?.onProgress) {
 								const percent = Math.round(
@@ -268,8 +265,9 @@ export class ApiFileUploader implements IFileUploader {
 				return rawItems.map((item: any, idx: number) =>
 					normalizeUploadResult(item, files[idx] || files[0], "LOCAL"),
 				);
+			} catch (fallbackErr: any) {
+				throw fallbackErr || err;
 			}
-			throw err;
 		}
 	}
 }

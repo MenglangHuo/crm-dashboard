@@ -5,11 +5,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	profileApi,
 	usersApi,
+	rolesApi,
 	uploadService,
 	fileUrl,
-	uploadFile,
 } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";
+import { formatRoleName } from "@/lib/role-utils";
 
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -40,9 +41,10 @@ import {
 	FileText,
 	RotateCcw,
 	Save,
-	Check,
 	Layers,
 	Search,
+	Users,
+	Filter,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +55,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { FileUpload } from "@/components/ui-custom/file-upload";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -96,56 +97,391 @@ const passwordFormSchema = z
 		path: ["confirmPassword"],
 	});
 
-interface NormalizedPermission {
+export interface NormalizedPermission {
 	id: string;
 	name: string;
+	code: string;
 	module: string;
+	action: string;
 	description?: string;
+	grantedByRoles: string[];
+	isDirect?: boolean;
 }
 
-function normalizePermissionsList(raw: any): NormalizedPermission[] {
-	if (!raw) return [];
-	if (Array.isArray(raw)) {
-		return raw.map((p: any, idx) => ({
-			id: String(p.id || idx),
-			name: String(p.name || p.code || "permission"),
-			module: String(
-				p.module ||
-					(p.name && p.name.includes(".")
-						? p.name.split(".")[0].toUpperCase()
-						: "General"),
-			),
-			description: p.description ? String(p.description) : undefined,
-		}));
-	}
-	if (typeof raw === "object") {
-		const list: NormalizedPermission[] = [];
-		Object.entries(raw).forEach(([domain, actions]) => {
-			const moduleName = domain.charAt(0).toUpperCase() + domain.slice(1);
-			if (Array.isArray(actions)) {
-				actions.forEach((act: any, idx) => {
-					const actionName =
-						typeof act === "string" ? act : act?.name || "access";
-					const code = `${domain}.${actionName}`;
-					list.push({
-						id: `${domain}-${actionName}-${idx}`,
-						name: code,
-						module: moduleName,
-						description: `${actionName.toUpperCase()} operation for ${domain}`,
+export interface PermissionsAggregationResult {
+	permissions: NormalizedPermission[];
+	totalRawGrants: number;
+	distinctCount: number;
+	duplicateCount: number;
+	rolesSummary: { name: string; count: number }[];
+	modulesList: string[];
+}
+
+function aggregateAndDeduplicatePermissions(
+	userProfile: any,
+	rolesCatalog: any[] = [],
+): PermissionsAggregationResult {
+	const permMap = new Map<string, NormalizedPermission>();
+	let totalRawGrants = 0;
+	const roleCountMap = new Map<string, number>();
+
+	const recordGrant = (
+		rawModule: string,
+		rawAction: string,
+		roleName: string,
+		desc?: string,
+		isDirect = false,
+		explicitId?: string,
+	) => {
+		const cleanMod = String(rawModule || "GENERAL").trim().toUpperCase();
+		const cleanAct = String(rawAction || "ACCESS").trim().toUpperCase();
+		if (!cleanMod && !cleanAct) return;
+
+		const canonicalCode = cleanAct.includes(".")
+			? cleanAct
+			: `${cleanMod}.${cleanAct}`;
+
+		const [modPart, actPart] = canonicalCode.includes(".")
+			? canonicalCode.split(".")
+			: [cleanMod, cleanAct];
+
+		const displayModule =
+			modPart.charAt(0).toUpperCase() + modPart.slice(1).toLowerCase();
+		const displayAction =
+			actPart.charAt(0).toUpperCase() + actPart.slice(1).toLowerCase();
+
+		totalRawGrants++;
+		roleCountMap.set(roleName, (roleCountMap.get(roleName) || 0) + 1);
+
+		if (permMap.has(canonicalCode)) {
+			const existing = permMap.get(canonicalCode)!;
+			if (roleName && !existing.grantedByRoles.includes(roleName)) {
+				existing.grantedByRoles.push(roleName);
+			}
+			if (isDirect) existing.isDirect = true;
+			if (!existing.description && desc) existing.description = desc;
+		} else {
+			permMap.set(canonicalCode, {
+				id: explicitId || canonicalCode.toLowerCase(),
+				name: displayAction,
+				code: canonicalCode,
+				module: displayModule,
+				action: actPart,
+				description:
+					desc || `${displayAction} authorization for ${displayModule}`,
+				grantedByRoles: roleName ? [roleName] : [],
+				isDirect: Boolean(isDirect),
+			});
+		}
+	};
+
+	// 1. Process User Assigned Roles
+	const assignedRoles = Array.isArray(userProfile?.roles)
+		? userProfile.roles
+		: [];
+
+	assignedRoles.forEach((roleObj: any) => {
+		const roleId = String(roleObj?.id || "");
+		const rawName = String(roleObj?.name || roleObj?.displayName || "Role");
+		const roleName = formatRoleName(rawName);
+
+		// Look up full role catalog if roleObj lacks detailed permissions
+		const catalogMatch = rolesCatalog.find(
+			(r) => String(r.id) === roleId || r.name === roleObj?.name,
+		);
+		const fullRole = catalogMatch || roleObj;
+
+		// A. Array permissions
+		const permsArray = Array.isArray(fullRole?.permissions)
+			? fullRole.permissions
+			: Array.isArray(roleObj?.permissions)
+				? roleObj.permissions
+				: null;
+
+		if (permsArray) {
+			permsArray.forEach((p: any) => {
+				if (typeof p === "string" || typeof p === "number") {
+					const str = String(p).trim();
+					if (str.includes(".")) {
+						const [m, ...rest] = str.split(".");
+						recordGrant(m, rest.join("."), roleName);
+					} else {
+						recordGrant("GENERAL", str, roleName);
+					}
+					return;
+				}
+				if (!p) return;
+
+				const modName = String(p.name || p.module || "GENERAL");
+				const actions = Array.isArray(p.actions)
+					? p.actions
+					: Array.isArray(p.permissions)
+						? p.permissions
+						: [];
+
+				if (actions.length > 0) {
+					actions.forEach((act: any) => {
+						if (typeof act === "string") {
+							recordGrant(modName, act, roleName);
+						} else if (act && act.enabled !== false) {
+							const actName = String(act.name || act.action || "ACCESS");
+							recordGrant(
+								modName,
+								actName,
+								roleName,
+								act.description,
+								false,
+								act.id ? String(act.id) : undefined,
+							);
+						}
 					});
-				});
-			} else if (typeof actions === "boolean" && actions) {
-				list.push({
-					id: domain,
-					name: domain,
-					module: moduleName,
-					description: `${moduleName} access`,
+				} else if (p.name || p.code || p.action) {
+					if (p.enabled !== false) {
+						const name = String(p.name || p.code || p.action);
+						if (name.includes(".")) {
+							const [m, ...rest] = name.split(".");
+							recordGrant(
+								m,
+								rest.join("."),
+								roleName,
+								p.description,
+								false,
+								p.id ? String(p.id) : undefined,
+							);
+						} else {
+							recordGrant(
+								p.module || "GENERAL",
+								name,
+								roleName,
+								p.description,
+								false,
+								p.id ? String(p.id) : undefined,
+							);
+						}
+					}
+				}
+			});
+		}
+
+		// B. Object/Map permissions
+		const permsMap =
+			typeof fullRole?.permissions === "object" &&
+			!Array.isArray(fullRole?.permissions)
+				? fullRole.permissions
+				: typeof roleObj?.permissions === "object" &&
+						!Array.isArray(roleObj?.permissions)
+					? roleObj.permissions
+					: null;
+
+		if (permsMap) {
+			Object.entries(permsMap).forEach(([domain, actions]: [string, any]) => {
+				if (Array.isArray(actions)) {
+					actions.forEach((act: any) => {
+						if (typeof act === "string") {
+							recordGrant(domain, act, roleName);
+						} else if (act && act.enabled !== false) {
+							const actName = String(act.name || act.action || "ACCESS");
+							recordGrant(
+								domain,
+								actName,
+								roleName,
+								act.description,
+								false,
+								act.id ? String(act.id) : undefined,
+							);
+						}
+					});
+				} else if (actions && typeof actions === "object") {
+					Object.entries(actions).forEach(([actName, isEnabled]) => {
+						if (Boolean(isEnabled)) {
+							recordGrant(domain, actName, roleName);
+						}
+					});
+				} else if (typeof actions === "boolean" && actions) {
+					recordGrant(domain, "ACCESS", roleName);
+				}
+			});
+		}
+
+		// C. permissionIds or grants array
+		const idArrays = [
+			fullRole?.permissionIds,
+			roleObj?.permissionIds,
+			fullRole?.grants,
+			roleObj?.grants,
+		];
+		idArrays.forEach((arr) => {
+			if (Array.isArray(arr)) {
+				arr.forEach((idVal: any) => {
+					const str = String(idVal).trim();
+					if (str.includes(".")) {
+						const [m, ...rest] = str.split(".");
+						recordGrant(m, rest.join("."), roleName);
+					} else {
+						recordGrant("GENERAL", str, roleName);
+					}
 				});
 			}
 		});
-		return list;
+
+		// D. actions or rolePermissions array
+		if (Array.isArray(fullRole?.actions)) {
+			fullRole.actions.forEach((act: any) => {
+				if (typeof act === "string") {
+					recordGrant("GENERAL", act, roleName);
+				} else if (act && act.enabled !== false) {
+					recordGrant(
+						act.module || "GENERAL",
+						act.name || act.action || "ACCESS",
+						roleName,
+						act.description,
+					);
+				}
+			});
+		}
+		if (Array.isArray(fullRole?.rolePermissions)) {
+			fullRole.rolePermissions.forEach((rp: any) => {
+				const p = rp.permission || rp;
+				if (p) {
+					recordGrant(
+						p.module || "GENERAL",
+						p.name || p.action || "ACCESS",
+						roleName,
+						p.description,
+					);
+				}
+			});
+		}
+	});
+
+	// 2. Process Direct User Permissions / Grants
+	if (userProfile?.permissions) {
+		if (Array.isArray(userProfile.permissions)) {
+			userProfile.permissions.forEach((p: any) => {
+				if (typeof p === "string") {
+					if (p.includes(".")) {
+						const [m, ...rest] = p.split(".");
+						recordGrant(m, rest.join("."), "Direct User Grant", undefined, true);
+					} else {
+						recordGrant("GENERAL", p, "Direct User Grant", undefined, true);
+					}
+				} else if (p && p.enabled !== false) {
+					const code = String(p.name || p.code || "permission");
+					if (code.includes(".")) {
+						const [m, ...rest] = code.split(".");
+						recordGrant(
+							m,
+							rest.join("."),
+							"Direct User Grant",
+							p.description,
+							true,
+							p.id ? String(p.id) : undefined,
+						);
+					} else {
+						recordGrant(
+							p.module || "GENERAL",
+							code,
+							"Direct User Grant",
+							p.description,
+							true,
+							p.id ? String(p.id) : undefined,
+						);
+					}
+				}
+			});
+		} else if (typeof userProfile.permissions === "object") {
+			Object.entries(userProfile.permissions).forEach(
+				([domain, actions]: [string, any]) => {
+					if (Array.isArray(actions)) {
+						actions.forEach((act: any) => {
+							const actName =
+								typeof act === "string" ? act : act?.name || "ACCESS";
+							recordGrant(
+								domain,
+								actName,
+								"Direct User Grant",
+								act?.description,
+								true,
+							);
+						});
+					} else if (typeof actions === "boolean" && actions) {
+						recordGrant(domain, "ACCESS", "Direct User Grant", undefined, true);
+					}
+				},
+			);
+		}
 	}
-	return [];
+
+	if (Array.isArray(userProfile?.grants)) {
+		userProfile.grants.forEach((g: any) => {
+			const str = String(g).trim();
+			if (str.includes(".")) {
+				const [m, ...rest] = str.split(".");
+				recordGrant(m, rest.join("."), "Direct User Grant", undefined, true);
+			} else {
+				recordGrant("GENERAL", str, "Direct User Grant", undefined, true);
+			}
+		});
+	}
+
+	if (Array.isArray(userProfile?.addedPermissionIds)) {
+		userProfile.addedPermissionIds.forEach((pid: any) => {
+			const str = String(pid).trim();
+			if (str.includes(".")) {
+				const [m, ...rest] = str.split(".");
+				recordGrant(m, rest.join("."), "Direct User Grant", undefined, true);
+			} else {
+				recordGrant("GENERAL", str, "Direct User Grant", undefined, true);
+			}
+		});
+	}
+
+	// 3. Exclude permissions in excludedPermissionIds
+	if (Array.isArray(userProfile?.excludedPermissionIds)) {
+		const excludedSet = new Set(
+			userProfile.excludedPermissionIds.map((id: any) =>
+				String(id).toLowerCase(),
+			),
+		);
+		Array.from(permMap.entries()).forEach(([code, p]) => {
+			if (
+				excludedSet.has(code.toLowerCase()) ||
+				excludedSet.has(p.id.toLowerCase()) ||
+				excludedSet.has(p.action.toLowerCase())
+			) {
+				permMap.delete(code);
+			}
+		});
+	}
+
+	const distinctPermissions = Array.from(permMap.values()).sort((a, b) => {
+		const modCmp = a.module.localeCompare(b.module);
+		if (modCmp !== 0) return modCmp;
+		return a.name.localeCompare(b.name);
+	});
+
+	const rolesSummary = Array.from(roleCountMap.entries()).map(
+		([name, count]) => ({
+			name,
+			count,
+		}),
+	);
+
+	const modulesList = Array.from(
+		new Set(distinctPermissions.map((p) => p.module)),
+	).sort();
+
+	const distinctCount = distinctPermissions.length;
+	const duplicateCount = Math.max(0, totalRawGrants - distinctCount);
+
+	return {
+		permissions: distinctPermissions,
+		totalRawGrants,
+		distinctCount,
+		duplicateCount,
+		rolesSummary,
+		modulesList,
+	};
 }
 
 export default function ProfilePage() {
@@ -155,6 +491,7 @@ export default function ProfilePage() {
 	const [showNewPassword, setShowNewPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 	const [permissionSearch, setPermissionSearch] = useState("");
+	const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>("ALL");
 	const [completeModalOpen, setCompleteModalOpen] = useState(false);
 
 	// 1. Load real authenticated profile data from /me
@@ -162,6 +499,13 @@ export default function ProfilePage() {
 		queryKey: ["profile"],
 		queryFn: profileApi.me,
 		staleTime: 30 * 1000,
+	});
+
+	// 2. Load all roles catalog to enrich permissions from assigned roles
+	const { data: allRolesPaged } = useQuery({
+		queryKey: ["roles-catalog-list"],
+		queryFn: () => rolesApi.list({ limit: 100 }),
+		staleTime: 60 * 1000,
 	});
 
 	// ---- Form Hooks --------------------------------------------
@@ -288,22 +632,69 @@ export default function ProfilePage() {
 		}
 	};
 
-	// ---- Normalize Permissions ---------------------------------
-	const allPermissions = useMemo(() => {
-		return normalizePermissionsList(userProfile?.permissions);
-	}, [userProfile?.permissions]);
+	// ---- Setup Completion Check (Value after login or profile data) ----
+	const isCompleteSetup = useMemo(() => {
+		if (userProfile?.isCompleteSetup !== undefined)
+			return Boolean(userProfile.isCompleteSetup);
+		if (userProfile?.isCompletedSetup !== undefined)
+			return Boolean(userProfile.isCompletedSetup);
+		if (userProfile?.completedSetup !== undefined)
+			return Boolean(userProfile.completedSetup);
+		if (typeof window !== "undefined") {
+			const stored = localStorage.getItem("crm_is_complete_setup");
+			if (stored !== null) return stored === "true" || stored === "1";
+		}
+		const hasName = Boolean(userProfile?.firstName || userProfile?.firstname);
+		const hasContact = Boolean(
+			userProfile?.contact ||
+				userProfile?.phone ||
+				userProfile?.primaryPhone,
+		);
+		return Boolean(hasName && hasContact);
+	}, [userProfile]);
+
+	// ---- Aggregate & Deduplicate Permissions across all Roles & Grants ----
+	const aggregatedPermissions = useMemo(() => {
+		return aggregateAndDeduplicatePermissions(
+			userProfile,
+			allRolesPaged?.items || [],
+		);
+	}, [userProfile, allRolesPaged?.items]);
+
+	const {
+		permissions: allPermissions,
+		totalRawGrants,
+		distinctCount,
+		duplicateCount,
+		rolesSummary,
+	} = aggregatedPermissions;
 
 	// ---- Filter Permissions ------------------------------------
 	const filteredPermissions = useMemo(() => {
-		if (!permissionSearch.trim()) return allPermissions;
-		const query = permissionSearch.toLowerCase();
-		return allPermissions.filter(
-			(p) =>
-				p.name.toLowerCase().includes(query) ||
-				p.module.toLowerCase().includes(query) ||
-				(p.description && p.description.toLowerCase().includes(query)),
-		);
-	}, [allPermissions, permissionSearch]);
+		let list = allPermissions;
+		if (selectedRoleFilter !== "ALL") {
+			if (selectedRoleFilter === "DIRECT") {
+				list = list.filter((p) => p.isDirect);
+			} else {
+				list = list.filter((p) =>
+					p.grantedByRoles.includes(selectedRoleFilter),
+				);
+			}
+		}
+		if (permissionSearch.trim()) {
+			const query = permissionSearch.toLowerCase().trim();
+			list = list.filter(
+				(p) =>
+					p.name.toLowerCase().includes(query) ||
+					p.code.toLowerCase().includes(query) ||
+					p.module.toLowerCase().includes(query) ||
+					p.action.toLowerCase().includes(query) ||
+					(p.description && p.description.toLowerCase().includes(query)) ||
+					p.grantedByRoles.some((r) => r.toLowerCase().includes(query)),
+			);
+		}
+		return list;
+	}, [allPermissions, selectedRoleFilter, permissionSearch]);
 
 	// Group permissions by module
 	const permissionsByModule = useMemo(() => {
@@ -431,6 +822,17 @@ export default function ProfilePage() {
 										{t("profile.superAdminBadge", "Super Admin")}
 									</Badge>
 								)}
+								{!isCompleteSetup && (
+									<Badge
+										variant="outline"
+										onClick={() => setCompleteModalOpen(true)}
+										className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold gap-1 text-[11px] cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors shadow-2xs"
+										title="Click to complete required profile information"
+									>
+										<Sparkles className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+										Setup Incomplete • Complete Now
+									</Badge>
+								)}
 							</div>
 
 							<p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2.5 flex-wrap">
@@ -506,7 +908,7 @@ export default function ProfilePage() {
 								{t("profile.effectiveGrantsCount", "Effective Grants")}
 							</p>
 							<p className="text-xl sm:text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">
-								{allPermissions.length}
+								{distinctCount}
 							</p>
 						</div>
 					</div>
@@ -523,12 +925,6 @@ export default function ProfilePage() {
 						icon={<UserIcon className="h-4 w-4" />}
 					>
 						{t("profile.tabs.personal", "Personal Info")}
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="staff"
-						icon={<Briefcase className="h-4 w-4" />}
-					>
-						{t("profile.tabs.staff", "Staff & HR Profile")}
 					</ModernTabsTrigger>
 					<ModernTabsTrigger
 						value="security"
@@ -560,18 +956,95 @@ export default function ProfilePage() {
 				{/* TAB 1: Personal Info */}
 				{/* ------------------------------------------------------------ */}
 				<ModernTabsContent value="personal">
+					{/* Forced Incomplete Setup Alert Banner */}
+					{!isCompleteSetup && (
+						<div className="mb-6 overflow-hidden rounded-2xl border-2 border-amber-400/80 bg-gradient-to-r from-amber-50 via-orange-50/70 to-amber-50/60 p-5 shadow-sm dark:border-amber-600/70 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-amber-950/20">
+							<div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+								<div className="flex items-start gap-4">
+									<div className="rounded-xl bg-amber-500/20 p-2.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 ring-1 ring-amber-500/30">
+										<ShieldAlert className="h-6 w-6" />
+									</div>
+									<div className="space-y-1">
+										<div className="flex items-center gap-2 flex-wrap">
+											<h3 className="font-bold text-base text-amber-950 dark:text-amber-200">
+												{t(
+													"profile.setupIncompleteTitle",
+													"Profile Setup Incomplete — Action Required",
+												)}
+											</h3>
+											<Badge
+												variant="outline"
+												className="border-amber-400 bg-amber-100 text-amber-800 dark:border-amber-600 dark:bg-amber-900/60 dark:text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-md"
+											>
+												Required
+											</Badge>
+										</div>
+										<p className="text-xs text-amber-900/80 dark:text-amber-300/80 max-w-2xl leading-relaxed">
+											{t(
+												"profile.setupIncompleteDesc",
+												"Your user profile information is incomplete. Please complement and submit your user profile details (names, contact phone number, job role, and address) to activate all system permissions, organization structures, and collaborative tools.",
+											)}
+										</p>
+										<div className="flex items-center gap-2 pt-1 flex-wrap text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+											<span className="flex items-center gap-1">
+												<Phone className="h-3 w-3 text-amber-600" /> Primary Phone
+											</span>
+											<span>•</span>
+											<span className="flex items-center gap-1">
+												<Briefcase className="h-3 w-3 text-amber-600" /> Job Position
+											</span>
+											<span>•</span>
+											<span className="flex items-center gap-1">
+												<MapPin className="h-3 w-3 text-amber-600" /> Location Address
+											</span>
+										</div>
+									</div>
+								</div>
+
+								<div className="shrink-0 w-full md:w-auto flex items-center justify-end">
+									<ModernButton
+										type="button"
+										variant="gradient"
+										size="sm"
+										onClick={() => setCompleteModalOpen(true)}
+										leftIcon={<UserCheck className="h-4 w-4" />}
+										className="shadow-sm w-full md:w-auto font-bold"
+									>
+										{t(
+											"profile.completeSetupButton",
+											"Complete User Profile Information",
+										)}
+									</ModernButton>
+								</div>
+							</div>
+						</div>
+					)}
+
 					<Card className="rounded-2xl border border-slate-200/80 shadow-xs dark:border-slate-800">
 						<CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-5">
-							<CardTitle className="flex items-center gap-2 text-lg text-slate-900 dark:text-white">
-								<UserIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-								{t("profile.personalCard.title", "Personal Information")}
-							</CardTitle>
-							<CardDescription>
-								{t(
-									"profile.personalCard.subtitle",
-									"Update your basic identity, profile avatar, position, and contact details.",
+							<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+								<div>
+									<CardTitle className="flex items-center gap-2 text-lg text-slate-900 dark:text-white">
+										<UserIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+										{t("profile.personalCard.title", "Personal Information")}
+									</CardTitle>
+									<CardDescription>
+										{t(
+											"profile.personalCard.subtitle",
+											"Update your basic identity, profile avatar, position, and contact details.",
+										)}
+									</CardDescription>
+								</div>
+								{!isCompleteSetup && (
+									<Badge
+										variant="outline"
+										className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold gap-1 text-xs shrink-0 cursor-pointer hover:bg-amber-100"
+										onClick={() => setCompleteModalOpen(true)}
+									>
+										<ShieldAlert className="h-3.5 w-3.5 text-amber-600" /> Setup Incomplete
+									</Badge>
 								)}
-							</CardDescription>
+							</div>
 						</CardHeader>
 						<CardContent className="pt-6">
 							<form
@@ -814,213 +1287,6 @@ export default function ProfilePage() {
 					</Card>
 				</ModernTabsContent>
 
-				{/* ------------------------------------------------------------ */}
-				{/* TAB 2: Staff & HR Profile */}
-				{/* ------------------------------------------------------------ */}
-				<ModernTabsContent value="staff">
-					<Card className="rounded-2xl border border-slate-200/80 shadow-xs dark:border-slate-800">
-						<CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-5">
-							<CardTitle className="flex items-center gap-2 text-lg text-slate-900 dark:text-white">
-								<Briefcase className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-								{t(
-									"profile.staffCard.title",
-									"Staff & Human Resources Profile",
-								)}
-							</CardTitle>
-							<CardDescription>
-								{t(
-									"profile.staffCard.subtitle",
-									"Detailed employment records, branch assignment, and emergency contact details.",
-								)}
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="pt-6 space-y-6">
-							{staff || userProfile.employeeCode || userProfile.position ? (
-								<div className="space-y-6">
-									{/* Staff Status Callout */}
-									<div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-4">
-										<UserCheck className="h-6 w-6 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-										<div>
-											<h4 className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">
-												{t(
-													"profile.staffCard.calloutTitle",
-													"Linked HR Staff Profile Active",
-												)}
-											</h4>
-											<p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 leading-relaxed">
-												{t(
-													"profile.staffCard.calloutDesc",
-													"Your user login account is linked to your HR Staff record. Organization structures, department assignments, and branch permissions apply to this record.",
-												)}
-											</p>
-										</div>
-									</div>
-
-									{/* Staff Info Grid */}
-									<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-										<div className="space-y-1 p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30">
-											<span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-												{t("profile.staffCard.fullName", "Full Name")}
-											</span>
-											<p className="font-bold text-sm text-slate-900 dark:text-white">
-												{staff?.name ||
-													`${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim() ||
-													userProfile.username}
-											</p>
-										</div>
-
-										<div className="space-y-1 p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30">
-											<span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-												{t(
-													"profile.staffCard.jobTitle",
-													"Position / Job Title",
-												)}
-											</span>
-											<p className="font-bold text-sm flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-												<Briefcase className="h-4 w-4" />
-												{staff?.position ||
-													userProfile.position ||
-													"Unspecified"}
-											</p>
-										</div>
-
-										<div className="space-y-1 p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30">
-											<span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-												{t("profile.staffCard.employeeCode", "Employee Code")}
-											</span>
-											<p className="font-bold text-sm text-slate-800 dark:text-slate-200 font-mono">
-												{userProfile.employeeCode ||
-													staff?.employeeCode ||
-													"EMP-001"}
-											</p>
-										</div>
-
-										<div className="space-y-1 p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30">
-											<span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-												{t(
-													"profile.staffCard.assignedBranch",
-													"Assigned Branch",
-												)}
-											</span>
-											<p className="font-semibold text-sm flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-												<MapPin className="h-4 w-4 text-blue-500" />
-												{staff?.branchName ||
-													userProfile.branchName ||
-													"Main Branch"}
-											</p>
-										</div>
-
-										<div className="space-y-1 p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30">
-											<span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-												{t("profile.staffCard.department", "Department")}
-											</span>
-											<p className="font-semibold text-sm flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-												<Layers className="h-4 w-4 text-indigo-500" />
-												{userProfile.departmentName ||
-													userProfile.department?.name ||
-													"General Operations"}
-											</p>
-										</div>
-
-										<div className="space-y-1 p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30">
-											<span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-												{t(
-													"profile.staffCard.employmentStatus",
-													"Employment Status",
-												)}
-											</span>
-											<div className="mt-1">
-												<Badge
-													variant="outline"
-													className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 font-bold"
-												>
-													{isUserActive
-														? t(
-																"profile.staffCard.activeEmployee",
-																"Active Employee",
-															)
-														: t(
-																"profile.staffCard.inactiveEmployee",
-																"Inactive",
-															)}
-												</Badge>
-											</div>
-										</div>
-									</div>
-
-									<Separator />
-
-									{/* Urgent / Emergency Contact */}
-									<div className="space-y-3">
-										<h4 className="font-bold text-sm flex items-center gap-2 text-slate-900 dark:text-white">
-											<ShieldAlert className="h-4 w-4 text-amber-500" />
-											{t(
-												"profile.staffCard.emergencyTitle",
-												"Emergency Contact Information",
-											)}
-										</h4>
-										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-											<div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30 space-y-1">
-												<span className="text-xs text-slate-400 font-medium">
-													{t(
-														"profile.staffCard.emergencyName",
-														"Emergency Contact Name",
-													)}
-												</span>
-												<p className="font-semibold text-sm text-slate-800 dark:text-slate-200">
-													{staff?.urgentContactName ||
-														t("profile.staffCard.notProvided", "Not provided")}
-												</p>
-											</div>
-											<div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30 space-y-1">
-												<span className="text-xs text-slate-400 font-medium">
-													{t(
-														"profile.staffCard.emergencyPhone",
-														"Emergency Contact Phone",
-													)}
-												</span>
-												<p className="font-semibold text-sm text-slate-800 dark:text-slate-200">
-													{userProfile.emergencyPhone ||
-														staff?.urgentContactPhone ||
-														t("profile.staffCard.notProvided", "Not provided")}
-												</p>
-											</div>
-										</div>
-									</div>
-								</div>
-							) : (
-								<div className="p-8 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-3">
-									<div className="mx-auto w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
-										<Briefcase className="h-6 w-6" />
-									</div>
-									<h3 className="font-bold text-base text-slate-900 dark:text-white">
-										{t(
-											"profile.staffCard.noStaffTitle",
-											"No HR Staff Record Linked",
-										)}
-									</h3>
-									<p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-										{t(
-											"profile.staffCard.noStaffDesc",
-											"This user account is currently operating as an administrative login without a linked HR Staff record. Administrative users can complete full profile setup to bind employee positions and branch details.",
-										)}
-									</p>
-									<ModernButton
-										variant="gradient"
-										size="sm"
-										onClick={() => setCompleteModalOpen(true)}
-										className="rounded-xl shadow-xs text-xs mt-2"
-									>
-										{t(
-											"profile.staffCard.completeSetup",
-											"Complete Profile Setup",
-										)}
-									</ModernButton>
-								</div>
-							)}
-						</CardContent>
-					</Card>
-				</ModernTabsContent>
 
 				{/* ------------------------------------------------------------ */}
 				{/* TAB 3: Security & Password */}
@@ -1313,29 +1579,57 @@ export default function ProfilePage() {
 							</CardHeader>
 							<CardContent className="pt-4 space-y-3">
 								{userProfile.roles && userProfile.roles.length > 0 ? (
-									userProfile.roles.map((role: any, idx: number) => (
-										<div
-											key={role?.id ?? role?.name ?? `role-${idx}`}
-											className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/40 space-y-1 transition-all hover:bg-slate-100/80 dark:hover:bg-slate-800/60"
-										>
-											<div className="flex items-center justify-between">
-												<span className="font-bold text-xs text-slate-900 dark:text-white">
-													{role.name}
-												</span>
-												<Badge
-													variant="outline"
-													className="text-[9px] px-1.5 py-0 rounded-md border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold"
-												>
-													{t("profile.activeAccount", "Active")}
-												</Badge>
+									userProfile.roles.map((role: any, idx: number) => {
+										const formattedName = formatRoleName(
+											role?.name || role?.displayName || `Role ${idx + 1}`,
+										);
+										const roleSummaryItem = rolesSummary.find(
+											(s) => s.name === formattedName,
+										);
+										const isSelected = selectedRoleFilter === formattedName;
+										return (
+											<div
+												key={role?.id ?? role?.name ?? `role-${idx}`}
+												onClick={() =>
+													setSelectedRoleFilter((prev) =>
+														prev === formattedName ? "ALL" : formattedName,
+													)
+												}
+												className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-1.5 ${
+													isSelected
+														? "border-indigo-400 bg-indigo-50/70 dark:border-indigo-600 dark:bg-indigo-950/40 shadow-xs"
+														: "border-slate-200/80 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/40 hover:bg-slate-100/80 dark:hover:bg-slate-800/60"
+												}`}
+											>
+												<div className="flex items-center justify-between">
+													<span className="font-bold text-xs text-slate-900 dark:text-white">
+														{formattedName}
+													</span>
+													<Badge
+														variant="outline"
+														className="text-[9px] px-1.5 py-0 rounded-md border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold"
+													>
+														{t("profile.activeAccount", "Active")}
+													</Badge>
+												</div>
+												{role.description && (
+													<p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+														{role.description}
+													</p>
+												)}
+												<div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-800/60">
+													<span>
+														{roleSummaryItem
+															? `${roleSummaryItem.count} grants`
+															: "Assigned"}
+													</span>
+													<span className="text-indigo-600 dark:text-indigo-400 font-medium">
+														{isSelected ? "Filtered • Click to clear" : "Click to filter"}
+													</span>
+												</div>
 											</div>
-											{role.description && (
-												<p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-													{role.description}
-												</p>
-											)}
-										</div>
-									))
+										);
+									})
 								) : (
 									<div className="py-6 text-center text-slate-400 space-y-1">
 										<Shield className="h-6 w-6 mx-auto opacity-40" />
@@ -1359,80 +1653,181 @@ export default function ProfilePage() {
 						{/* Permissions Matrix / Browser */}
 						<Card className="rounded-2xl border border-slate-200/80 shadow-xs dark:border-slate-800">
 							<CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
-								<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-									<div>
-										<CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-											<Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-											{t(
-												"profile.permissionsCard.grantsTitle",
-												"Effective Grants & Permissions ({{count}})",
-												{ count: filteredPermissions.length },
-											)}
-										</CardTitle>
-										<CardDescription className="text-xs">
-											{t(
-												"profile.permissionsCard.grantsSubtitle",
-												"Granular API authorities and menu view capabilities active for your session.",
-											)}
-										</CardDescription>
+								<div className="flex flex-col gap-3">
+									<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+										<div>
+											<div className="flex items-center gap-2 flex-wrap">
+												<CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+													<Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+													{t(
+														"profile.permissionsCard.grantsTitle",
+														"Effective Grants & Permissions ({{count}})",
+														{ count: distinctCount },
+													)}
+												</CardTitle>
+												<Badge
+													variant="outline"
+													className="border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold text-[10px] px-2 py-0.5 rounded-md"
+												>
+													{distinctCount} Distinct Grants
+												</Badge>
+												{duplicateCount > 0 && (
+													<Badge
+														variant="outline"
+														className="border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 font-medium text-[10px] px-2 py-0.5 rounded-md gap-1"
+														title={`${duplicateCount} duplicate permissions consolidated into unique grants`}
+													>
+														<Layers className="h-3 w-3 text-indigo-500" />
+														{duplicateCount} duplicates merged
+													</Badge>
+												)}
+											</div>
+											<CardDescription className="text-xs mt-1">
+												{t(
+													"profile.permissionsCard.grantsSubtitle",
+													"Consolidated authorities active across your assigned roles and direct grants.",
+												)}
+											</CardDescription>
+										</div>
+
+										<div className="w-full sm:w-64">
+											<ModernInput
+												placeholder={t(
+													"profile.permissionsCard.searchPlaceholder",
+													"Search permissions or roles...",
+												)}
+												value={permissionSearch}
+												onChange={(e) => setPermissionSearch(e.target.value)}
+												leftIcon={
+													<Search className="h-3.5 w-3.5 text-slate-400" />
+												}
+												inputSize="sm"
+												clearable
+												onClear={() => setPermissionSearch("")}
+											/>
+										</div>
 									</div>
 
-									<div className="w-full sm:w-60">
-										<ModernInput
-											placeholder={t(
-												"profile.permissionsCard.searchPlaceholder",
-												"Search permissions...",
+									{/* Role Filter Pills */}
+									{(rolesSummary.length > 1 || selectedRoleFilter !== "ALL") && (
+										<div className="flex items-center gap-1.5 pt-1 overflow-x-auto scrollbar-none flex-wrap">
+											<span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mr-1">
+												<Filter className="h-3 w-3 text-slate-400" /> Filter:
+											</span>
+											<button
+												type="button"
+												onClick={() => setSelectedRoleFilter("ALL")}
+												className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+													selectedRoleFilter === "ALL"
+														? "bg-indigo-600 text-white shadow-2xs"
+														: "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+												}`}
+											>
+												All Roles ({distinctCount})
+											</button>
+											{rolesSummary.map((rs) => (
+												<button
+													key={rs.name}
+													type="button"
+													onClick={() => setSelectedRoleFilter(rs.name)}
+													className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+														selectedRoleFilter === rs.name
+															? "bg-indigo-600 text-white shadow-2xs"
+															: "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+													}`}
+												>
+													{rs.name} ({rs.count})
+												</button>
+											))}
+											{allPermissions.some((p) => p.isDirect) && (
+												<button
+													type="button"
+													onClick={() => setSelectedRoleFilter("DIRECT")}
+													className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+														selectedRoleFilter === "DIRECT"
+															? "bg-amber-600 text-white shadow-2xs"
+															: "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
+													}`}
+												>
+													Direct Grants
+												</button>
 											)}
-											value={permissionSearch}
-											onChange={(e) => setPermissionSearch(e.target.value)}
-											leftIcon={
-												<Search className="h-3.5 w-3.5 text-slate-400" />
-											}
-											inputSize="sm"
-											clearable
-											onClear={() => setPermissionSearch("")}
-										/>
-									</div>
+										</div>
+									)}
 								</div>
 							</CardHeader>
 							<CardContent className="pt-4">
 								{Object.keys(permissionsByModule).length > 0 ? (
-									<div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin">
+									<div className="space-y-5 max-h-[550px] overflow-y-auto pr-2 scrollbar-thin">
 										{Object.entries(permissionsByModule).map(
 											([moduleName, perms]) => (
-												<div key={moduleName} className="space-y-2">
-													<div className="flex items-center gap-2">
-														<Badge
-															variant="secondary"
-															className="font-bold text-[10px] uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-														>
-															{moduleName}
-														</Badge>
-														<span className="text-[11px] text-slate-400 font-medium">
-															{t(
-																"profile.permissionsCard.grantsCount",
-																"({{count}} grants)",
-																{ count: perms.length },
-															)}
-														</span>
-													</div>
-													<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-														{perms.map((p, pIdx) => (
-															<div
-																key={`${p.id}-${pIdx}`}
-																className="p-2.5 rounded-xl border border-slate-200/60 bg-white/80 dark:border-slate-800/80 dark:bg-slate-900/40 flex items-center justify-between gap-2 shadow-2xs hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+												<div key={moduleName} className="space-y-2.5">
+													<div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800/80">
+														<div className="flex items-center gap-2">
+															<Badge
+																variant="secondary"
+																className="font-bold text-[10px] uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800"
 															>
-																<div className="min-w-0">
-																	<p className="font-semibold text-xs text-slate-800 dark:text-slate-200 truncate">
-																		{p.name}
-																	</p>
-																	{p.description && (
-																		<p className="text-[10px] text-slate-400 truncate">
-																			{p.description}
-																		</p>
+																{moduleName}
+															</Badge>
+															<span className="text-[11px] text-slate-400 font-medium">
+																{perms.length} {perms.length === 1 ? "grant" : "grants"}
+															</span>
+														</div>
+													</div>
+
+													<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+														{perms.map((p) => (
+															<div
+																key={p.code}
+																className="p-3 rounded-xl border border-slate-200/70 bg-white/90 dark:border-slate-800/80 dark:bg-slate-900/50 flex flex-col justify-between gap-2 shadow-2xs hover:border-indigo-300 dark:hover:border-indigo-700 transition-all hover:shadow-xs group"
+															>
+																<div className="flex items-start justify-between gap-2">
+																	<div className="min-w-0 flex-1">
+																		<div className="flex items-center gap-1.5 flex-wrap">
+																			<p className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
+																				{p.name}
+																			</p>
+																			<span className="text-[10px] text-slate-400 font-mono">
+																				{p.code.toLowerCase()}
+																			</span>
+																		</div>
+																		{p.description && (
+																			<p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+																				{p.description}
+																			</p>
+																		)}
+																	</div>
+																	<CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+																</div>
+
+																{/* Role attribution badges */}
+																<div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/60 flex-wrap">
+																	{p.grantedByRoles.length > 1 ? (
+																		<Badge
+																			variant="outline"
+																			className="text-[9px] px-1.5 py-0 rounded font-semibold border-indigo-200 bg-indigo-50/70 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300 gap-1"
+																			title={`Granted by: ${p.grantedByRoles.join(", ")}`}
+																		>
+																			<Users className="h-2.5 w-2.5 text-indigo-500" />
+																			<span>{p.grantedByRoles.length} Roles: {p.grantedByRoles.join(", ")}</span>
+																		</Badge>
+																	) : p.grantedByRoles.length === 1 ? (
+																		<span className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
+																			<Shield className="h-2.5 w-2.5 text-slate-400 shrink-0" />
+																			<span className="truncate">Via {p.grantedByRoles[0]}</span>
+																		</span>
+																	) : null}
+
+																	{p.isDirect && (
+																		<Badge
+																			variant="outline"
+																			className="text-[9px] px-1.5 py-0 rounded font-semibold border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+																		>
+																			Direct Grant
+																		</Badge>
 																	)}
 																</div>
-																<Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
 															</div>
 														))}
 													</div>
@@ -1441,15 +1836,35 @@ export default function ProfilePage() {
 										)}
 									</div>
 								) : (
-									<div className="py-12 text-center text-slate-400 space-y-2">
-										<Search className="h-6 w-6 mx-auto opacity-40" />
-										<p className="text-xs font-semibold">
-											{t(
-												"profile.permissionsCard.noMatch",
-												'No permissions match "{{query}}"',
-												{ query: permissionSearch },
-											)}
-										</p>
+									<div className="py-12 text-center text-slate-400 space-y-3">
+										<Search className="h-8 w-8 mx-auto opacity-40 text-slate-400" />
+										<div className="space-y-1">
+											<p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+												{permissionSearch
+													? t(
+															"profile.permissionsCard.noMatch",
+															'No permissions match "{{query}}"',
+															{ query: permissionSearch },
+														)
+													: "No permissions match current role filter"}
+											</p>
+											<p className="text-[11px] text-slate-400">
+												Try adjusting your search terms or selecting &quot;All Roles&quot;.
+											</p>
+										</div>
+										{(permissionSearch || selectedRoleFilter !== "ALL") && (
+											<ModernButton
+												variant="outline"
+												size="sm"
+												onClick={() => {
+													setPermissionSearch("");
+													setSelectedRoleFilter("ALL");
+												}}
+												className="text-xs h-8"
+											>
+												Reset Filters
+											</ModernButton>
+										)}
 									</div>
 								)}
 							</CardContent>

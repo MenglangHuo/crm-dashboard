@@ -249,6 +249,10 @@ export function CompleteProfileModal({
 		mutationFn: profileApi.completeSetup,
 		onSuccess: () => {
 			toast.success("Profile setup completed successfully!");
+			if (typeof window !== "undefined") {
+				localStorage.setItem("crm_is_complete_setup", "true");
+				document.cookie = `crm_is_complete_setup=true; path=/; max-age=604800; SameSite=Lax`;
+			}
 			queryClient.invalidateQueries({ queryKey: ["profile"] });
 			queryClient.invalidateQueries({ queryKey: ["current-user"] });
 			queryClient.invalidateQueries({ queryKey: ["auth-me"] });

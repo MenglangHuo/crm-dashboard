@@ -85,6 +85,7 @@ export interface Company {
 	enableBranch?: boolean;
 	active?: boolean;
 	isActive?: boolean;
+	deleted?: boolean;
 	deletedAt?: string | null;
 	createdAt: string;
 	updatedAt?: string | null;
@@ -92,6 +93,16 @@ export interface Company {
 	branchCount?: number;
 	staffCount?: number;
 	userCount?: number;
+}
+
+export interface CompanyStats {
+	totalCompanies: number;
+	activeCompanies: number;
+	trialCompanies: number;
+	paidCompanies: number;
+	deletedCompanies: number;
+	multiBranchCount: number;
+	geoTaggedCount: number;
 }
 
 export interface RegisterCompanyPayload {
@@ -269,6 +280,7 @@ export interface User {
 	description?: string | null;
 	address?: string | null;
 	dob?: string | null;
+	isCompleteSetup?: boolean;
 	isCompletedSetup?: boolean;
 	completedSetup?: boolean;
 	pinSet?: boolean;
@@ -363,6 +375,8 @@ export interface SignInResponse {
 	user?: UserProfile;
 	passwordResetRequired?: boolean;
 	passwordResetToken?: string;
+	isCompleteSetup?: boolean;
+	isCompletedSetup?: boolean;
 }
 
 export interface UploadUrlResponse {

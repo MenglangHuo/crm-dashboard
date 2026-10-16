@@ -678,7 +678,7 @@ export default function RegisterCompanyPage() {
 												</label>
 												<div className="relative">
 													<ModernInput
-														type={showPassword ? "text" : "password"}
+														// type={showPassword ? "text" : "password"}
 														placeholder="e.g. Bron@123"
 														autoComplete="new-password"
 														{...register("adminPassword")}
@@ -712,7 +712,7 @@ export default function RegisterCompanyPage() {
 												</label>
 												<div className="relative">
 													<ModernInput
-														type={showConfirmPassword ? "text" : "password"}
+														// type={showConfirmPassword ? "text" : "password"}
 														placeholder="Repeat password"
 														autoComplete="new-password"
 														{...register("confirmPassword")}

@@ -26,18 +26,17 @@ import {
 	Moon,
 	ArrowUpRight,
 	Check,
+	ShieldUser,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { LanguageSwitcher } from "@/components/header/language-switcher";
 import { useTranslation } from "@/lib/i18n/context";
 
 const formSchema = z.object({
 	username: z.string().min(1, "Username or email is required"),
 	password: z.string().min(1, "Password is required"),
-	rememberMe: z.boolean().optional(),
 });
 
 const demoAccounts = [
@@ -80,137 +79,22 @@ function getSafeReturnUrl(value: string | null) {
 }
 
 /**
- * Modern AI Bot Agent Logo Emblem
+ * Modern Security Guard Protection Logo Emblem
  */
-function BotAgentLogo({ className = "h-16 w-16" }: { className?: string }) {
+function SecurityGuardEmblem({ className = "h-14 w-14 sm:h-16 sm:w-16" }: { className?: string }) {
 	return (
-		<div className="group/bot relative flex items-center justify-center">
+		<div className="group/security relative flex items-center justify-center">
 			{/* Ambient glowing aura */}
-			<div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-indigo-600 opacity-30 blur-xl transition-all duration-500 group-hover/bot:opacity-60 group-hover/bot:blur-2xl" />
+			<div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-indigo-600 opacity-40 blur-xl transition-all duration-500 group-hover/security:opacity-60 group-hover/security:blur-2xl" />
 
-			<svg
-				className={`${className} relative transform drop-shadow-lg transition-all duration-300 group-hover/bot:scale-105`}
-				viewBox="0 0 100 100"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
+			<div
+				className={`${className} relative flex items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-500 via-indigo-600 to-blue-700 p-3 shadow-xl shadow-blue-500/30 border border-white/25 overflow-hidden transition-all duration-300 group-hover/security:scale-105`}
 			>
-				<defs>
-					<linearGradient id="botBg" x1="0%" y1="0%" x2="100%" y2="100%">
-						<stop offset="0%" stopColor="#1e3a8a" />
-						<stop offset="50%" stopColor="#1d4ed8" />
-						<stop offset="100%" stopColor="#0f172a" />
-					</linearGradient>
-					<linearGradient id="botHelmet" x1="0%" y1="0%" x2="0%" y2="100%">
-						<stop offset="0%" stopColor="#ffffff" />
-						<stop offset="100%" stopColor="#cbd5e1" />
-					</linearGradient>
-					<linearGradient id="botVisor" x1="0%" y1="0%" x2="0%" y2="100%">
-						<stop offset="0%" stopColor="#090d16" />
-						<stop offset="100%" stopColor="#0f172a" />
-					</linearGradient>
-					<linearGradient id="botEyeGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-						<stop offset="0%" stopColor="#38bdf8" />
-						<stop offset="100%" stopColor="#2563eb" />
-					</linearGradient>
-					<linearGradient id="botEar" x1="0%" y1="0%" x2="0%" y2="100%">
-						<stop offset="0%" stopColor="#3b82f6" />
-						<stop offset="100%" stopColor="#1d4ed8" />
-					</linearGradient>
-					<linearGradient id="botGlass" x1="0%" y1="0%" x2="0%" y2="100%">
-						<stop offset="0%" stopColor="#ffffff" stopOpacity="0.4" />
-						<stop offset="100%" stopColor="#ffffff" stopOpacity="0.05" />
-					</linearGradient>
-					<filter id="botGlow" x="-20%" y="-20%" width="140%" height="140%">
-						<feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#38bdf8" floodOpacity="0.6" />
-					</filter>
-				</defs>
-
-				{/* Rounded Squircle Container */}
-				<rect
-					x="4"
-					y="4"
-					width="92"
-					height="92"
-					rx="26"
-					fill="url(#botBg)"
-					stroke="rgba(255, 255, 255, 0.2)"
-					strokeWidth="2"
-				/>
-
 				{/* Glass Specular Curved Reflection */}
-				<rect
-					x="6"
-					y="6"
-					width="88"
-					height="44"
-					rx="24"
-					fill="url(#botGlass)"
-				/>
+				<div className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-[22px]" />
 
-				{/* Top Antenna / Signal Emitter */}
-				<line x1="50" y1="14" x2="50" y2="24" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round" />
-				<circle cx="50" cy="14" r="4" fill="#38bdf8" filter="url(#botGlow)" />
-				<circle cx="50" cy="14" r="2" fill="#ffffff" />
-
-				{/* Side Ears / Audio Sensor Nodes */}
-				<rect x="18" y="42" width="6" height="18" rx="3" fill="url(#botEar)" />
-				<circle cx="21" cy="51" r="1.5" fill="#38bdf8" />
-				<rect x="76" y="42" width="6" height="18" rx="3" fill="url(#botEar)" />
-				<circle cx="79" cy="51" r="1.5" fill="#38bdf8" />
-
-				{/* Bot Head Helmet Outer Shell */}
-				<rect
-					x="22"
-					y="24"
-					width="56"
-					height="52"
-					rx="18"
-					fill="url(#botHelmet)"
-					stroke="#94a3b8"
-					strokeWidth="1.5"
-				/>
-
-				{/* Inner Visor Face Screen */}
-				<rect
-					x="27"
-					y="31"
-					width="46"
-					height="34"
-					rx="12"
-					fill="url(#botVisor)"
-					stroke="#1e293b"
-					strokeWidth="1.5"
-				/>
-
-				{/* Subtle Visor Reflection Line */}
-				<path
-					d="M31 34 Q50 38 69 34"
-					stroke="#ffffff"
-					strokeWidth="1.2"
-					strokeOpacity="0.25"
-					strokeLinecap="round"
-					fill="none"
-				/>
-
-				{/* Glowing Bot Agent Eyes (Expressive Capsule Eyes) */}
-				<g filter="url(#botGlow)">
-					{/* Left Eye */}
-					<rect x="34" y="41" width="11" height="9" rx="4.5" fill="url(#botEyeGlow)" />
-					<circle cx="37" cy="44" r="1.5" fill="#ffffff" />
-
-					{/* Right Eye */}
-					<rect x="55" y="41" width="11" height="9" rx="4.5" fill="url(#botEyeGlow)" />
-					<circle cx="58" cy="44" r="1.5" fill="#ffffff" />
-				</g>
-
-				{/* Friendly Smart Status Micro-Dots */}
-				<circle cx="46" cy="56" r="1" fill="#38bdf8" opacity="0.8" />
-				<circle cx="50" cy="56" r="1" fill="#38bdf8" />
-				<circle cx="54" cy="56" r="1" fill="#38bdf8" opacity="0.8" />
-
-				{/* Bottom Chin Accent Plate */}
-				<rect x="42" y="70" width="16" height="3" rx="1.5" fill="#64748b" />
-			</svg>
+				<ShieldUser className="relative z-10 h-7 w-7 sm:h-8 sm:w-8 text-white drop-shadow-md stroke-[2.2]" />
+			</div>
 		</div>
 	);
 }
@@ -266,7 +150,6 @@ function SignInForm() {
 		defaultValues: {
 			username: queryUsername || "",
 			password: "",
-			rememberMe: true,
 		},
 	});
 
@@ -348,6 +231,28 @@ function SignInForm() {
 						document.cookie = `crm_company_id=${encodeURIComponent(companyId)}; path=/; max-age=2592000; SameSite=Lax`;
 						localStorage.setItem("crm_company_id", String(companyId));
 					}
+					const isCompleteVal =
+						response?.isCompleteSetup ??
+						response?.data?.isCompleteSetup ??
+						response?.user?.isCompleteSetup ??
+						response?.data?.user?.isCompleteSetup ??
+						response?.isCompletedSetup ??
+						response?.data?.isCompletedSetup ??
+						response?.user?.isCompletedSetup ??
+						response?.data?.user?.isCompletedSetup ??
+						response?.completedSetup ??
+						response?.data?.completedSetup ??
+						response?.user?.completedSetup;
+					if (isCompleteVal !== undefined) {
+						document.cookie = `crm_is_complete_setup=${encodeURIComponent(String(isCompleteVal))}; path=/; max-age=604800; SameSite=Lax`;
+						localStorage.setItem("crm_is_complete_setup", String(isCompleteVal));
+					}
+					const userData = response?.user || response?.data?.user;
+					if (userData) {
+						try {
+							localStorage.setItem("crm_user_profile", JSON.stringify(userData));
+						} catch {}
+					}
 				}
 				await setAuthCookies(token, refreshToken, companyId);
 				toast.success("Authentication successful! Welcome back.");
@@ -364,7 +269,7 @@ function SignInForm() {
 	}
 
 	return (
-		<main className="fixed inset-0 h-screen w-screen overflow-hidden flex flex-col justify-between items-center p-3 sm:p-4 bg-slate-50 dark:bg-slate-950 selection:bg-blue-600 selection:text-white">
+		<main className="min-h-screen w-full flex flex-col justify-between items-center p-3 sm:p-4 bg-slate-50 dark:bg-slate-950 selection:bg-blue-600 selection:text-white overflow-x-hidden">
 			{/* Ambient background glow elements */}
 			<div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-gradient-to-b from-blue-500/15 via-indigo-500/10 to-transparent blur-3xl dark:from-blue-600/15 dark:via-indigo-600/10" />
 			<div className="pointer-events-none absolute -bottom-40 right-10 h-[400px] w-[500px] rounded-full bg-cyan-500/10 blur-3xl dark:bg-cyan-500/5" />
@@ -389,12 +294,12 @@ function SignInForm() {
 				</div>
 			</header>
 
-			{/* Centered Elevated Sign-In Card: exactly 80vh, wider max-w-[490px], fits perfectly */}
-			<section className="relative z-10 flex flex-1 items-center justify-center w-full my-auto py-1">
-				<div className="w-full max-w-[490px] h-[80vh] max-h-[720px] min-h-[560px] flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white/95 p-6 sm:p-7 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl transition-all dark:border-slate-800/80 dark:bg-slate-900/95 dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-					{/* Top Header: Bot Agent Logo & Title */}
+			{/* Centered Elevated Sign-In Card: 75% height of screen with spacious proportional width */}
+			<section className="relative z-10 flex flex-1 items-center justify-center w-full my-auto py-2">
+				<div className="h-[75vh] max-h-[750px] min-h-[530px] w-full max-w-[480px] sm:max-w-[500px] rounded-3xl border border-slate-200/80 bg-white/95 p-6 sm:p-8 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl flex flex-col justify-between transition-all dark:border-slate-800/80 dark:bg-slate-900/95 dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+					{/* Top Header: Security Guard Emblem & Title */}
 					<div className="flex flex-col items-center text-center shrink-0">
-						<BotAgentLogo className="h-14 w-14 sm:h-16 sm:w-16" />
+						<SecurityGuardEmblem className="h-14 w-14 sm:h-16 sm:w-16" />
 						<h1 className="mt-2.5 font-heading text-2xl font-bold tracking-tight text-slate-900 sm:text-[25px] dark:text-white leading-tight">
 							{t("auth.signInTitle", "Welcome back")}
 						</h1>
@@ -403,9 +308,9 @@ function SignInForm() {
 						</p>
 					</div>
 
-					{/* 1-Click Quick Demo Access: Compact, user-only, NO description */}
-					<div className="my-2 rounded-2xl border border-slate-100 bg-slate-50/80 p-1.5 dark:border-slate-800/80 dark:bg-slate-950/40 shrink-0">
-						<div className="mb-1 flex items-center justify-between px-1">
+					{/* 1-Click Quick Demo Access: Clean & Spacious */}
+					<div className="my-1 rounded-2xl border border-slate-100 bg-slate-50/80 p-2 dark:border-slate-800/80 dark:bg-slate-950/40 shrink-0">
+						<div className="mb-1.5 flex items-center justify-between px-1">
 							<span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
 								<Sparkles className="h-3 w-3 text-blue-600 dark:text-blue-400" />
 								{t("auth.quickDemoAccess", "Quick Demo Access")}
@@ -414,7 +319,7 @@ function SignInForm() {
 								{t("auth.oneClickAutoFill", "1-Click Auto Fill")}
 							</span>
 						</div>
-						<div className="grid grid-cols-2 gap-1.5">
+						<div className="grid grid-cols-2 gap-2">
 							{demoAccounts.map((acc) => {
 								const Icon = acc.icon;
 								const isSelected = selectedDemo === acc.username;
@@ -427,7 +332,7 @@ function SignInForm() {
 										key={acc.username}
 										type="button"
 										onClick={() => fillDemoAccount(acc)}
-										className={`group relative flex h-9 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-all duration-200 cursor-pointer ${
+										className={`group relative flex h-9.5 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-all duration-200 cursor-pointer ${
 											isSelected
 												? "border-blue-500 bg-blue-50/90 text-blue-900 shadow-xs ring-2 ring-blue-500/20 dark:border-blue-500/80 dark:bg-blue-950/40 dark:text-blue-100"
 												: "border-slate-200/80 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/80"
@@ -453,11 +358,11 @@ function SignInForm() {
 					{/* Sign In Form */}
 					<form
 						onSubmit={form.handleSubmit(onSubmit)}
-						className="space-y-3 shrink-0"
+						className="space-y-3 sm:space-y-3.5 shrink-0"
 						noValidate
 					>
 						{/* Username / Email Input */}
-						<div className="space-y-1">
+						<div className="space-y-1.5">
 							<label
 								htmlFor="username"
 								className="text-xs font-semibold text-slate-700 dark:text-slate-300"
@@ -466,7 +371,7 @@ function SignInForm() {
 							</label>
 							<div className="relative group/field">
 								<div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors group-focus-within/field:text-blue-600 dark:group-focus-within/field:text-blue-400">
-									<Mail className="h-4 w-4" />
+									<Mail className="h-4.5 w-4.5" />
 								</div>
 								<Input
 									id="username"
@@ -480,7 +385,7 @@ function SignInForm() {
 										"bronx@dmin or your.email@company.com",
 									)}
 									{...form.register("username")}
-									className="h-10 rounded-xl border-slate-200/90 bg-slate-50/50 pl-10 pr-3 text-xs text-slate-900 transition-all placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-600/10 dark:border-slate-800 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-950"
+									className="h-11 sm:h-12 rounded-xl border-slate-200/90 bg-slate-50/50 pl-11 pr-4 text-sm text-slate-900 transition-all placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-600/10 dark:border-slate-800 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-950"
 								/>
 							</div>
 							{form.formState.errors.username && (
@@ -491,7 +396,7 @@ function SignInForm() {
 						</div>
 
 						{/* Password Input */}
-						<div className="space-y-1">
+						<div className="space-y-1.5">
 							<div className="flex items-center justify-between">
 								<label
 									htmlFor="password"
@@ -508,7 +413,7 @@ function SignInForm() {
 							</div>
 							<div className="relative group/field">
 								<div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors group-focus-within/field:text-blue-600 dark:group-focus-within/field:text-blue-400">
-									<Lock className="h-4 w-4" />
+									<Lock className="h-4.5 w-4.5" />
 								</div>
 								<Input
 									id="password"
@@ -517,19 +422,19 @@ function SignInForm() {
 									required
 									placeholder={t("auth.passwordPlaceholder", "••••••••••••")}
 									{...form.register("password")}
-									className="h-10 rounded-xl border-slate-200/90 bg-slate-50/50 pl-10 pr-10 text-xs text-slate-900 transition-all placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-600/10 dark:border-slate-800 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-950"
+									className="h-11 sm:h-12 rounded-xl border-slate-200/90 bg-slate-50/50 pl-11 pr-11 text-sm text-slate-900 transition-all placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-600/10 dark:border-slate-800 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-950"
 								/>
 								<button
 									type="button"
 									onClick={() => setShowPassword(!showPassword)}
-									className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer"
+									className="absolute right-2.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer"
 									aria-label={showPassword ? "Hide password" : "Show password"}
 									aria-pressed={showPassword}
 								>
 									{showPassword ? (
-										<EyeOff className="h-4 w-4" />
+										<EyeOff className="h-4.5 w-4.5" />
 									) : (
-										<Eye className="h-4 w-4" />
+										<Eye className="h-4.5 w-4.5" />
 									)}
 								</button>
 							</div>
@@ -540,40 +445,28 @@ function SignInForm() {
 							)}
 						</div>
 
-						{/* Remember Me Checkbox */}
-						<div className="flex items-center pt-0.5">
-							<label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-600 select-none dark:text-slate-400">
-								<Checkbox
-									id="rememberMe"
-									defaultChecked
-									className="rounded-md border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-								/>
-								<span>{t("auth.rememberMeDevice", "Remember me on this device")}</span>
-							</label>
-						</div>
-
 						{/* Primary Sign In Button */}
 						<Button
 							type="submit"
-							className="group relative mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-xs font-bold text-white shadow-lg shadow-blue-600/25 transition-all duration-200 hover:from-blue-500 hover:to-indigo-500 hover:shadow-xl hover:shadow-blue-600/35 hover:scale-[1.008] active:scale-[0.99] disabled:opacity-70 disabled:pointer-events-none cursor-pointer"
+							className="group relative mt-1 flex h-11 sm:h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all duration-200 hover:from-blue-500 hover:to-indigo-500 hover:shadow-xl hover:shadow-blue-600/35 hover:scale-[1.008] active:scale-[0.99] disabled:opacity-70 disabled:pointer-events-none cursor-pointer"
 							disabled={isLoading}
 						>
 							{isLoading ? (
 								<span className="flex items-center gap-2">
-									<Loader2 className="h-4 w-4 animate-spin" />
+									<Loader2 className="h-4.5 w-4.5 animate-spin" />
 									{t("auth.signingIn", "Signing In...")}
 								</span>
 							) : (
 								<span className="flex items-center justify-center gap-2">
 									<span>{t("auth.signInButton", "Sign In to Dashboard")}</span>
-									<ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+									<ArrowRight className="h-4.5 w-4.5 transition-transform duration-200 group-hover:translate-x-0.5" />
 								</span>
 							)}
 						</Button>
 					</form>
 
 					{/* Card Footer: Register Organization Link & Security Badge */}
-					<div className="border-t border-slate-100 pt-2.5 text-center dark:border-slate-800 shrink-0 space-y-2">
+					<div className="border-t border-slate-100 pt-2.5 text-center dark:border-slate-800 shrink-0 space-y-1.5">
 						<p className="text-xs text-slate-500 dark:text-slate-400">
 							{t("auth.needOnboard", "Need to onboard a new organization?")}{" "}
 							<Link

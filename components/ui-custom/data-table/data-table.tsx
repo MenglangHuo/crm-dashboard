@@ -2021,25 +2021,55 @@ export function DataTable<T extends Record<string, any>>({
 					{/* Page size selector & entry counter */}
 					<div className="flex items-center gap-4 text-muted-foreground w-full sm:w-auto justify-between sm:justify-start">
 						<div className="flex items-center gap-2">
-							<span>{t("common.rowsPerPage", "Rows per page:")}</span>
-							<select
-								value={pageSize}
-								onChange={(e) => {
-									const size = Number(e.target.value);
-									if (onPageSizeChange) onPageSizeChange(size);
-									else setUncontrolledPageSize(size);
+							<span className="text-xs text-muted-foreground font-medium">
+								{t("common.rowsPerPage", "Rows per page:")}
+							</span>
+							<DropdownMenu>
+								<DropdownMenuTrigger
+									render={
+										<Button
+											variant="outline"
+											size="sm"
+											className="h-8 min-w-[62px] px-2.5 text-xs font-semibold rounded-lg border-border bg-background hover:bg-muted text-foreground gap-1.5 shadow-2xs transition-all cursor-pointer focus-visible:ring-1 focus-visible:ring-primary"
+										>
+											<span>{pageSize}</span>
+											<ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200" />
+										</Button>
+									}
+								/>
+								<DropdownMenuContent
+									align="start"
+									side="top"
+									className="min-w-[80px] p-1 shadow-xl rounded-xl border-border bg-popover"
+								>
+									{pageSizeOptions.map((opt) => {
+										const isSelected = pageSize === opt;
+										return (
+											<DropdownMenuItem
+												key={opt}
+												onClick={() => {
+													if (onPageSizeChange) onPageSizeChange(opt);
+													else setUncontrolledPageSize(opt);
 
-									if (onPageChange) onPageChange(1);
-									else setUncontrolledPage(1);
-								}}
-								className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium focus:ring-1 focus:ring-primary"
-							>
-								{pageSizeOptions.map((opt) => (
-									<option key={opt} value={opt}>
-										{opt}
-									</option>
-								))}
-							</select>
+													if (onPageChange) onPageChange(1);
+													else setUncontrolledPage(1);
+												}}
+												className={cn(
+													"flex items-center justify-between px-2.5 py-1.5 text-xs font-medium rounded-lg cursor-pointer transition-colors",
+													isSelected
+														? "bg-primary/10 text-primary font-bold"
+														: "text-foreground hover:bg-muted",
+												)}
+											>
+												<span>{opt}</span>
+												{isSelected && (
+													<Check className="h-3.5 w-3.5 text-primary shrink-0" />
+												)}
+											</DropdownMenuItem>
+										);
+									})}
+								</DropdownMenuContent>
+							</DropdownMenu>
 						</div>
 
 						<span>

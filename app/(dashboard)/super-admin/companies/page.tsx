@@ -66,6 +66,7 @@ import {
 	ModernTabsTrigger,
 } from "@/components/ui-custom/modern-tabs";
 import { useTranslation } from "@/lib/i18n/context";
+import { ModernButton } from "@/components/ui-custom/button";
 
 // Form validation schema
 const companyFormSchema = z.object({
@@ -104,7 +105,7 @@ export default function CompaniesPage() {
 	const [togglingId, setTogglingId] = useState<string | number | null>(null);
 	const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-	// Fetch Companies List
+	// Fetch Companies List with status filter
 	const { data, isLoading, refetch, isRefetching } = useQuery({
 		queryKey: [
 			"companies",
@@ -115,10 +116,18 @@ export default function CompaniesPage() {
 				page,
 				limit: pageSize,
 				search,
+				status: statusFilter,
+				statusFilter,
 				includeDeleted: true,
 				sortBy,
 				orderBy,
 			}),
+	});
+
+	// Fetch aggregate statistics for metrics cards and tab badges
+	const { data: statsData, refetch: refetchStats } = useQuery({
+		queryKey: ["companies-stats"],
+		queryFn: () => companiesApi.stats(),
 	});
 
 	// Fetch detailed info for viewing modal
@@ -197,6 +206,7 @@ export default function CompaniesPage() {
 					: "Company created successfully",
 			);
 			queryClient.invalidateQueries({ queryKey: ["companies"] });
+			queryClient.invalidateQueries({ queryKey: ["companies-stats"] });
 			setIsCreateOpen(false);
 			createForm.reset();
 		},
@@ -234,6 +244,7 @@ export default function CompaniesPage() {
 					: "Company updated successfully",
 			);
 			queryClient.invalidateQueries({ queryKey: ["companies"] });
+			queryClient.invalidateQueries({ queryKey: ["companies-stats"] });
 			if (viewingCompany && String(viewingCompany.id) === String(res?.id)) {
 				setViewingCompany(res);
 			}
@@ -248,6 +259,7 @@ export default function CompaniesPage() {
 		onSuccess: () => {
 			toast.success("Company marked as inactive / soft-deleted");
 			queryClient.invalidateQueries({ queryKey: ["companies"] });
+			queryClient.invalidateQueries({ queryKey: ["companies-stats"] });
 			if (viewingCompany) setViewingCompany(null);
 		},
 		onError: (error) => toast.error(getErrorMessage(error)),
@@ -258,6 +270,7 @@ export default function CompaniesPage() {
 		onSuccess: () => {
 			toast.success("Company restored and reactivated");
 			queryClient.invalidateQueries({ queryKey: ["companies"] });
+			queryClient.invalidateQueries({ queryKey: ["companies-stats"] });
 			if (viewingCompany) setViewingCompany(null);
 		},
 		onError: (error) => toast.error(getErrorMessage(error)),
@@ -275,6 +288,7 @@ export default function CompaniesPage() {
 		onSuccess: (res) => {
 			toast.success(`Company "${res.name}" active status updated`);
 			queryClient.invalidateQueries({ queryKey: ["companies"] });
+			queryClient.invalidateQueries({ queryKey: ["companies-stats"] });
 			if (viewingCompany && String(viewingCompany.id) === String(res?.id)) {
 				setViewingCompany(res);
 			}
@@ -536,16 +550,18 @@ export default function CompaniesPage() {
 	const companiesList = data?.items || [];
 	const totalCompanies = data?.total || 0;
 
-	// Filtered list based on statusFilter tab
+	// Filtered list based on statusFilter tab (matches server filtering logic)
 	const displayCompanies = useMemo(() => {
 		if (statusFilter === "ALL") return companiesList;
 		if (statusFilter === "ACTIVE")
-			return companiesList.filter((c) => c.active && !c.deletedAt);
+			return companiesList.filter((c) => c.active !== false && !c.deletedAt && !c.deleted);
 		if (statusFilter === "TRIAL")
 			return companiesList.filter(
 				(c) =>
 					(c.subscription?.status || "").toUpperCase() === "TRIAL" ||
-					(c.subscription?.billingCycle || "").toUpperCase() === "FREE_TIER",
+					(c.subscription?.billingCycle || "").toUpperCase() === "FREE_TIER" ||
+					c.subscription?.planPrice === 0 ||
+					!c.subscription,
 			);
 		if (statusFilter === "PAID")
 			return companiesList.filter(
@@ -554,30 +570,64 @@ export default function CompaniesPage() {
 					(c.subscription?.status || "").toUpperCase() === "ACTIVE",
 			);
 		if (statusFilter === "DELETED")
-			return companiesList.filter((c) => c.deletedAt || !c.active);
+			return companiesList.filter((c) => c.deletedAt || c.deleted || c.active === false);
 		return companiesList;
 	}, [companiesList, statusFilter]);
 
-	const activeCompaniesCount = companiesList.filter(
-		(c) => c.active && !c.deletedAt,
-	).length;
-	const trialCompaniesCount = companiesList.filter(
-		(c) =>
-			(c.subscription?.status || "").toUpperCase() === "TRIAL" ||
-			(c.subscription?.billingCycle || "").toUpperCase() === "FREE_TIER",
-	).length;
-	const paidCompaniesCount = companiesList.filter(
-		(c) =>
-			(c.subscription?.planPrice || 0) > 0 &&
-			(c.subscription?.status || "").toUpperCase() === "ACTIVE",
-	).length;
-	const deletedCompaniesCount = companiesList.filter(
-		(c) => c.deletedAt || !c.active,
-	).length;
-	const multiBranchCount = companiesList.filter((c) => c.enableBranch).length;
-	const geoTaggedCount = companiesList.filter(
-		(c) => typeof c.lat === "number" && typeof c.lng === "number",
-	).length;
+	// Use backend statsData if available, otherwise compute from local list
+	const totalCompaniesCount = statsData?.totalCompanies ?? totalCompanies;
+	const activeCompaniesCount =
+		statsData?.activeCompanies ??
+		companiesList.filter((c) => c.active !== false && !c.deletedAt && !c.deleted).length;
+	const trialCompaniesCount =
+		statsData?.trialCompanies ??
+		companiesList.filter(
+			(c) =>
+				(c.subscription?.status || "").toUpperCase() === "TRIAL" ||
+				(c.subscription?.billingCycle || "").toUpperCase() === "FREE_TIER" ||
+				c.subscription?.planPrice === 0 ||
+				!c.subscription,
+		).length;
+	const paidCompaniesCount =
+		statsData?.paidCompanies ??
+		companiesList.filter(
+			(c) =>
+				(c.subscription?.planPrice || 0) > 0 &&
+				(c.subscription?.status || "").toUpperCase() === "ACTIVE",
+		).length;
+	const deletedCompaniesCount =
+		statsData?.deletedCompanies ??
+		companiesList.filter((c) => c.deletedAt || c.deleted || c.active === false).length;
+	const multiBranchCount =
+		statsData?.multiBranchCount ??
+		companiesList.filter((c) => c.enableBranch).length;
+	const geoTaggedCount =
+		statsData?.geoTaggedCount ??
+		companiesList.filter(
+			(c) => typeof c.lat === "number" && typeof c.lng === "number",
+		).length;
+
+	// Total count for table pagination
+	const effectiveTableTotal = useMemo(() => {
+		if (data?.total !== undefined) {
+			return data.total;
+		}
+		if (statusFilter === "ALL") return totalCompaniesCount;
+		if (statusFilter === "ACTIVE") return activeCompaniesCount;
+		if (statusFilter === "TRIAL") return trialCompaniesCount;
+		if (statusFilter === "PAID") return paidCompaniesCount;
+		if (statusFilter === "DELETED") return deletedCompaniesCount;
+		return displayCompanies.length;
+	}, [
+		data?.total,
+		statusFilter,
+		totalCompaniesCount,
+		activeCompaniesCount,
+		trialCompaniesCount,
+		paidCompaniesCount,
+		deletedCompaniesCount,
+		displayCompanies.length,
+	]);
 
 	// Table Columns Definition
 	const columns: ColumnDef<Company>[] = [
@@ -907,29 +957,6 @@ export default function CompaniesPage() {
 						)}
 					</p>
 				</div>
-
-				<div className="flex items-center gap-2.5">
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => refetch()}
-						disabled={isRefetching}
-						className="rounded-xl text-xs font-semibold gap-1.5 border-slate-200 dark:border-slate-800"
-					>
-						<RefreshCw
-							className={`h-3.5 w-3.5 ${isRefetching ? "animate-spin text-purple-600" : "text-slate-500"}`}
-						/>
-						<span>{t("superAdmin.companies.syncData", "Sync Data")}</span>
-					</Button>
-
-					<Button
-						onClick={openCreateModal}
-						className="rounded-xl px-4 py-2 text-xs font-bold gap-2 shadow-sm shadow-primary/20"
-					>
-						<Plus className="h-4 w-4" />
-						<span>{t("superAdmin.companies.addCompany", "Add Company")}</span>
-					</Button>
-				</div>
 			</div>
 
 			{/* Overview Metric Cards */}
@@ -941,7 +968,7 @@ export default function CompaniesPage() {
 								{t("superAdmin.companies.totalCompanies", "Total Companies")}
 							</p>
 							<h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-								{totalCompanies}
+								{totalCompaniesCount}
 							</h3>
 							<p className="text-[11px] text-slate-500 mt-0.5">
 								{t(
@@ -1039,7 +1066,7 @@ export default function CompaniesPage() {
 				<ModernTabsList variant="pills" size="sm">
 					<ModernTabsTrigger
 						value="ALL"
-						badge={totalCompanies}
+						badge={totalCompaniesCount}
 						badgeColor="purple"
 						icon={<Building2 className="h-3.5 w-3.5" />}
 					>
@@ -1085,7 +1112,35 @@ export default function CompaniesPage() {
 				data={displayCompanies}
 				columns={columns}
 				getRowId={(c) => String(c.id)}
-				title={t("superAdmin.companies.listTitle", "Tenants List")}
+				hideHeader={true}
+				primaryAction={
+					<div className="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								refetch();
+								refetchStats?.();
+							}}
+							disabled={isRefetching}
+							className="h-9 px-3 text-xs font-semibold gap-1.5 rounded-lg border-border hover:bg-muted"
+						>
+							<RefreshCw
+								className={`h-3.5 w-3.5 ${isRefetching ? "animate-spin text-purple-600" : "text-muted-foreground"}`}
+							/>
+							<span>{t("superAdmin.companies.syncData", "Sync Data")}</span>
+						</Button>
+
+						<Button
+							onClick={openCreateModal}
+							size="sm"
+							className="h-9 px-3.5 text-xs font-semibold gap-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+						>
+							<Plus className="h-4 w-4" />
+							<span>{t("superAdmin.companies.addCompany", "Add Company")}</span>
+						</Button>
+					</div>
+				}
 				searchPlaceholder={t(
 					"superAdmin.companies.searchPlaceholder",
 					"Search company by name, username, email, phone, address, notes...",
@@ -1095,11 +1150,9 @@ export default function CompaniesPage() {
 					setSearch(val);
 					setPage(1);
 				}}
-				createButtonLabel={t("superAdmin.companies.addCompany", "Add Company")}
-				onCreateNew={openCreateModal}
 				actions={customRowActions}
 				manualPagination={true}
-				totalCount={totalCompanies}
+				totalCount={effectiveTableTotal}
 				page={page}
 				pageSize={pageSize}
 				onPageChange={setPage}
@@ -1138,7 +1191,8 @@ export default function CompaniesPage() {
 				footer={
 					<ModernModalFooter>
 						<ModernModalCancelButton onClick={() => setIsCreateOpen(false)} />
-						<ModernModalSubmitButton
+						<ModernButton
+						    size="lg"
 							form="create-company-form"
 							isLoading={createMutation.isPending}
 						>
@@ -1146,7 +1200,7 @@ export default function CompaniesPage() {
 								"superAdmin.companies.createModal.submitButton",
 								"Create Company",
 							)}
-						</ModernModalSubmitButton>
+						</ModernButton>
 					</ModernModalFooter>
 				}
 			>
@@ -1653,23 +1707,20 @@ export default function CompaniesPage() {
 							label={t("common.close", "Close")}
 						/>
 						{activeCompanyDetails && (
-							<Button
-								variant="outline"
-								className="rounded-xl px-4 py-2 text-xs font-semibold gap-2 border-slate-200 dark:border-slate-800"
+							<ModernModalSubmitButton
+								type="button"
 								onClick={() => {
 									const target = activeCompanyDetails;
 									setViewingCompany(null);
 									openEditModal(target);
 								}}
+								icon={<Pencil className="h-4 w-4 shrink-0" />}
 							>
-								<Pencil className="h-3.5 w-3.5" />
-								<span>
-									{t(
-										"superAdmin.companies.actions.editProfile",
-										"Edit Company",
-									)}
-								</span>
-							</Button>
+								{t(
+									"superAdmin.companies.actions.editProfile",
+									"Edit Company Profile",
+								)}
+							</ModernModalSubmitButton>
 						)}
 					</ModernModalFooter>
 				}

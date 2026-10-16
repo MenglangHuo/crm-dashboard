@@ -80,6 +80,7 @@ export function QuickPaymentModal() {
 
 	// Receipt / Attachment State
 	const [receiptUrl, setReceiptUrl] = useState<string>("");
+	const [receiptFileName, setReceiptFileName] = useState<string>("");
 	const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
 	const [previewImageModal, setPreviewImageModal] = useState<string | null>(
 		null,
@@ -139,9 +140,15 @@ export function QuickPaymentModal() {
 				setSelectedInvoiceId(String(quickPayInitialData.invoiceId));
 			if (quickPayInitialData.amount !== undefined)
 				setPaymentAmount(Number(quickPayInitialData.amount));
-			if (quickPayInitialData.receiptUrl)
+			if (quickPayInitialData.receiptUrl) {
 				setReceiptUrl(quickPayInitialData.receiptUrl);
-			else setReceiptUrl("");
+				setReceiptFileName(
+					quickPayInitialData.receiptUrl.split("/").pop() || "Receipt Attached",
+				);
+			} else {
+				setReceiptUrl("");
+				setReceiptFileName("");
+			}
 		} else {
 			setSelectedCustomerId("");
 			setSelectedInvoiceId("");
@@ -151,6 +158,7 @@ export function QuickPaymentModal() {
 			setShowDiscountSection(false);
 			setReference(`PAY-${Math.floor(100000 + Math.random() * 900000)}`);
 			setReceiptUrl("");
+			setReceiptFileName("");
 		}
 	}, [quickPayInitialData, isQuickPayOpen]);
 
@@ -323,24 +331,42 @@ export function QuickPaymentModal() {
 			return;
 		}
 
+		if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+			toast.error("Please select a valid image (PNG, JPG, WebP) or PDF file");
+			return;
+		}
+
 		setIsUploadingReceipt(true);
+		setReceiptFileName(file.name);
 		try {
+			// Upload to server API (falls back gracefully between /public/files/upload and /files/upload)
 			const res = await uploadService.uploadSingle(file, {
 				category: "PAYMENTS",
 				folder: "receipts",
+				isPublic: true,
 			});
-			const uploadedUrl = res.url || res.fileKey || res.storageKey || "";
+			const uploadedUrl =
+				res.url ||
+				res.imageUrl ||
+				(res.storageKey ? fileUrl(res.storageKey) : "") ||
+				res.fileKey ||
+				"";
+
+			if (!uploadedUrl || uploadedUrl.startsWith("data:")) {
+				throw new Error("Invalid receipt URL returned from upload server");
+			}
+
+			// Save the server URL in receiptUrl field for API submission
 			setReceiptUrl(uploadedUrl);
 			toast.success("Payment receipt uploaded successfully");
-		} catch {
-			toast.warning("Server upload error, using local file preview");
-			const reader = new FileReader();
-			reader.onload = (e) => {
-				if (e.target?.result) {
-					setReceiptUrl(String(e.target.result));
-				}
-			};
-			reader.readAsDataURL(file);
+		} catch (error: any) {
+			console.error("[QuickPaymentModal] Receipt upload failed:", error);
+			setReceiptUrl("");
+			setReceiptFileName("");
+			toast.error(
+				getErrorMessage(error) ||
+					"Failed to upload receipt to server. Please try again or proceed without receipt.",
+			);
 		} finally {
 			setIsUploadingReceipt(false);
 			if (receiptFileInputRef.current) receiptFileInputRef.current.value = "";
@@ -379,6 +405,19 @@ export function QuickPaymentModal() {
 					`Total payment + discount ($${totalCredit.toFixed(2)}) cannot exceed remaining invoice balance ($${maxAllowablePay.toFixed(2)})`,
 				);
 			}
+			if (isUploadingReceipt) {
+				throw new Error(
+					"Please wait for receipt upload to complete before recording payment.",
+				);
+			}
+
+			// Clean and guard receiptUrl: NEVER submit base64 data to payments API
+			const cleanReceiptUrl = receiptUrl.trim();
+			if (cleanReceiptUrl.startsWith("data:")) {
+				throw new Error(
+					"Receipt file was not uploaded to server. Please re-upload your receipt file.",
+				);
+			}
 
 			const payload: CreatePaymentRequest = {
 				invoiceId: selectedInvoiceId || undefined,
@@ -392,7 +431,7 @@ export function QuickPaymentModal() {
 				paymentMethod: "BANK_TRANSFER",
 				referenceNumber: reference || undefined,
 				notes: notes || undefined,
-				receiptUrl: receiptUrl.trim() || undefined,
+				receiptUrl: cleanReceiptUrl || undefined,
 				// status: "COMPLETED",
 			};
 
@@ -448,10 +487,13 @@ export function QuickPaymentModal() {
 
 					<ModernModalSubmitButton
 						onClick={() => processPaymentMutation.mutate()}
+						disabled={isUploadingReceipt || processPaymentMutation.isPending}
 						isLoading={processPaymentMutation.isPending}
 						icon={<CheckCircle2 className="h-4 w-4 shrink-0" />}
 					>
-						{t("quickPay.recordPayment", "Record Payment & Issue Receipt")}
+						{isUploadingReceipt
+							? "Uploading Receipt..."
+							: t("quickPay.recordPayment", "Record Payment & Issue Receipt")}
 					</ModernModalSubmitButton>
 				</ModernModalFooter>
 			}
@@ -755,16 +797,21 @@ export function QuickPaymentModal() {
 									onClick={() =>
 										setPreviewImageModal(fileUrl(receiptUrl) || receiptUrl)
 									}
-									className="relative size-12 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shrink-0 cursor-pointer group shadow-2xs"
+									className="relative size-12 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shrink-0 cursor-pointer group shadow-2xs flex items-center justify-center"
 								>
-									<img
-										src={fileUrl(receiptUrl) || receiptUrl}
-										alt="Receipt"
-										className="size-full object-cover group-hover:scale-105 transition-transform"
-										onError={(e) => {
-											(e.currentTarget as HTMLElement).style.display = "none";
-										}}
-									/>
+									{receiptUrl.toLowerCase().endsWith(".pdf") ||
+									receiptFileName.toLowerCase().endsWith(".pdf") ? (
+										<FileText className="size-6 text-indigo-500" />
+									) : (
+										<img
+											src={fileUrl(receiptUrl) || receiptUrl}
+											alt="Receipt"
+											className="size-full object-cover group-hover:scale-105 transition-transform"
+											onError={(e) => {
+												(e.currentTarget as HTMLElement).style.display = "none";
+											}}
+										/>
+									)}
 									<div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
 										<Eye className="size-4 text-white" />
 									</div>
@@ -776,7 +823,7 @@ export function QuickPaymentModal() {
 											Attached
 										</Badge>
 										<span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[200px] sm:max-w-[280px]">
-											{receiptUrl.split("/").pop() || "Receipt Attached"}
+											{receiptFileName || receiptUrl.split("/").pop() || "Receipt Attached"}
 										</span>
 									</div>
 									<p className="text-[11px] text-slate-400 truncate max-w-[220px] sm:max-w-[320px] mt-0.5">
@@ -805,6 +852,7 @@ export function QuickPaymentModal() {
 									size="sm"
 									onClick={() => {
 										setReceiptUrl("");
+										setReceiptFileName("");
 										if (receiptFileInputRef.current)
 											receiptFileInputRef.current.value = "";
 									}}

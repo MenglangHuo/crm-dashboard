@@ -113,12 +113,14 @@ export function clearClientSession() {
 	deleteCookie("crm_refresh_token");
 	deleteCookie("crm_company_id");
 	deleteCookie("crm_is_system_admin");
+	deleteCookie("crm_is_complete_setup");
 	try {
 		localStorage.removeItem("crm_access_token");
 		localStorage.removeItem("crm_refresh_token");
 		localStorage.removeItem("crm_company_id");
 		localStorage.removeItem("crm_is_system_admin");
 		localStorage.removeItem("crm_user_profile");
+		localStorage.removeItem("crm_is_complete_setup");
 	} catch {}
 	try {
 		logoutOneSignalUser();
@@ -232,6 +234,17 @@ export const api = axios.create({
 
 // Attach Authorization header if access token cookie is set, X-Company-Id header, and companyId to request params
 api.interceptors.request.use((config) => {
+	// If sending FormData, delete Content-Type so browser sets multipart/form-data with proper boundary
+	if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+		if (typeof config.headers?.delete === "function") {
+			config.headers.delete("Content-Type");
+			config.headers.delete("content-type");
+		} else if (config.headers) {
+			delete config.headers["Content-Type"];
+			delete config.headers["content-type"];
+		}
+	}
+
 	if (typeof window !== "undefined") {
 		const token =
 			readCookie("crm_access_token") ||

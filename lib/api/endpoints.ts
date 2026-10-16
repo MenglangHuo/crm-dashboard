@@ -28,6 +28,7 @@ import type {
 	Category,
 	Commune,
 	Company,
+	CompanyStats,
 	CompanyConfiguration,
 	CreateAdministrativeDivisionInput,
 	CreateAttachmentInput,
@@ -414,7 +415,45 @@ export const profileApi = {
 					? d.permissions
 					: [],
 			groups: Array.isArray(up?.groups) ? up.groups : [],
-			isCompletedSetup: up?.isCompletedSetup ?? true,
+			isCompleteSetup: (() => {
+				if (up?.isCompleteSetup !== undefined) return Boolean(up.isCompleteSetup);
+				if (d?.isCompleteSetup !== undefined) return Boolean(d.isCompleteSetup);
+				if (up?.isCompletedSetup !== undefined) return Boolean(up.isCompletedSetup);
+				if (d?.isCompletedSetup !== undefined) return Boolean(d.isCompletedSetup);
+				if (up?.completedSetup !== undefined) return Boolean(up.completedSetup);
+				if (d?.completedSetup !== undefined) return Boolean(d.completedSetup);
+				if (typeof window !== "undefined") {
+					const stored = localStorage.getItem("crm_is_complete_setup");
+					if (stored !== null) return stored === "true" || stored === "1";
+				}
+				return Boolean(firstName && phone);
+			})(),
+			isCompletedSetup: (() => {
+				if (up?.isCompleteSetup !== undefined) return Boolean(up.isCompleteSetup);
+				if (d?.isCompleteSetup !== undefined) return Boolean(d.isCompleteSetup);
+				if (up?.isCompletedSetup !== undefined) return Boolean(up.isCompletedSetup);
+				if (d?.isCompletedSetup !== undefined) return Boolean(d.isCompletedSetup);
+				if (up?.completedSetup !== undefined) return Boolean(up.completedSetup);
+				if (d?.completedSetup !== undefined) return Boolean(d.completedSetup);
+				if (typeof window !== "undefined") {
+					const stored = localStorage.getItem("crm_is_complete_setup");
+					if (stored !== null) return stored === "true" || stored === "1";
+				}
+				return Boolean(firstName && phone);
+			})(),
+			completedSetup: (() => {
+				if (up?.isCompleteSetup !== undefined) return Boolean(up.isCompleteSetup);
+				if (d?.isCompleteSetup !== undefined) return Boolean(d.isCompleteSetup);
+				if (up?.isCompletedSetup !== undefined) return Boolean(up.isCompletedSetup);
+				if (d?.isCompletedSetup !== undefined) return Boolean(d.isCompletedSetup);
+				if (up?.completedSetup !== undefined) return Boolean(up.completedSetup);
+				if (d?.completedSetup !== undefined) return Boolean(d.completedSetup);
+				if (typeof window !== "undefined") {
+					const stored = localStorage.getItem("crm_is_complete_setup");
+					if (stored !== null) return stored === "true" || stored === "1";
+				}
+				return Boolean(firstName && phone);
+			})(),
 			lastLoginAt: up?.lastLogin || up?.lastLoginAt || d?.lastLoginAt || null,
 			accountType: d?.accountType || (d?.systemAdmin ? "SYSTEM_ADMIN" : "USER"),
 		};
@@ -635,6 +674,9 @@ export const dashboardApi = {
 export interface CompanyListParams extends ListParams {
 	includeDeleted?: boolean;
 	subscriptionStatus?: string;
+	status?: string;
+	statusFilter?: string;
+	query?: string;
 	sortBy?: string;
 	orderBy?: "ASC" | "DESC" | string;
 }
@@ -683,9 +725,10 @@ function mapCompanyFromBackend(c: any): Company {
 			typeof c.lat === "number" ? c.lat : c.lat ? parseFloat(c.lat) : undefined,
 		lng:
 			typeof c.lng === "number" ? c.lng : c.lng ? parseFloat(c.lng) : undefined,
-		enableBranch: Boolean(c.enableBranch),
+		enableBranch: Boolean(c.enableBranch ?? c.enabledDivision),
 		active,
 		isActive: active,
+		deleted: Boolean(c.deleted),
 		deletedAt: c.deletedAt || null,
 		createdAt: c.createdAt || "",
 		updatedAt: c.updatedAt || null,
@@ -800,9 +843,22 @@ export const companiesApi = {
 			sortBy: params.sortBy || "createdAt",
 			orderBy: params.orderBy || "DESC",
 		};
-		if (params.search) queryParams.search = params.search;
-		if (params.includeDeleted !== undefined)
+		if (params.search) {
+			queryParams.search = params.search;
+			queryParams.query = params.search;
+		}
+		if (params.query) {
+			queryParams.query = params.query;
+			queryParams.search = params.query;
+		}
+		if (params.includeDeleted !== undefined) {
 			queryParams.includeDeleted = params.includeDeleted;
+		}
+		const status = params.status || params.statusFilter;
+		if (status && status !== "ALL") {
+			queryParams.status = status;
+			queryParams.statusFilter = status;
+		}
 		if (params.subscriptionStatus && params.subscriptionStatus !== "ALL") {
 			queryParams.subscriptionStatus = params.subscriptionStatus;
 		}
@@ -815,6 +871,8 @@ export const companiesApi = {
 				return paged;
 			});
 	},
+	stats: () =>
+		api.get<CompanyStats>("/companies/stats").then((r) => r.data),
 	get: async (id: string | number) => {
 		try {
 			const res = await api.get<
@@ -1899,7 +1957,7 @@ export function fileUrl(fileKey: string | null | undefined) {
 	if (trimmed.startsWith("public/")) {
 		return `https://public-crm-amz-s3.s3.us-east-1.amazonaws.com/${trimmed}`;
 	}
-	return `/api/v1/storage/object/${trimmed.split("/").map(encodeURIComponent).join("/")}`;
+	return `/api/public/files/${trimmed.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 export const DEFAULT_IMAGE_URL = "/images/bitcoin.png";
@@ -4060,7 +4118,6 @@ export const publicFilesApi = {
 			formData.append("description", options.description);
 
 		const res = await api.post<any>("/public/files/upload", formData, {
-			headers: { "Content-Type": "multipart/form-data" },
 			onUploadProgress: (progressEvent) => {
 				if (progressEvent.total && options?.onProgress) {
 					const percent = Math.round(
