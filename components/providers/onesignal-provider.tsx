@@ -235,6 +235,10 @@ export function OneSignalProvider({ children }: { children: React.ReactNode }) {
 
 	// Permission Request
 	const handleRequestPermission = useCallback(async (): Promise<boolean> => {
+		if (!isInitialized) {
+			toast.info("Push notification service is not available or not yet configured.");
+			return false;
+		}
 		const granted = await requestPushPermission();
 		setPermission(getPushPermissionStatus());
 		setIsSubscribed(granted);
@@ -244,7 +248,7 @@ export function OneSignalProvider({ children }: { children: React.ReactNode }) {
 			toast.info("Push notification permission was not granted.");
 		}
 		return granted;
-	}, []);
+	}, [isInitialized]);
 
 	const handlePromptSubscription = useCallback(async () => {
 		await handleRequestPermission();

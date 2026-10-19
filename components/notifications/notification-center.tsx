@@ -66,7 +66,8 @@ function formatRelativeTime(dateStr?: string): string {
 export function NotificationCenter() {
 	const router = useRouter();
 	const queryClient = useQueryClient();
-	const { permission, requestPermission, isBlocked } = useOneSignal();
+	const { permission, requestPermission, isBlocked, isInitialized } =
+		useOneSignal();
 	const [open, setOpen] = useState(false);
 	const [activeFilter, setActiveFilter] = useState<"ALL" | "UNREAD" | "ALERTS">(
 		"ALL",
@@ -413,17 +414,23 @@ export function NotificationCenter() {
 							<span className="text-slate-600 dark:text-slate-300 font-medium">
 								{isBlocked
 									? "Push blocked by adblocker"
-									: permission === "granted"
-										? "Live Order Push Active"
-										: permission === "denied"
-											? "Push Blocked in Browser"
-											: "Live Push Notifications"}
+									: !isInitialized
+										? "Push Notifications Inactive"
+										: permission === "granted"
+											? "Live Order Push Active"
+											: permission === "denied"
+												? "Push Blocked in Browser"
+												: "Live Push Notifications"}
 							</span>
 						</div>
 
 						{isBlocked ? (
 							<span className="text-[10px] text-slate-400 font-normal">
 								Whitelist site
+							</span>
+						) : !isInitialized ? (
+							<span className="text-[10px] text-slate-400 font-normal">
+								Not configured
 							</span>
 						) : permission !== "granted" && permission !== "denied" ? (
 							<button

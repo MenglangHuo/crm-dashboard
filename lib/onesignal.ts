@@ -104,11 +104,18 @@ export async function initOneSignal(appId?: string): Promise<boolean> {
 						effectiveAppId,
 					);
 					resolve(true);
-				} catch (initErr) {
-					console.warn(
-						"[OneSignal] OneSignal.init encountered an issue:",
-						initErr,
-					);
+				} catch (initErr: any) {
+					const msg = initErr?.message || String(initErr);
+					if (msg.includes("App not configured for web push")) {
+						console.warn(
+							`[OneSignal] Web Push platform is not configured for App ID "${effectiveAppId}" in the OneSignal Dashboard (Settings > Platforms > Web). Push notifications will remain inactive until Web Push is set up.`,
+						);
+					} else {
+						console.warn(
+							"[OneSignal] OneSignal.init encountered an issue:",
+							initErr,
+						);
+					}
 					resolve(false);
 				}
 			});
@@ -170,6 +177,13 @@ export async function logoutOneSignalUser(): Promise<void> {
 export async function requestPushPermission(): Promise<boolean> {
 	if (typeof window === "undefined" || !("Notification" in window))
 		return false;
+
+	if (!isInitialized) {
+		console.warn(
+			"[OneSignal] Cannot request push permission: SDK is not initialized.",
+		);
+		return false;
+	}
 
 	return new Promise<boolean>((resolve) => {
 		window.OneSignalDeferred = window.OneSignalDeferred || [];
