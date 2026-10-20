@@ -317,9 +317,10 @@ export const authApi = {
 			.post<VerifyResetOtpResponse>("/auth/verify-reset-otp", body)
 			.then((r) => r.data),
 	resetPassword: (body: {
-		identifier: string;
 		resetToken: string;
 		newPassword: string;
+		confirmPassword: string;
+		identifier?: string;
 	}) => api.post<string>("/auth/reset-password", body).then((r) => r.data),
 	setNewPassword: (body: {
 		resetToken: string;
@@ -957,6 +958,8 @@ export const adminsApi = {
 	},
 	get: (id: string | number) =>
 		api.get<SystemAdmin>(`/system_admins/${id}`).then((r) => r.data),
+	getByIdentifier: (identifier: string) =>
+		api.get<SystemAdmin>(`/system_admins/identifier/${encodeURIComponent(identifier)}`).then((r) => r.data),
 	create: (body: CreateSystemAdminInput) =>
 		api.post<SystemAdmin>("/system_admins", body).then((r) => r.data),
 	update: (id: string | number, body: UpdateSystemAdminInput) =>
@@ -965,6 +968,8 @@ export const adminsApi = {
 		api.delete(`/system_admins/${id}`).then((r) => r.data),
 	restore: (id: string | number) =>
 		api.patch<SystemAdmin>(`/system_admins/${id}/restore`).then((r) => r.data),
+	resetPassword: (id: string | number) =>
+		api.post<AdminResetPasswordResponse>(`/system_admins/${id}/reset-password`).then((r) => r.data),
 };
 
 export interface ConfigurationListParams extends ListParams {

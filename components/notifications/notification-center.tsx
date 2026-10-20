@@ -35,7 +35,6 @@ import {
 	FileText,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useOneSignal } from "@/hooks/use-onesignal";
 import { getNotificationTargetUrl } from "@/lib/notification-routing";
 
 function formatRelativeTime(dateStr?: string): string {
@@ -66,8 +65,6 @@ function formatRelativeTime(dateStr?: string): string {
 export function NotificationCenter() {
 	const router = useRouter();
 	const queryClient = useQueryClient();
-	const { permission, requestPermission, isBlocked, isInitialized } =
-		useOneSignal();
 	const [open, setOpen] = useState(false);
 	const [activeFilter, setActiveFilter] = useState<"ALL" | "UNREAD" | "ALERTS">(
 		"ALL",
@@ -398,50 +395,7 @@ export function NotificationCenter() {
 						</div>
 					</div>
 
-					{/* OneSignal Live Push Notification Status & Action */}
-					<div className="mb-3 flex items-center justify-between rounded-xl bg-white dark:bg-slate-900/80 px-2.5 py-1.5 border border-slate-200/80 dark:border-slate-800 text-[11px] shadow-2xs">
-						<div className="flex items-center gap-2">
-							<span className="relative flex h-2 w-2">
-								{permission === "granted" && !isBlocked ? (
-									<>
-										<span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-										<span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-									</>
-								) : (
-									<span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />
-								)}
-							</span>
-							<span className="text-slate-600 dark:text-slate-300 font-medium">
-								{isBlocked
-									? "Push blocked by adblocker"
-									: !isInitialized
-										? "Push Notifications Inactive"
-										: permission === "granted"
-											? "Live Order Push Active"
-											: permission === "denied"
-												? "Push Blocked in Browser"
-												: "Live Push Notifications"}
-							</span>
-						</div>
 
-						{isBlocked ? (
-							<span className="text-[10px] text-slate-400 font-normal">
-								Whitelist site
-							</span>
-						) : !isInitialized ? (
-							<span className="text-[10px] text-slate-400 font-normal">
-								Not configured
-							</span>
-						) : permission !== "granted" && permission !== "denied" ? (
-							<button
-								type="button"
-								onClick={() => requestPermission()}
-								className="font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
-							>
-								Enable Push
-							</button>
-						) : null}
-					</div>
 
 					{/* Filter Tabs & Search */}
 					<div className="flex items-center justify-between gap-2">

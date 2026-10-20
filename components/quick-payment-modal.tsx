@@ -230,6 +230,65 @@ export function QuickPaymentModal() {
 		return rem > 0 ? rem : currentTotalAmount;
 	}, [selectedInvoice, paymentAmount, currentTotalAmount]);
 
+	const customerOptions = useMemo(() => {
+		const list = customersData?.items ? [...customersData.items] : [];
+		const opts = list.map((c) => ({
+			value: String(c.id),
+			label: c.name,
+			description: c.phone || c.email,
+		}));
+		if (
+			selectedCustomerId &&
+			!opts.some((opt) => opt.value === String(selectedCustomerId))
+		) {
+			const custName =
+				selectedInvoice?.customer?.name ||
+				(selectedInvoice as any)?.customerName ||
+				`Customer #${selectedCustomerId}`;
+			opts.unshift({
+				value: String(selectedCustomerId),
+				label: custName,
+				description: "Selected Customer",
+			});
+		}
+		return opts;
+	}, [customersData, selectedInvoice, selectedCustomerId]);
+
+	const invoiceOptions = useMemo(() => {
+		const list = invoicesData?.items ? [...invoicesData.items] : [];
+		if (
+			selectedInvoice &&
+			!list.some((i) => String(i.id) === String(selectedInvoice.id))
+		) {
+			list.unshift(selectedInvoice);
+		}
+		const opts = list.map((inv) => {
+			const due = getInvoiceRemainingBalance(inv);
+			return {
+				value: String(inv.id),
+				label: `${inv.invoiceNo || inv.invoiceNumber || String(inv.id).slice(0, 8)} (${due > 0 ? `Due: $${due.toFixed(2)}` : "Paid"})`,
+				description: `Total: $${inv.totalAmount} | Due Date: ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}${
+					inv.earlyDiscountPct
+						? ` | ⚡ ${inv.earlyDiscountPct}% early discount`
+						: ""
+				}`,
+			};
+		});
+		if (
+			selectedInvoiceId &&
+			!opts.some((opt) => opt.value === String(selectedInvoiceId))
+		) {
+			opts.unshift({
+				value: String(selectedInvoiceId),
+				label:
+					quickPayInitialData?.invoiceNo ||
+					`Invoice #${String(selectedInvoiceId).slice(0, 8)}`,
+				description: "Selected Invoice",
+			});
+		}
+		return opts;
+	}, [invoicesData, selectedInvoice, selectedInvoiceId, quickPayInitialData]);
+
 	// Check if a payment discount was already applied on previous payments
 	const hasPreviousDiscount = useMemo(() => {
 		if (!selectedInvoice) return false;
@@ -421,6 +480,7 @@ export function QuickPaymentModal() {
 
 			const payload: CreatePaymentRequest = {
 				invoiceId: selectedInvoiceId || undefined,
+				customerId: selectedCustomerId || undefined,
 				amount: paymentAmount,
 				discountAmount: effectiveDiscount > 0 ? effectiveDiscount : 0,
 				discountType: "FLAT", // resolved to flat dollar amount for API consistency
@@ -506,13 +566,7 @@ export function QuickPaymentModal() {
 						placeholder={t("quickPay.selectCustomer", "Select customer...")}
 						value={selectedCustomerId}
 						onChange={setSelectedCustomerId}
-						options={
-							customersData?.items?.map((c) => ({
-								value: String(c.id),
-								label: c.name,
-								description: c.phone || c.email,
-							})) || []
-						}
+						options={customerOptions}
 						searchable
 						required
 						disabled={isInvoiceLocked}
@@ -531,20 +585,7 @@ export function QuickPaymentModal() {
 						)}
 						value={selectedInvoiceId}
 						onChange={handleSelectInvoice}
-						options={
-							invoicesData?.items?.map((inv) => {
-								const due = getInvoiceRemainingBalance(inv);
-								return {
-									value: String(inv.id),
-									label: `${inv.invoiceNo || inv.invoiceNumber || String(inv.id).slice(0, 8)} (${due > 0 ? `Due: $${due.toFixed(2)}` : "Paid"})`,
-									description: `Total: $${inv.totalAmount} | Due Date: ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}${
-										inv.earlyDiscountPct
-											? ` | ⚡ ${inv.earlyDiscountPct}% early discount`
-											: ""
-									}`,
-								};
-							}) || []
-						}
+						options={invoiceOptions}
 						searchable
 						disabled={isInvoiceLocked}
 						helperText={isInvoiceLocked ? "Locked to selected invoice" : undefined}

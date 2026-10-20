@@ -127,6 +127,29 @@ function OrdersPageContent() {
 	const [isRejectOpen, setIsRejectOpen] = useState(false);
 	const [isTimelineOpen, setIsTimelineOpen] = useState(false);
 
+	// Global Command Palette Shortcut Listener & Query Param Handler
+	useEffect(() => {
+		const handleOpenCreate = () => setIsCreateOpen(true);
+		const handleOpenPos = () => setIsPosOpen(true);
+		window.addEventListener("crm:open-create-order", handleOpenCreate);
+		window.addEventListener("crm:open-pos-order", handleOpenPos);
+
+		if (typeof window !== "undefined") {
+			const params = new URLSearchParams(window.location.search);
+			if (params.get("action") === "create") {
+				setIsCreateOpen(true);
+			}
+			if (params.get("action") === "pos") {
+				setIsPosOpen(true);
+			}
+		}
+
+		return () => {
+			window.removeEventListener("crm:open-create-order", handleOpenCreate);
+			window.removeEventListener("crm:open-pos-order", handleOpenPos);
+		};
+	}, []);
+
 	// Fetch Orders using JPA Search Specification Payload
 	const { data, isLoading, isError, error, refetch } = useQuery({
 		queryKey: [
@@ -714,7 +737,20 @@ function OrdersPageContent() {
 	];
 
 	return (
-		<div className="space-y-4 pb-12">
+		<div className="space-y-6 pb-12">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+						<ShoppingCart className="size-7 text-primary" />
+						<span>{t("orders.title", "Sales Orders")}</span>
+					</h1>
+					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+						{t("orders.subtitle", "End-to-end order processing, warehouse verification, multi-level approvals, and invoicing.")}
+					</p>
+				</div>
+			</div>
+
 			{/* Main Data Table with Integrated Clean Toolbar */}
 			<DataTable<Order>
 				data={items}

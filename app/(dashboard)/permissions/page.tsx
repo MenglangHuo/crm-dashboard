@@ -158,6 +158,19 @@ export default function PermissionsPage() {
 
 	return (
 		<div className="space-y-6">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+						<Shield className="size-7 text-primary" />
+						<span>{t("permissions.title", "System Permissions Registry")}</span>
+					</h1>
+					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+						{t("permissions.subtitle", "Comprehensive list of all fine-grained security permissions, modules, and role assignments.")}
+					</p>
+				</div>
+			</div>
+
 			{/* Header Stat Cards */}
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<Card className="border-slate-200/80 dark:border-slate-800/80 shadow-xs">

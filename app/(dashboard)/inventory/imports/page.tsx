@@ -865,6 +865,19 @@ export default function InventoryImportsPage() {
 
 	return (
 		<div className="space-y-6">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+						<Truck className="size-7 text-primary" />
+						<span>{t("imports.title", "Imports & Receiving")}</span>
+					</h1>
+					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+						{t("imports.subtitle", "Manage stock shipment imports, purchase receiving, and supplier returns.")}
+					</p>
+				</div>
+			</div>
+
 			{/* Top Navigation Tabs: All Shipments vs Supplier Return */}
 			<ModernTabs
 				value={activeTab}

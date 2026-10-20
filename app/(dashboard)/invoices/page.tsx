@@ -866,7 +866,20 @@ function InvoicesPageContent() {
 	);
 
 	return (
-		<div className="space-y-4 pb-12">
+		<div className="space-y-6 pb-12">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+						<FileText className="size-7 text-primary" />
+						<span>{t("invoices.title", "Invoices & Billing")}</span>
+					</h1>
+					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+						{t("invoices.subtitle", "Manage tax receipts, KHQR Bakong payments, receivables tracking, void, and refund operations.")}
+					</p>
+				</div>
+			</div>
+
 			{/* Data Table with Integrated Clean Toolbar */}
 			<DataTable<Invoice>
 				data={invoicesList}

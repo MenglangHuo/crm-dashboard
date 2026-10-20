@@ -300,9 +300,11 @@ export interface User {
 }
 
 export interface AdminResetPasswordResponse {
-	userId: number;
+	id?: number;
+	userId?: number;
 	username: string;
 	email?: string;
+	phoneNumber?: string;
 	tempPassword: string;
 	message?: string;
 }
@@ -314,6 +316,7 @@ export interface SystemAdmin {
 	username: string;
 	displayName?: string | null;
 	email: string;
+	phoneNumber?: string | null;
 	isActive: boolean;
 	isLocked?: boolean;
 	loginAttempts?: number;
@@ -328,6 +331,7 @@ export interface CreateSystemAdminInput {
 	username: string;
 	displayName: string;
 	email: string;
+	phoneNumber?: string;
 	password?: string;
 	isActive?: boolean;
 	adminLevel: string;
@@ -338,6 +342,7 @@ export interface UpdateSystemAdminInput {
 	username?: string;
 	displayName?: string;
 	email?: string;
+	phoneNumber?: string;
 	password?: string;
 	isActive?: boolean;
 	adminLevel?: string;

@@ -260,7 +260,20 @@ export default function PaymentTermsPage() {
 	];
 
 	return (
-		<div className="space-y-4 pb-12">
+		<div className="space-y-6 pb-12">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+						<Clock className="size-7 text-primary" />
+						<span>{t("paymentTerms.title", "Payment Terms & Policies")}</span>
+					</h1>
+					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+						{t("paymentTerms.subtitle", "Configure customer credit windows, cash settlement discount tiers, and due date policies.")}
+					</p>
+				</div>
+			</div>
+
 			{/* Main DataTable */}
 			<DataTable<PaymentTerm>
 				hideHeader={true}

@@ -9,3 +9,4 @@ export * from "./modern-search-select";
 export * from "./modern-image-upload";
 export * from "./modern-tags-input";
 export * from "./modern-combobox";
+export * from "./category-tree-select";

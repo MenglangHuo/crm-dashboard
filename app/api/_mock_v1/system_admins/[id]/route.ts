@@ -48,6 +48,10 @@ export async function PUT(
 				? body.displayName.trim()
 				: current.displayName,
 		email: body.email !== undefined ? body.email.trim() : current.email,
+		phoneNumber:
+			body.phoneNumber !== undefined
+				? (body.phoneNumber ? body.phoneNumber.trim() : null)
+				: current.phoneNumber,
 		isActive:
 			body.isActive !== undefined ? Boolean(body.isActive) : current.isActive,
 		adminLevel:

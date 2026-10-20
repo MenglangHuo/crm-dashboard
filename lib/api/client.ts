@@ -10,7 +10,6 @@
 import axios, { AxiosError } from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
 import { refreshAuthCookies } from "@/app/actions/auth";
-import { logoutOneSignalUser } from "@/lib/onesignal";
 import type { ApiResponse } from "@/lib/types";
 
 export class ApiError extends Error {
@@ -121,9 +120,6 @@ export function clearClientSession() {
 		localStorage.removeItem("crm_is_system_admin");
 		localStorage.removeItem("crm_user_profile");
 		localStorage.removeItem("crm_is_complete_setup");
-	} catch {}
-	try {
-		logoutOneSignalUser();
 	} catch {}
 }
 

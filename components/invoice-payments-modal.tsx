@@ -86,9 +86,9 @@ export function InvoicePaymentsModal({
 	const totalAmount = Number(invoice?.totalAmount || 0);
 	const paymentDiscountAmount = Number(invoice?.paymentDiscountAmount || 0);
 	const remainingAmount = Number(
-		invoice?.remainingAmount !== undefined
+		invoice?.remainingAmount !== undefined && invoice?.remainingAmount !== null
 			? invoice.remainingAmount
-			: rawInvoice?.remainingAmount !== undefined
+			: rawInvoice?.remainingAmount !== undefined && rawInvoice?.remainingAmount !== null
 				? rawInvoice.remainingAmount
 				: Math.max(
 						0,

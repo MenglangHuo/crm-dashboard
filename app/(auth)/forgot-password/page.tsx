@@ -29,7 +29,10 @@ const step1Schema = z.object({
 });
 
 const step2Schema = z.object({
-	otpCode: z.string().min(4, "Please enter the OTP code sent to your device"),
+	otpCode: z
+		.string()
+		.min(6, "Please enter the 6-digit OTP code")
+		.max(6, "Please enter the 6-digit OTP code"),
 });
 
 function ForgotPasswordIllustrationSvg({ isStep2 }: { isStep2: boolean }) {
@@ -80,9 +83,16 @@ export default function ForgotPasswordPage() {
 
 	const verifyOtpMutation = useMutation({
 		mutationFn: authApi.verifyResetOtp,
-		onSuccess: (data) => {
+		onSuccess: (data: any) => {
 			toast.success("OTP verified successfully!");
-			const token = data?.resetToken || "VERIFIED";
+			const token =
+				typeof data === "string"
+					? data
+					: data?.resetToken || data?.token || data?.data?.resetToken || "";
+			if (!token) {
+				toast.error("Failed to receive reset token. Please request a new code.");
+				return;
+			}
 			router.push(
 				`/reset-password?identifier=${encodeURIComponent(identifier)}&token=${encodeURIComponent(token)}`,
 			);

@@ -29,7 +29,13 @@ import { useTranslation } from "@/lib/i18n/context";
 
 const formSchema = z
 	.object({
-		password: z.string().min(8, "Password must be at least 8 characters"),
+		password: z
+			.string()
+			.min(8, "Password must be at least 8 characters")
+			.regex(
+				/^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!])(?=\S+$).{8,}$/,
+				"Password must contain uppercase, lowercase, number, and special character (@#$%^&+=!)",
+			),
 		confirmPassword: z.string().min(1, "Please confirm your password"),
 	})
 	.refine((data) => data.password === data.confirmPassword, {
@@ -79,9 +85,10 @@ function ResetPasswordForm() {
 				});
 			}
 			return authApi.resetPassword({
-				identifier,
 				resetToken: token!,
 				newPassword: values.password,
+				confirmPassword: values.confirmPassword,
+				identifier: identifier || undefined,
 			});
 		},
 		onSuccess: (_, variables) => {
@@ -106,10 +113,6 @@ function ResetPasswordForm() {
 	const onSubmit = (values: z.infer<typeof formSchema>) => {
 		if (!token) {
 			toast.error("Missing verification token.");
-			return;
-		}
-		if (!isForced && !identifier) {
-			toast.error("Missing identifier.");
 			return;
 		}
 		mutation.mutate(values);

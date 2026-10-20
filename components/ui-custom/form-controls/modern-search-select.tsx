@@ -13,11 +13,16 @@ import {
 	X
 } from "lucide-react";
 import React, {
+	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
-	useState
+	useState,
 } from "react";
+import { createPortal } from "react-dom";
+
+const useIsomorphicLayoutEffect =
+	typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
 
 export interface SearchSelectOption {
 	value: string | number;
@@ -49,6 +54,7 @@ export interface ModernSearchSelectProps {
 	primaryValue?: string | number | null;
 	onSetPrimary?: (value: string | number) => void;
 	primaryLabel?: string;
+	portal?: boolean;
 }
 
 export function ModernSearchSelect({
@@ -69,14 +75,63 @@ export function ModernSearchSelect({
 	primaryValue,
 	onSetPrimary,
 	primaryLabel = "Primary",
+	portal = false,
 }: ModernSearchSelectProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [asyncOptions, setAsyncOptions] = useState<SearchSelectOption[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
+	const triggerRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const popoverRef = useRef<HTMLDivElement>(null);
 	const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+	const [popoverCoords, setPopoverCoords] = useState<{
+		top: number;
+		left: number;
+		width: number;
+	} | null>(null);
+
+	const calculatePopoverCoords = useCallback(() => {
+		const el = triggerRef.current || containerRef.current;
+		if (!el) return null;
+		const rect = el.getBoundingClientRect();
+		const dropdownHeight = 300;
+		const spaceBelow = window.innerHeight - rect.bottom;
+		let top = rect.bottom + 4;
+		if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
+			top = Math.max(10, rect.top - dropdownHeight - 4);
+		}
+		return {
+			top,
+			left: rect.left,
+			width: Math.max(rect.width, 240),
+		};
+	}, []);
+
+	const updatePopoverCoords = useCallback(() => {
+		const coords = calculatePopoverCoords();
+		if (coords) setPopoverCoords(coords);
+	}, [calculatePopoverCoords]);
+
+	useIsomorphicLayoutEffect(() => {
+		if (isOpen && portal) {
+			updatePopoverCoords();
+		}
+	}, [isOpen, portal, updatePopoverCoords]);
+
+	useEffect(() => {
+		if (isOpen && portal) {
+			const handleScrollOrResize = () => updatePopoverCoords();
+			window.addEventListener("scroll", handleScrollOrResize, true);
+			window.addEventListener("resize", handleScrollOrResize);
+			return () => {
+				window.removeEventListener("scroll", handleScrollOrResize, true);
+				window.removeEventListener("resize", handleScrollOrResize);
+			};
+		}
+	}, [isOpen, portal, updatePopoverCoords]);
 
 	// Normalize current selected values into an array
 	const selectedValues: (string | number)[] = useMemo(() => {
@@ -164,16 +219,18 @@ export function ModernSearchSelect({
 	// Click outside to close
 	useEffect(() => {
 		const handleOutsideClick = (e: MouseEvent) => {
+			const target = e.target as Node;
 			if (
-				containerRef.current &&
-				!containerRef.current.contains(e.target as Node)
+				(containerRef.current && containerRef.current.contains(target)) ||
+				(portal && popoverRef.current && popoverRef.current.contains(target))
 			) {
-				setIsOpen(false);
+				return;
 			}
+			setIsOpen(false);
 		};
 		document.addEventListener("mousedown", handleOutsideClick);
 		return () => document.removeEventListener("mousedown", handleOutsideClick);
-	}, []);
+	}, [portal]);
 
 	// Handle select / toggle option
 	const handleToggleOption = (opt: SearchSelectOption) => {
@@ -271,11 +328,18 @@ export function ModernSearchSelect({
 
 			{/* Control Box */}
 			<div
+				ref={triggerRef}
 				onClick={() => {
 					if (!disabled) {
-						setIsOpen(!isOpen);
 						if (!isOpen) {
+							if (portal) {
+								const coords = calculatePopoverCoords();
+								if (coords) setPopoverCoords(coords);
+							}
+							setIsOpen(true);
 							setTimeout(() => inputRef.current?.focus(), 50);
+						} else {
+							setIsOpen(false);
 						}
 					}
 				}}
@@ -432,9 +496,26 @@ export function ModernSearchSelect({
 			</div>
 
 			{/* Dropdown Popover */}
-			{isOpen && (
-				<div className="relative z-50">
-					<div className="absolute top-1 left-0 right-0 rounded-xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-slate-950 p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-72 flex flex-col space-y-1.5">
+			{isOpen && (!portal || popoverCoords) && (() => {
+				const dropdownContent = (
+					<div
+						ref={popoverRef}
+						style={
+							portal && popoverCoords
+								? {
+										position: "fixed",
+										top: `${popoverCoords.top}px`,
+										left: `${popoverCoords.left}px`,
+										width: `${popoverCoords.width}px`,
+										zIndex: 99999,
+									}
+								: undefined
+						}
+						className={cn(
+							"rounded-xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-slate-950 p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-72 flex flex-col space-y-1.5",
+							!portal && "absolute top-1 left-0 right-0 z-50",
+						)}
+					>
 						{/* Search Input Bar */}
 						<div className="relative">
 							<Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
@@ -538,8 +619,12 @@ export function ModernSearchSelect({
 							)}
 						</div>
 					</div>
-				</div>
-			)}
+				);
+
+				return portal && typeof document !== "undefined"
+					? createPortal(dropdownContent, document.body)
+					: <div className="relative z-50">{dropdownContent}</div>;
+			})()}
 
 			{description && (
 				<p className="text-[11px] text-slate-500 dark:text-slate-400">

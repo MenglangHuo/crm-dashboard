@@ -354,7 +354,6 @@ export function AppSidebar() {
 		{ title: t("sidebar.department"), url: "/departments", icon: Building },
 		{ title: t("sidebar.supplier"), url: "/suppliers", icon: Truck },
 		{ title: t("sidebar.delivery"), url: "/deliveries", icon: MapPin },
-		{ title: t("sidebar.locations", "Locations"), url: "/locations", icon: MapPin },
 		{ title: t("sidebar.customer"), url: "/customers", icon: Contact },
 		{ title: t("sidebar.feedback"), url: "/feedback", icon: MessageSquare },
 	];

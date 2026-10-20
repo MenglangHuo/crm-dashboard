@@ -170,7 +170,7 @@ export function InvoiceDetailsModal({
 			payments.reduce((acc, p) => acc + (p.amountPaid || p.amount || 0), 0),
 	);
 	const remainingAmount =
-		invoice?.remainingAmount !== undefined
+		invoice?.remainingAmount !== undefined && invoice?.remainingAmount !== null
 			? Number(invoice.remainingAmount)
 			: Math.max(0, totalAmount - paidAmount - paymentDiscountAmount);
 	const isTerminal =

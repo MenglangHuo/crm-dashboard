@@ -118,6 +118,7 @@ import {
 	ModernTextarea,
 	ModernSwitch,
 	ModernTagsInput,
+	CategoryTreeSelect,
 } from "@/components/ui-custom/form-controls";
 import {
 	ModernTabs,
@@ -394,6 +395,34 @@ function ProductsTab() {
 		"general",
 	);
 
+	// Global Command Palette Shortcut Listener & Query Param Handler
+	useEffect(() => {
+		const handleOpenCreate = () => {
+			setEditingProduct(null);
+			setIsDialogOpen(true);
+		};
+		const handleOpenFilter = () => {
+			setIsFilterExpanded(true);
+		};
+		window.addEventListener("crm:open-create-product", handleOpenCreate);
+		window.addEventListener("crm:open-filter-product", handleOpenFilter);
+
+		if (typeof window !== "undefined") {
+			const params = new URLSearchParams(window.location.search);
+			if (params.get("action") === "create" || params.get("create") === "true") {
+				handleOpenCreate();
+			}
+			if (params.get("action") === "filter" || params.get("filter") === "true") {
+				handleOpenFilter();
+			}
+		}
+
+		return () => {
+			window.removeEventListener("crm:open-create-product", handleOpenCreate);
+			window.removeEventListener("crm:open-filter-product", handleOpenFilter);
+		};
+	}, []);
+
 	// Price History Grouping View Mode ("all" | "byUnit")
 	const [priceHistoryGroupMode, setPriceHistoryGroupMode] = useState<
 		"all" | "byUnit"
@@ -580,11 +609,32 @@ function ProductsTab() {
 					filterCategory !== "ALL" &&
 					!activeDomainFilters.some((f) => f.field === "category")
 				) {
-					payload.filterGroup?.filters.push({
-						field: "category",
-						operator: "EQUAL",
-						value: Number(filterCategory),
-					});
+					const allSubIds: number[] = [];
+					const collectChildren = (parentId: string | number) => {
+						const children =
+							categoriesData?.items?.filter(
+								(c) => String(c.parentId) === String(parentId),
+							) || [];
+						for (const ch of children) {
+							allSubIds.push(Number(ch.id));
+							collectChildren(ch.id);
+						}
+					};
+					collectChildren(filterCategory);
+
+					if (allSubIds.length > 0) {
+						payload.filterGroup?.filters.push({
+							field: "category",
+							operator: "IN",
+							values: [Number(filterCategory), ...allSubIds],
+						});
+					} else {
+						payload.filterGroup?.filters.push({
+							field: "category",
+							operator: "EQUAL",
+							value: Number(filterCategory),
+						});
+					}
 				}
 				if (
 					filterBrand &&
@@ -677,19 +727,17 @@ function ProductsTab() {
 
 	const { data: brandsData } = useQuery({
 		queryKey: ["brands-all"],
-		queryFn: () => brandsApi.list({ limit: 100 }),
-		enabled: isDialogOpen || isMapUnitOpen,
+		queryFn: () => brandsApi.list({ limit: 500 }),
 	});
 
 	const { data: categoriesData } = useQuery({
 		queryKey: ["categories-all"],
-		queryFn: () => categoriesApi.list({ limit: 100 }),
-		enabled: isDialogOpen || isMapUnitOpen,
+		queryFn: () => categoriesApi.list({ limit: 500 }),
 	});
 
 	const { data: unitsData } = useQuery({
 		queryKey: ["units-all"],
-		queryFn: () => unitsApi.list({ limit: 100 }),
+		queryFn: () => unitsApi.list({ limit: 500 }),
 		enabled: isDialogOpen || isMapUnitOpen,
 	});
 
@@ -2074,35 +2122,42 @@ function ProductsTab() {
 						{/* EXPANDABLE ADVANCED FILTER CONTROLS */}
 						{isFilterExpanded && (
 							<div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
-								<ModernSelect
+								<CategoryTreeSelect
 									label="Category"
-									value={filterCategory}
+									placeholder="All Categories"
+									searchPlaceholder="Search category or subcategory..."
+									selectSize="md"
+									portal
+									value={filterCategory === "ALL" ? null : filterCategory}
+									categories={categoriesData?.items || []}
 									onChange={(val) => {
-										setFilterCategory(val);
+										setFilterCategory(val ? String(val) : "ALL");
 										setPage(1);
 									}}
-									options={[
-										{ value: "ALL", label: "All Categories" },
-										...(categoriesData?.items?.map((c) => ({
-											value: String(c.id),
-											label: c.name,
-										})) || []),
-									]}
 								/>
 
 								<ModernSelect
 									label="Brand"
 									value={filterBrand}
 									onChange={(val) => {
-										setFilterBrand(val);
+										setFilterBrand(val || "ALL");
 										setPage(1);
 									}}
+									searchable
+									portal
+									clearable
 									options={[
 										{ value: "ALL", label: "All Brands" },
-										...(brandsData?.items?.map((b) => ({
-											value: String(b.id),
-											label: b.name,
-										})) || []),
+										...(brandsData?.items
+											? [...brandsData.items]
+													.sort((a, b) =>
+														(a.name || "").localeCompare(b.name || ""),
+													)
+													.map((b) => ({
+														value: String(b.id),
+														label: b.name,
+													}))
+											: []),
 									]}
 								/>
 

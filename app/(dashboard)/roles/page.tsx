@@ -534,7 +534,20 @@ export default function RolesPage() {
 	);
 
 	return (
-		<div className="space-y-4 pb-12">
+		<div className="space-y-6 pb-12">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+						<ShieldCheck className="size-7 text-primary" />
+						<span>{t("roles.title", "Access Control Roles")}</span>
+					</h1>
+					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+						{t("roles.subtitle", "Define authorization roles, assign permission bundles, and configure hierarchy priority for security.")}
+					</p>
+				</div>
+			</div>
+
 			{/* Grid Cards View Mode */}
 			{viewMode === "grid" ? (
 				<div className="space-y-4">

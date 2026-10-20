@@ -1,9 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Search, X, Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+
+const useIsomorphicLayoutEffect =
+	typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
 
 export interface SelectOption {
 	value: string;
@@ -36,6 +40,7 @@ export interface ModernSelectProps {
 	name?: string;
 	id?: string;
 	children?: React.ReactNode;
+	portal?: boolean;
 }
 
 export function ModernSelect({
@@ -60,6 +65,7 @@ export function ModernSelect({
 	name,
 	id,
 	children,
+	portal = false,
 }: ModernSelectProps) {
 	const generatedId = React.useId();
 	const selectId = id || generatedId;
@@ -70,6 +76,53 @@ export function ModernSelect({
 	const [isOpen, setIsOpen] = React.useState(false);
 	const [searchQuery, setSearchQuery] = React.useState("");
 	const dropdownRef = React.useRef<HTMLDivElement>(null);
+	const triggerRef = React.useRef<HTMLButtonElement>(null);
+	const popoverRef = React.useRef<HTMLDivElement>(null);
+
+	const [popoverCoords, setPopoverCoords] = React.useState<{
+		top: number;
+		left: number;
+		width: number;
+	} | null>(null);
+
+	const calculatePopoverCoords = React.useCallback(() => {
+		if (!triggerRef.current) return null;
+		const rect = triggerRef.current.getBoundingClientRect();
+		const dropdownHeight = 280;
+		const spaceBelow = window.innerHeight - rect.bottom;
+		let top = rect.bottom + 4;
+		if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
+			top = Math.max(10, rect.top - dropdownHeight - 4);
+		}
+		return {
+			top,
+			left: rect.left,
+			width: Math.max(rect.width, 220),
+		};
+	}, []);
+
+	const updatePopoverCoords = React.useCallback(() => {
+		const coords = calculatePopoverCoords();
+		if (coords) setPopoverCoords(coords);
+	}, [calculatePopoverCoords]);
+
+	useIsomorphicLayoutEffect(() => {
+		if (isOpen && portal) {
+			updatePopoverCoords();
+		}
+	}, [isOpen, portal, updatePopoverCoords]);
+
+	React.useEffect(() => {
+		if (isOpen && portal) {
+			const handleScrollOrResize = () => updatePopoverCoords();
+			window.addEventListener("scroll", handleScrollOrResize, true);
+			window.addEventListener("resize", handleScrollOrResize);
+			return () => {
+				window.removeEventListener("scroll", handleScrollOrResize, true);
+				window.removeEventListener("resize", handleScrollOrResize);
+			};
+		}
+	}, [isOpen, portal, updatePopoverCoords]);
 
 	React.useEffect(() => {
 		if (value !== undefined) {
@@ -80,16 +133,18 @@ export function ModernSelect({
 	// Close dropdown on outside click
 	React.useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
 			if (
-				dropdownRef.current &&
-				!dropdownRef.current.contains(event.target as Node)
+				(dropdownRef.current && dropdownRef.current.contains(target)) ||
+				(portal && popoverRef.current && popoverRef.current.contains(target))
 			) {
-				setIsOpen(false);
+				return;
 			}
+			setIsOpen(false);
 		};
 		document.addEventListener("mousedown", handleClickOutside);
 		return () => document.removeEventListener("mousedown", handleClickOutside);
-	}, []);
+	}, [portal]);
 
 	const selectedOption = React.useMemo(() => {
 		return options.find((opt) => opt.value === selectedValue);
@@ -233,10 +288,22 @@ export function ModernSelect({
 			{/* Select Trigger Box */}
 			<div className={cn("relative", isOpen && "z-50")}>
 				<button
+					ref={triggerRef}
 					id={selectId}
 					type="button"
-					disabled={disabled}
-					onClick={() => setIsOpen((prev) => !prev)}
+					onClick={() => {
+						if (!disabled) {
+							if (!isOpen) {
+								if (portal) {
+									const coords = calculatePopoverCoords();
+									if (coords) setPopoverCoords(coords);
+								}
+								setIsOpen(true);
+							} else {
+								setIsOpen(false);
+							}
+						}
+					}}
 					className={cn(
 						"w-full flex items-center justify-between rounded-lg border transition-all duration-200 shadow-2xs outline-none focus:outline-none focus-visible:outline-none text-left cursor-pointer",
 						sizeStyles[selectSize],
@@ -320,83 +387,106 @@ export function ModernSelect({
 				</button>
 
 				{/* Dropdown Popup Menu */}
-				{isOpen && (
-					<div className="absolute z-50 mt-1.5 w-full rounded-xl border border-border/90 bg-popover text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in-50 zoom-in-95 duration-150 overflow-hidden dark:bg-slate-900 dark:border-slate-800">
-						{/* Search Input Filter */}
-						{searchable && (
-							<div className="p-2 border-b border-border/40">
-								<div className="relative flex items-center">
-									<Search className="absolute left-2.5 size-3.5 text-muted-foreground" />
-									<input
-										type="text"
-										value={searchQuery}
-										onChange={(e) => setSearchQuery(e.target.value)}
-										placeholder="Search options..."
-										className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted/40 rounded-lg outline-none border border-transparent focus:border-primary/40 dark:bg-slate-800/50"
-										autoFocus
-									/>
+				{isOpen && (!portal || popoverCoords) && (() => {
+					const dropdownMenuContent = (
+						<div
+							ref={popoverRef}
+							style={
+								portal && popoverCoords
+									? {
+											position: "fixed",
+											top: `${popoverCoords.top}px`,
+											left: `${popoverCoords.left}px`,
+											width: `${popoverCoords.width}px`,
+											zIndex: 99999,
+										}
+									: undefined
+							}
+							className={cn(
+								"rounded-xl border border-border/90 bg-popover text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in-50 zoom-in-95 duration-150 overflow-hidden dark:bg-slate-900 dark:border-slate-800",
+								!portal && "absolute z-50 mt-1.5 w-full",
+							)}
+						>
+							{/* Search Input Filter */}
+							{searchable && (
+								<div className="p-2 border-b border-border/40">
+									<div className="relative flex items-center">
+										<Search className="absolute left-2.5 size-3.5 text-muted-foreground" />
+										<input
+											type="text"
+											value={searchQuery}
+											onChange={(e) => setSearchQuery(e.target.value)}
+											placeholder="Search options..."
+											className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted/40 rounded-lg outline-none border border-transparent focus:border-primary/40 dark:bg-slate-800/50"
+											autoFocus
+										/>
+									</div>
 								</div>
-							</div>
-						)}
+							)}
 
-						{/* Options Scroll List */}
-						<div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5">
-							{filteredOptions.length === 0 ? (
-								<div className="py-4 text-center text-xs text-muted-foreground">
-									No options found.
-								</div>
-							) : (
-								filteredOptions.map((opt) => {
-									const isSelected = opt.value === selectedValue;
-									return (
-										<button
-											key={opt.value}
-											type="button"
-											disabled={opt.disabled}
-											onClick={() => handleSelect(opt.value)}
-											className={cn(
-												"w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left",
-												isSelected
-													? "bg-primary/10 text-primary font-semibold dark:bg-primary/20"
-													: "hover:bg-muted text-foreground dark:hover:bg-slate-800/80",
-												opt.disabled && "opacity-50 cursor-not-allowed",
-											)}
-										>
-											<div className="flex items-center gap-2.5 min-w-0 pr-2">
-												{opt.icon && (
-													<span className="shrink-0 text-muted-foreground">
-														{opt.icon}
-													</span>
+							{/* Options Scroll List */}
+							<div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5">
+								{filteredOptions.length === 0 ? (
+									<div className="py-4 text-center text-xs text-muted-foreground">
+										No options found.
+									</div>
+								) : (
+									filteredOptions.map((opt) => {
+										const isSelected = opt.value === selectedValue;
+										return (
+											<button
+												key={opt.value}
+												type="button"
+												disabled={opt.disabled}
+												onClick={() => handleSelect(opt.value)}
+												className={cn(
+													"w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left",
+													isSelected
+														? "bg-primary/10 text-primary font-semibold dark:bg-primary/20"
+														: "hover:bg-muted text-foreground dark:hover:bg-slate-800/80",
+													opt.disabled && "opacity-50 cursor-not-allowed",
 												)}
-												<div className="truncate">
-													<div className="truncate font-medium">
-														{opt.label}
-													</div>
-													{opt.description && (
-														<div className="text-[10px] text-muted-foreground truncate">
-															{opt.description}
+											>
+												<div className="flex items-center gap-2.5 min-w-0 pr-2">
+													{opt.icon && (
+														<span className="shrink-0 text-muted-foreground">
+															{opt.icon}
+														</span>
+													)}
+													<div className="truncate">
+														<div className="truncate font-medium">
+															{opt.label}
 														</div>
+														{opt.description && (
+															<div className="text-[10px] text-muted-foreground truncate">
+																{opt.description}
+															</div>
+														)}
+													</div>
+												</div>
+
+												<div className="flex items-center gap-2 shrink-0">
+													{opt.badge && (
+														<span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+															{opt.badge}
+														</span>
+													)}
+													{isSelected && (
+														<Check className="size-4 text-primary" />
 													)}
 												</div>
-											</div>
-
-											<div className="flex items-center gap-2 shrink-0">
-												{opt.badge && (
-													<span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
-														{opt.badge}
-													</span>
-												)}
-												{isSelected && (
-													<Check className="size-4 text-primary" />
-												)}
-											</div>
-										</button>
-									);
-								})
-							)}
+											</button>
+										);
+									})
+								)}
+							</div>
 						</div>
-					</div>
-				)}
+					);
+
+					return portal && typeof document !== "undefined"
+						? createPortal(dropdownMenuContent, document.body)
+						: dropdownMenuContent;
+				})()}
 			</div>
 
 			{/* Helper / Error */}

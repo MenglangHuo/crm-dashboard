@@ -28,10 +28,12 @@ import {
 	LogOut,
 	Moon,
 	Palette,
+	Search,
 	Settings,
 	Sun,
 	User
 } from "lucide-react";
+import { useQuickActions } from "@/components/quick-action-modal-context";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import React from "react";
@@ -100,6 +102,7 @@ export function Header() {
 	const { setTheme, theme } = useTheme();
 	const { setIsCustomizerOpen } = useCustomTheme();
 	const { t } = useTranslation();
+	const { setCommandPaletteOpen } = useQuickActions();
 
 	const { data: userProfile, isLoading: isLoadingProfile } = useQuery({
 		queryKey: ["profile"],
@@ -178,12 +181,39 @@ export function Header() {
 				</div>
 			</div>
 
-			<div className="flex items-center gap-3 md:gap-4">
+			<div className="flex items-center gap-2.5 sm:gap-3 md:gap-4">
+				{/* Global Search & Command Trigger (Aligned with Company & Utilities) */}
+				<button
+					type="button"
+					onClick={() => setCommandPaletteOpen(true)}
+					className="group hidden sm:flex h-9.5 w-44 md:w-56 lg:w-64 items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-slate-100/70 px-3 text-xs text-slate-500 shadow-2xs transition-all duration-150 hover:border-primary/40 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:border-primary/40 dark:hover:bg-slate-900 dark:hover:text-slate-100 cursor-pointer select-none"
+					title="Open Global Search (⌘K)"
+				>
+					<Search className="size-4 shrink-0 text-slate-400 group-hover:text-primary transition-colors" />
+					<span className="flex-1 text-left font-medium truncate">
+						{t("common.globalSearch", "Search CRM...")}
+					</span>
+					<kbd className="inline-flex h-5 items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 font-mono text-[10px] font-semibold text-slate-500 shadow-2xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+						<span className="text-[11px]">⌘</span>K
+					</kbd>
+				</button>
+
 				{/* Company Switcher for System Admin */}
 				<CompanySwitcher />
 
 				{/* Quick Icon Actions */}
 				<div className="flex items-center gap-1 rounded-2xl border border-slate-200/70 bg-slate-100/70 p-1 dark:border-slate-800 dark:bg-slate-900/70">
+					{/* Mobile Search Icon Trigger */}
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8 rounded-xl text-slate-500 hover:bg-white hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 sm:hidden"
+						onClick={() => setCommandPaletteOpen(true)}
+						title="Open Global Search (⌘K)"
+					>
+						<Search className="h-4 w-4 text-primary" />
+					</Button>
+
 					{/* Interactive Language Selector */}
 					<LanguageSwitcher />
 

@@ -1,58 +1,48 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getErrorMessage } from "@/lib/api/client";
 import { adminsApi } from "@/lib/api/endpoints";
 import {
+	AdminResetPasswordResponse,
 	SystemAdmin,
-	CreateSystemAdminInput,
-	UpdateSystemAdminInput,
+	UpdateSystemAdminInput
 } from "@/lib/types";
-import { getErrorMessage } from "@/lib/api/client";
-import { toast } from "sonner";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+	AlertCircle,
+	Calendar,
+	CheckCheck,
+	CheckCircle2,
+	Clock,
+	Copy,
+	Eye,
+	FileText,
+	Headphones,
+	KeyRound,
+	Loader2,
+	Lock,
+	Mail,
+	Pencil,
+	Phone,
+	RotateCcw,
+	Shield,
 	ShieldAlert,
 	ShieldCheck,
-	Shield,
-	Eye,
-	Pencil,
-	Mail,
-	Lock,
-	Unlock,
-	KeyRound,
 	Users,
-	CheckCircle2,
-	XCircle,
-	Clock,
-	Calendar,
-	Sparkles,
-	UserCheck,
-	Headphones,
-	FileText,
-	Copy,
-	CheckCheck,
-	AlertTriangle,
-	RotateCcw,
+	XCircle
 } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import * as z from "zod";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
-	DataTable,
 	ColumnDef,
-	UserDetailCell,
+	DataTable,
 	RowAction,
+	UserDetailCell,
 } from "@/components/ui-custom/data-table";
-import {
-	ModernModal,
-	ModernModalFooter,
-	ModernModalCancelButton,
-	ModernModalSubmitButton,
-} from "@/components/ui-custom/modal";
 import {
 	ModernInput,
 	ModernSelect,
@@ -60,36 +50,29 @@ import {
 	ModernTextarea,
 } from "@/components/ui-custom/form-controls";
 import {
-	ModernTabs,
-	ModernTabsList,
-	ModernTabsTrigger,
-} from "@/components/ui-custom/modern-tabs";
+	ModernModal,
+	ModernModalCancelButton,
+	ModernModalFooter,
+	ModernModalSubmitButton,
+} from "@/components/ui-custom/modal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useTranslation } from "@/lib/i18n/context";
 
-// Admin Level Options
-const ADMIN_LEVEL_OPTIONS = [
-	{
-		value: "SUPPORT",
-		label: "Support Team (SUPPORT)",
-		description: "Operational support, user assistance, and management",
-	},
-	{
-		value: "READ_ONLY",
-		label: "Read Only (READ_ONLY)",
-		description: "View-only access across administrative domains",
-	},
-	{
-		value: "FULL",
-		label: "Full Administrator (FULL)",
-		description: "Unrestricted root administrative permissions and settings",
-	},
-];
 
 // Form validation schemas
 const createFormSchema = z.object({
 	displayName: z.string().min(1, "Display name is required"),
 	username: z.string().min(3, "Username must be at least 3 characters"),
 	email: z.string().email("Valid email address is required"),
+	phoneNumber: z
+		.string()
+		.optional()
+		.refine(
+			(val) => !val || (val.length >= 8 && val.length <= 20),
+			"Phone number must be between 8 and 20 digits",
+		),
 	password: z.string().min(6, "Password must be at least 6 characters"),
 	adminLevel: z.string().min(1, "Admin level is required"),
 	isActive: z.boolean().default(true),
@@ -100,6 +83,13 @@ const editFormSchema = z.object({
 	displayName: z.string().min(1, "Display name is required"),
 	username: z.string().min(3, "Username must be at least 3 characters"),
 	email: z.string().email("Valid email address is required"),
+	phoneNumber: z
+		.string()
+		.optional()
+		.refine(
+			(val) => !val || (val.length >= 8 && val.length <= 20),
+			"Phone number must be between 8 and 20 digits",
+		),
 	password: z.string().optional(),
 	adminLevel: z.string().min(1, "Admin level is required"),
 	isActive: z.boolean().default(true),
@@ -162,6 +152,9 @@ export default function SystemAdminsPage() {
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
 	const [editingAdmin, setEditingAdmin] = useState<SystemAdmin | null>(null);
 	const [viewingAdmin, setViewingAdmin] = useState<SystemAdmin | null>(null);
+	const [resetPasswordAdmin, setResetPasswordAdmin] = useState<SystemAdmin | null>(null);
+	const [tempPasswordResult, setTempPasswordResult] = useState<AdminResetPasswordResponse | null>(null);
+	const [copiedTempPassword, setCopiedTempPassword] = useState(false);
 	const [togglingId, setTogglingId] = useState<string | number | null>(null);
 	const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
@@ -199,6 +192,7 @@ export default function SystemAdminsPage() {
 			displayName: "",
 			username: "",
 			email: "",
+			phoneNumber: "",
 			password: "",
 			adminLevel: "SUPPORT",
 			isActive: true,
@@ -213,6 +207,7 @@ export default function SystemAdminsPage() {
 			displayName: "",
 			username: "",
 			email: "",
+			phoneNumber: "",
 			password: "",
 			adminLevel: "SUPPORT",
 			isActive: true,
@@ -222,7 +217,13 @@ export default function SystemAdminsPage() {
 
 	// Create Mutation
 	const createMutation = useMutation({
-		mutationFn: (values: CreateFormValues) => adminsApi.create(values),
+		mutationFn: (values: CreateFormValues) => {
+			const payload = {
+				...values,
+				phoneNumber: values.phoneNumber?.trim() || undefined,
+			};
+			return adminsApi.create(payload);
+		},
 		onSuccess: (res) => {
 			toast.success(
 				res?.username
@@ -257,6 +258,25 @@ export default function SystemAdminsPage() {
 			}
 			setEditingAdmin(null);
 			editForm.reset();
+		},
+		onError: (error) => toast.error(getErrorMessage(error)),
+	});
+
+	// Reset Password Mutation
+	const resetPasswordMutation = useMutation({
+		mutationFn: (admin: SystemAdmin) => adminsApi.resetPassword(admin.id),
+		onSuccess: (res) => {
+			toast.success(
+				"Password reset successfully. A temporary password has been generated.",
+			);
+			setResetPasswordAdmin(null);
+			setTempPasswordResult(res);
+			queryClient.invalidateQueries({ queryKey: ["system-admins"] });
+			if (res?.id) {
+				queryClient.invalidateQueries({
+					queryKey: ["system-admin-detail", res.id],
+				});
+			}
 		},
 		onError: (error) => toast.error(getErrorMessage(error)),
 	});
@@ -302,6 +322,7 @@ export default function SystemAdminsPage() {
 			displayName: "",
 			username: "",
 			email: "",
+			phoneNumber: "",
 			password: "",
 			adminLevel: "SUPPORT",
 			isActive: true,
@@ -317,6 +338,7 @@ export default function SystemAdminsPage() {
 			displayName: admin.displayName || "",
 			username: admin.username || "",
 			email: admin.email || "",
+			phoneNumber: admin.phoneNumber || "",
 			password: "",
 			adminLevel: admin.adminLevel || "SUPPORT",
 			isActive: admin.isActive !== false,
@@ -336,6 +358,7 @@ export default function SystemAdminsPage() {
 			displayName: values.displayName,
 			username: values.username,
 			email: values.email,
+			phoneNumber: values.phoneNumber !== undefined ? (values.phoneNumber.trim() || undefined) : undefined,
 			adminLevel: values.adminLevel,
 			isActive: values.isActive,
 			notes: values.notes,
@@ -464,6 +487,23 @@ export default function SystemAdminsPage() {
 					)}
 				</div>
 			),
+		},
+		{
+			id: "phone",
+			header: t("superAdmin.admins.columns.phone", "Phone Number"),
+			accessorKey: "phoneNumber",
+			sortable: true,
+			cell: ({ row }) =>
+				row.phoneNumber ? (
+					<div className="flex items-center gap-1.5 text-xs font-mono text-foreground">
+						<Phone className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+						<span>{row.phoneNumber}</span>
+					</div>
+				) : (
+					<span className="text-xs text-slate-300 dark:text-slate-600 italic">
+						—
+					</span>
+				),
 		},
 		{
 			id: "adminLevel",
@@ -602,6 +642,15 @@ export default function SystemAdminsPage() {
 			),
 			icon: <Pencil className="h-3.5 w-3.5 text-blue-600" />,
 			onClick: (admin) => openEditModal(admin),
+		},
+		{
+			id: "resetPassword",
+			label: t(
+				"superAdmin.admins.actions.resetPassword",
+				"Reset Password",
+			),
+			icon: <KeyRound className="h-3.5 w-3.5 text-amber-600" />,
+			onClick: (admin) => setResetPasswordAdmin(admin),
 		},
 		{
 			id: "toggle",
@@ -748,55 +797,14 @@ export default function SystemAdminsPage() {
 			</div>
 
 			{/* Privilege Level Filter Tabs */}
-			<ModernTabs
-				value={levelFilter}
-				onValueChange={(val) => {
-					setLevelFilter(val);
-					setPage(1);
-				}}
-			>
-				<ModernTabsList variant="pills" size="sm">
-					<ModernTabsTrigger
-						value="ALL"
-						badge={totalAdmins}
-						badgeColor="purple"
-						icon={<Shield className="h-3.5 w-3.5" />}
-					>
-						{t("superAdmin.admins.allAdmins", "All Admins")}
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="SUPPORT"
-						badge={supportAdminsCount}
-						badgeColor="sky"
-						icon={<Headphones className="h-3.5 w-3.5" />}
-					>
-						{t("superAdmin.admins.supportTab", "Support Staff")}
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="READ_ONLY"
-						badge={readOnlyAdminsCount}
-						badgeColor="slate"
-						icon={<Eye className="h-3.5 w-3.5" />}
-					>
-						{t("superAdmin.admins.readOnlyTab", "Read Only")}
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="FULL"
-						badge={fullAdminsCount}
-						badgeColor="indigo"
-						icon={<ShieldAlert className="h-3.5 w-3.5" />}
-					>
-						{t("superAdmin.admins.rootTab", "Root Full Admin")}
-					</ModernTabsTrigger>
-				</ModernTabsList>
-			</ModernTabs>
+
 
 			{/* Main Data Table */}
 			<DataTable<SystemAdmin>
 				data={adminList}
 				columns={columns}
 				getRowId={(a) => String(a.id)}
-				title={t("superAdmin.admins.listTitle", "System Administrators List")}
+				hideHeader={true}
 				searchPlaceholder={t(
 					"superAdmin.admins.searchPlaceholder",
 					"Search admin by name, username, email, notes...",
@@ -806,8 +814,6 @@ export default function SystemAdminsPage() {
 					setSearch(val);
 					setPage(1);
 				}}
-				createButtonLabel={t("superAdmin.admins.addAdmin", "Provision Admin")}
-				onCreateNew={openCreateModal}
 				actions={customRowActions}
 				manualPagination={true}
 				totalCount={data?.total || 0}
@@ -910,19 +916,33 @@ export default function SystemAdminsPage() {
 						/>
 						<ModernInput
 							label={t(
-								"superAdmin.admins.createModal.passwordLabel",
-								"Account Password",
+								"superAdmin.admins.createModal.phoneLabel",
+								"Phone Number",
 							)}
-							type="password"
+							type="tel"
 							placeholder={t(
-								"superAdmin.admins.createModal.passwordPlaceholder",
-								"••••••••",
+								"superAdmin.admins.createModal.phonePlaceholder",
+								"e.g. 0968137739",
 							)}
-							{...createForm.register("password")}
-							error={createForm.formState.errors.password?.message}
-							required
+							{...createForm.register("phoneNumber")}
+							error={createForm.formState.errors.phoneNumber?.message}
 						/>
 					</div>
+
+					<ModernInput
+						label={t(
+							"superAdmin.admins.createModal.passwordLabel",
+							"Account Password",
+						)}
+						type="password"
+						placeholder={t(
+							"superAdmin.admins.createModal.passwordPlaceholder",
+							"••••••••",
+						)}
+						{...createForm.register("password")}
+						error={createForm.formState.errors.password?.message}
+						required
+					/>
 
 					<ModernSelect
 						label={t(
@@ -1052,19 +1072,33 @@ export default function SystemAdminsPage() {
 						/>
 						<ModernInput
 							label={t(
-								"superAdmin.admins.createModal.passwordLabel",
-								"Account Password",
+								"superAdmin.admins.createModal.phoneLabel",
+								"Phone Number",
 							)}
-							type="password"
-							placeholder="••••••••"
-							{...editForm.register("password")}
-							error={editForm.formState.errors.password?.message}
-							helperText={t(
-								"superAdmin.admins.editModal.passwordHelper",
-								"Leave blank to keep existing password unchanged",
+							type="tel"
+							placeholder={t(
+								"superAdmin.admins.createModal.phonePlaceholder",
+								"e.g. 0968137739",
 							)}
+							{...editForm.register("phoneNumber")}
+							error={editForm.formState.errors.phoneNumber?.message}
 						/>
 					</div>
+
+					<ModernInput
+						label={t(
+							"superAdmin.admins.createModal.passwordLabel",
+							"Account Password",
+						)}
+						type="password"
+						placeholder="••••••••"
+						{...editForm.register("password")}
+						error={editForm.formState.errors.password?.message}
+						helperText={t(
+							"superAdmin.admins.editModal.passwordHelper",
+							"Leave blank to keep existing password unchanged",
+						)}
+					/>
 
 					<ModernSelect
 						label={t(
@@ -1137,23 +1171,42 @@ export default function SystemAdminsPage() {
 							label={t("common.close", "Close")}
 						/>
 						{activeAdminDetails && (
-							<Button
-								variant="outline"
-								className="rounded-xl px-4 py-2 text-xs font-semibold gap-2 border-slate-200 dark:border-slate-800"
-								onClick={() => {
-									const target = activeAdminDetails;
-									setViewingAdmin(null);
-									openEditModal(target);
-								}}
-							>
-								<Pencil className="h-3.5 w-3.5" />
-								<span>
-									{t(
-										"superAdmin.admins.actions.editAdmin",
-										"Edit Credentials & Level",
-									)}
-								</span>
-							</Button>
+							<>
+								<Button
+									variant="outline"
+									className="rounded-xl px-4 py-2 text-xs font-semibold gap-2 border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-900/60 dark:text-amber-400 dark:hover:bg-amber-950/40"
+									onClick={() => {
+										const target = activeAdminDetails;
+										setViewingAdmin(null);
+										setResetPasswordAdmin(target);
+									}}
+								>
+									<KeyRound className="h-3.5 w-3.5" />
+									<span>
+										{t(
+											"superAdmin.admins.actions.resetPassword",
+											"Reset Password",
+										)}
+									</span>
+								</Button>
+								<Button
+									variant="outline"
+									className="rounded-xl px-4 py-2 text-xs font-semibold gap-2 border-slate-200 dark:border-slate-800"
+									onClick={() => {
+										const target = activeAdminDetails;
+										setViewingAdmin(null);
+										openEditModal(target);
+									}}
+								>
+									<Pencil className="h-3.5 w-3.5" />
+									<span>
+										{t(
+											"superAdmin.admins.actions.editAdmin",
+											"Edit Credentials & Level",
+										)}
+									</span>
+								</Button>
+							</>
 						)}
 					</ModernModalFooter>
 				}
@@ -1192,6 +1245,12 @@ export default function SystemAdminsPage() {
 										<Mail className="h-3 w-3 text-muted-foreground" />
 										<span>{activeAdminDetails.email}</span>
 									</p>
+									{activeAdminDetails.phoneNumber && (
+										<p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 flex items-center gap-1.5 font-mono">
+											<Phone className="h-3 w-3 text-emerald-600 shrink-0" />
+											<span>{activeAdminDetails.phoneNumber}</span>
+										</p>
+									)}
 								</div>
 							</div>
 
@@ -1271,6 +1330,18 @@ export default function SystemAdminsPage() {
 
 							<div className="p-3.5 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900/50 space-y-1">
 								<span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+									Phone Number
+								</span>
+								<p className="text-xs text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1.5 font-mono">
+									<Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+									<span>
+										{activeAdminDetails.phoneNumber || "No phone registered"}
+									</span>
+								</p>
+							</div>
+
+							<div className="p-3.5 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900/50 space-y-1">
+								<span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
 									Last Login Timestamp
 								</span>
 								<p className="text-xs text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1.5">
@@ -1283,7 +1354,7 @@ export default function SystemAdminsPage() {
 								</p>
 							</div>
 
-							<div className="p-3.5 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900/50 space-y-1">
+							<div className="p-3.5 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900/50 space-y-1 sm:col-span-2">
 								<span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
 									Registered Date
 								</span>
@@ -1306,6 +1377,176 @@ export default function SystemAdminsPage() {
 								</p>
 							</div>
 						)}
+					</div>
+				)}
+			</ModernModal>
+
+			{/* ============================================================ */}
+			{/* 4. ADMIN RESET PASSWORD CONFIRMATION MODAL                   */}
+			{/* ============================================================ */}
+			<ModernModal
+				isOpen={!!resetPasswordAdmin}
+				onClose={() => setResetPasswordAdmin(null)}
+				title={t(
+					"superAdmin.admins.resetPasswordModal.title",
+					"Reset System Admin Password",
+				)}
+				subtitle={
+					resetPasswordAdmin
+						? `${t(
+								"superAdmin.admins.resetPasswordModal.confirmPrompt",
+								"Are you sure you want to reset the password for system admin",
+						  )} @${resetPasswordAdmin.username}?`
+						: ""
+				}
+				icon={<KeyRound className="h-5 w-5 text-amber-600" />}
+				size="md"
+				isLoading={resetPasswordMutation.isPending}
+				footer={
+					<ModernModalFooter>
+						<ModernModalCancelButton
+							onClick={() => setResetPasswordAdmin(null)}
+							disabled={resetPasswordMutation.isPending}
+						/>
+						<Button
+							variant="destructive"
+							onClick={() =>
+								resetPasswordAdmin &&
+								resetPasswordMutation.mutate(resetPasswordAdmin)
+							}
+							disabled={resetPasswordMutation.isPending}
+							className="rounded-xl px-4 py-2 text-xs font-semibold gap-2"
+						>
+							{resetPasswordMutation.isPending ? (
+								<Loader2 className="h-4 w-4 animate-spin shrink-0" />
+							) : (
+								<KeyRound className="h-4 w-4 shrink-0" />
+							)}
+							<span>
+								{t(
+									"superAdmin.admins.resetPasswordModal.confirmButton",
+									"Reset Password",
+								)}
+							</span>
+						</Button>
+					</ModernModalFooter>
+				}
+			>
+				{resetPasswordAdmin && (
+					<div className="space-y-3.5 py-1">
+						<div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300 flex items-start gap-2.5">
+							<AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+							<p className="leading-relaxed">
+								{t(
+									"superAdmin.admins.resetPasswordModal.confirmWarning",
+									"This will immediately terminate all active sessions for this administrator and generate a temporary password.",
+								)}
+							</p>
+						</div>
+
+						<div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-xs space-y-1.5 font-mono">
+							<div>
+								<span className="text-muted-foreground">Admin: </span>
+								<span className="font-semibold text-foreground">
+									{resetPasswordAdmin.displayName || resetPasswordAdmin.username} (@{resetPasswordAdmin.username})
+								</span>
+							</div>
+							<div>
+								<span className="text-muted-foreground">Email: </span>
+								<span className="text-foreground">{resetPasswordAdmin.email}</span>
+							</div>
+							{resetPasswordAdmin.phoneNumber && (
+								<div>
+									<span className="text-muted-foreground">Phone: </span>
+									<span className="text-foreground">{resetPasswordAdmin.phoneNumber}</span>
+								</div>
+							)}
+						</div>
+					</div>
+				)}
+			</ModernModal>
+
+			{/* ============================================================ */}
+			{/* 5. TEMPORARY PASSWORD RESULT MODAL                           */}
+			{/* ============================================================ */}
+			<ModernModal
+				isOpen={!!tempPasswordResult}
+				onClose={() => setTempPasswordResult(null)}
+				title={t(
+					"superAdmin.admins.resetPasswordModal.tempPasswordTitle",
+					"Temporary Password Generated",
+				)}
+				subtitle={t(
+					"superAdmin.admins.resetPasswordModal.tempPasswordDesc",
+					"A temporary password has been generated for this administrator. Please securely share it with them.",
+				)}
+				icon={<ShieldCheck className="h-5 w-5 text-emerald-600" />}
+				size="md"
+				footer={
+					<ModernModalFooter>
+						<Button
+							onClick={() => setTempPasswordResult(null)}
+							className="rounded-xl px-5 py-2 text-xs font-semibold"
+						>
+							{t("common.done", "Done")}
+						</Button>
+					</ModernModalFooter>
+				}
+			>
+				{tempPasswordResult && (
+					<div className="space-y-4 py-2">
+						<div className="space-y-1.5">
+							<label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+								{t(
+									"superAdmin.admins.resetPasswordModal.tempPasswordLabel",
+									"Temporary Password",
+								)}
+							</label>
+							<div className="flex items-center gap-2">
+								<div className="flex-1 p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono text-base font-bold text-slate-900 dark:text-slate-100 tracking-wider select-all">
+									{tempPasswordResult.tempPassword}
+								</div>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => {
+										navigator.clipboard.writeText(tempPasswordResult.tempPassword);
+										setCopiedTempPassword(true);
+										toast.success("Temporary password copied to clipboard");
+										setTimeout(() => setCopiedTempPassword(false), 2000);
+									}}
+									className="rounded-xl px-3.5 py-3 h-auto text-xs font-semibold gap-1.5 border-slate-200 dark:border-slate-800 shrink-0"
+								>
+									{copiedTempPassword ? (
+										<>
+											<CheckCheck className="h-4 w-4 text-emerald-600" />
+											<span>Copied!</span>
+										</>
+									) : (
+										<>
+											<Copy className="h-4 w-4" />
+											<span>Copy</span>
+										</>
+									)}
+								</Button>
+							</div>
+						</div>
+
+						<div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 p-3 text-xs space-y-1 font-mono">
+							<div className="text-muted-foreground">
+								Target: <span className="font-semibold text-foreground">@{tempPasswordResult.username}</span>
+							</div>
+							{tempPasswordResult.email && (
+								<div className="text-muted-foreground">
+									Email: <span className="text-foreground">{tempPasswordResult.email}</span>
+								</div>
+							)}
+							{tempPasswordResult.phoneNumber && (
+								<div className="text-muted-foreground">
+									Phone: <span className="text-foreground">{tempPasswordResult.phoneNumber}</span>
+								</div>
+							)}
+						</div>
 					</div>
 				)}
 			</ModernModal>

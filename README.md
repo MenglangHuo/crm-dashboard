@@ -64,8 +64,6 @@ The CRM frontend is designed as a secure, high-performance single-page/server-re
 - **Analytics & Reporting**:
   - Interactive dashboards using ApexCharts.
   - Revenue, profit/loss, and inventory valuation time-series charts.
-- **Push Notifications**:
-  - Real-time web push notifications powered by OneSignal.
 
 ---
 
@@ -81,7 +79,7 @@ The CRM frontend is designed as a secure, high-performance single-page/server-re
 | **State & Data Fetching** | TanStack React Query v5, Axios |
 | **Forms & Validation** | React Hook Form, Zod |
 | **Charts** | ApexCharts, React-ApexCharts |
-| **Notifications** | Sonner (Toasts), OneSignal (Push Notifications) |
+| **Notifications** | Sonner (Toasts) |
 | **Package Manager** | pnpm 11 |
 
 ---
@@ -135,7 +133,6 @@ Create a `.env` file in the `crm-dashboard` root directory:
 | `NEXT_PUBLIC_API_BACKEND_URL` | **Yes** | `http://localhost:8091` | The target Spring Boot API server URL used by Next.js rewrites and server proxy. **Set to `https://crmapi.bronxtechnology.site` in production.** |
 | `NEXT_PUBLIC_API_BASE_URL` | **Yes** | `/api/v1` | Relative base path for browser API client calls (same-origin). |
 | `NEXT_PUBLIC_API_TIMEOUT` | No | `15000` | Axios HTTP timeout in milliseconds. |
-| `NEXT_PUBLIC_ONESIGNAL_APP_ID` | No | - | App ID for OneSignal push notification integration. |
 | `NEXT_PUBLIC_COMPANY_NAME` | No | `Crm` | Company display name in the navigation header. |
 | `NEXT_PUBLIC_COMPANY_TAGLINE` | No | - | Subtitle tagline on authentication pages. |
 | `NEXT_PUBLIC_COMPANY_LOGO_URL` | No | `/icon.svg` | Path or URL to company logo icon. |
@@ -160,7 +157,6 @@ When deploying `crm-dashboard` to Vercel:
    - `NEXT_PUBLIC_API_BACKEND_URL`: `https://crmapi.bronxtechnology.site`
    - `NEXT_PUBLIC_API_BASE_URL`: `/api/v1`
    - `NEXT_PUBLIC_API_TIMEOUT`: `15000`
-   - `NEXT_PUBLIC_ONESIGNAL_APP_ID`: `your_onesignal_app_id`
 
 ---
 

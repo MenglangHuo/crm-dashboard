@@ -640,7 +640,20 @@ export default function DeliveriesPage() {
 	const isSaving = createMutation.isPending || updateMutation.isPending;
 
 	return (
-		<div className="space-y-4 pb-12">
+		<div className="space-y-6 pb-12">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+						<Truck className="size-7 text-primary" />
+						<span>{t("deliveries.title", "Delivery Carriers & Logistics")}</span>
+					</h1>
+					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+						{t("deliveries.subtitle", "Manage dispatch drivers, transport vehicle types, and province coverage")}
+					</p>
+				</div>
+			</div>
+
 			{/* Metrics Summary Cards */}
 			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 				<Card className="rounded-2xl border-slate-200/80 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">

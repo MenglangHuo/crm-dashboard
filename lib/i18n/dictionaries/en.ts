@@ -812,6 +812,14 @@ export const en = {
 		notes: "Notes",
 		netBalanceImpact: "Net Impact",
 	},
+	imports: {
+		title: "Imports & Receiving",
+		subtitle: "Manage stock shipment imports, purchase receiving, and supplier returns.",
+	},
+	paymentTerms: {
+		title: "Payment Terms & Policies",
+		subtitle: "Configure customer credit windows, cash settlement discount tiers, and due date policies.",
+	},
 	customers: {
 		title: "Customer Management",
 		subtitle: "Manage client directory, shop locations, visit cycles, and balances",
@@ -1900,6 +1908,7 @@ export const en = {
 			columns: {
 				adminInfo: "Admin Name & Username",
 				email: "Email Address",
+				phone: "Phone Number",
 				level: "Privilege Level",
 				status: "Account Status",
 				created: "Created Date",
@@ -1907,6 +1916,7 @@ export const en = {
 			actions: {
 				viewProfile: "Inspect Admin Profile",
 				editAdmin: "Edit Credentials & Level",
+				resetPassword: "Reset Password",
 				deactivate: "Deactivate Admin",
 				activate: "Activate Admin",
 			},
@@ -1919,6 +1929,8 @@ export const en = {
 				usernamePlaceholder: "e.g. huomenglang",
 				emailLabel: "Email Address",
 				emailPlaceholder: "e.g. menglanghuo@gmail.com",
+				phoneLabel: "Phone Number",
+				phonePlaceholder: "e.g. 0968137739",
 				passwordLabel: "Account Password",
 				passwordPlaceholder: "••••••••",
 				levelLabel: "Admin Access Level",
@@ -1942,6 +1954,16 @@ export const en = {
 			inspectModal: {
 				title: "System Administrator Profile #{{id}}",
 				subtitle: "Comprehensive security parameters, access privileges, and creation metadata.",
+			},
+			resetPasswordModal: {
+				title: "Reset System Admin Password",
+				confirmPrompt: "Are you sure you want to reset the password for system admin",
+				confirmWarning: "This will immediately terminate all active sessions for this administrator and generate a temporary password.",
+				confirmButton: "Reset Password",
+				tempPasswordTitle: "Temporary Password Generated",
+				tempPasswordDesc: "A temporary password has been generated for this administrator. Please securely share it with them.",
+				tempPasswordLabel: "Temporary Password",
+				copyPassword: "Copy Password",
 			},
 		},
 	},

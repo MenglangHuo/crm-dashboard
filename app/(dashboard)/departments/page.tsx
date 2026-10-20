@@ -188,7 +188,20 @@ export default function DepartmentsPage() {
 	];
 
 	return (
-		<div className="space-y-4 pb-12">
+		<div className="space-y-6 pb-12">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+						<Building2 className="size-7 text-primary" />
+						<span>{t("departments.title", "Departments Directory")}</span>
+					</h1>
+					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+						{t("departments.subtitle", "Manage company operating departments and parent division assignments.")}
+					</p>
+				</div>
+			</div>
+
 			<DataTable<Department>
 				data={data?.items || []}
 				columns={columns}

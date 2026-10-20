@@ -76,6 +76,7 @@ export interface ModernModalProps {
 
 	onMinimizeChange?: (isMinimized: boolean) => void;
 	onMaximizeChange?: (isMaximized: boolean) => void;
+	onResize?: (dimensions: { width?: number; height?: number }) => void;
 }
 
 type WindowMode = "normal" | "minimized" | "maximized" | "fullscreen";
@@ -90,6 +91,65 @@ const SIZE_MAP: Record<ModalSize, { width: string; height: string }> = {
 	auto: { width: "w-auto min-w-[320px]", height: "h-auto" },
 };
 
+function parseSizeToPixels(
+	val: number | string | undefined,
+	viewportDimension: number,
+	defaultVal: number,
+): number {
+	if (typeof val === "number") return val;
+	if (typeof val === "string") {
+		const trimmed = val.trim();
+		if (trimmed.endsWith("px")) {
+			const parsed = parseFloat(trimmed);
+			if (!isNaN(parsed)) return parsed;
+		}
+		if (trimmed.endsWith("vw") || trimmed.endsWith("vh")) {
+			const parsed = parseFloat(trimmed);
+			if (!isNaN(parsed)) return (parsed / 100) * viewportDimension;
+		}
+		if (trimmed.endsWith("%")) {
+			const parsed = parseFloat(trimmed);
+			if (!isNaN(parsed)) return (parsed / 100) * viewportDimension;
+		}
+		const tailwindMap: Record<string, number> = {
+			sm: 384,
+			md: 448,
+			lg: 512,
+			xl: 576,
+			"2xl": 672,
+			"3xl": 768,
+			"4xl": 896,
+			"5xl": 1024,
+			"6xl": 1152,
+			"7xl": 1280,
+		};
+		const key = trimmed.replace(/^max-w-/, "");
+		if (tailwindMap[key]) return tailwindMap[key];
+		const parsed = parseFloat(trimmed);
+		if (!isNaN(parsed)) return parsed;
+	}
+	return defaultVal;
+}
+
+function getResizeCursor(direction: string): string {
+	switch (direction) {
+		case "n":
+		case "s":
+			return "ns-resize";
+		case "e":
+		case "w":
+			return "ew-resize";
+		case "nw":
+		case "se":
+			return "nwse-resize";
+		case "ne":
+		case "sw":
+			return "nesw-resize";
+		default:
+			return "default";
+	}
+}
+
 export function ModernModal({
 	isOpen,
 	open,
@@ -101,7 +161,7 @@ export function ModernModal({
 	icon,
 	children,
 	footer,
-	size = "lg",
+	size = "md",
 	defaultWidth,
 	defaultHeight,
 	minWidth = 340,
@@ -133,13 +193,14 @@ export function ModernModal({
 	overlayClassName,
 	onMinimizeChange,
 	onMaximizeChange,
+	onResize,
 }: ModernModalProps) {
 	const isModalOpen = Boolean(isOpen ?? open);
 	const effectiveSubtitle = subtitle ?? description;
-	const handleClose = () => {
+	const handleClose = useCallback(() => {
 		onClose?.();
 		onOpenChange?.(false);
-	};
+	}, [onClose, onOpenChange]);
 
 	const [mounted, setMounted] = useState(false);
 	const [mode, setMode] = useState<WindowMode>("normal");
@@ -155,35 +216,10 @@ export function ModernModal({
 	const [isResizing, setIsResizing] = useState(false);
 
 	const modalRef = useRef<HTMLDivElement>(null);
-	const dragStartRef = useRef<{
-		startX: number;
-		startY: number;
-		posX: number;
-		posY: number;
-	}>({
-		startX: 0,
-		startY: 0,
-		posX: 0,
-		posY: 0,
-	});
-
-	const resizeStartRef = useRef<{
-		startX: number;
-		startY: number;
-		startW: number;
-		startH: number;
-		posX: number;
-		posY: number;
-		direction: string;
-	}>({
-		startX: 0,
-		startY: 0,
-		startW: 0,
-		startH: 0,
-		posX: 0,
-		posY: 0,
-		direction: "",
-	});
+	const prevOpenRef = useRef(false);
+	const justInteractedRef = useRef(false);
+	const isDraggingRef = useRef(false);
+	const isResizingRef = useRef(false);
 
 	const titleId = useId();
 	const descriptionId = useId();
@@ -192,17 +228,34 @@ export function ModernModal({
 		setMounted(true);
 	}, []);
 
-	// Reset window position and dimensions on open
+	// Reset window position and dimensions only on initial open transition
 	useEffect(() => {
-		if (isModalOpen) {
+		if (isModalOpen && !prevOpenRef.current) {
 			setMode("normal");
 			setPosition({ x: 0, y: 0 });
 			const initialW =
-				typeof defaultWidth === "number" ? defaultWidth : undefined;
+				typeof defaultWidth === "number"
+					? defaultWidth
+					: typeof defaultWidth === "string"
+						? parseSizeToPixels(
+								defaultWidth,
+								typeof window !== "undefined" ? window.innerWidth : 1024,
+								0,
+							) || undefined
+						: undefined;
 			const initialH =
-				typeof defaultHeight === "number" ? defaultHeight : undefined;
+				typeof defaultHeight === "number"
+					? defaultHeight
+					: typeof defaultHeight === "string"
+						? parseSizeToPixels(
+								defaultHeight,
+								typeof window !== "undefined" ? window.innerHeight : 768,
+								0,
+							) || undefined
+						: undefined;
 			setDimensions({ width: initialW, height: initialH });
 		}
+		prevOpenRef.current = isModalOpen;
 	}, [isModalOpen, defaultWidth, defaultHeight]);
 
 	// Sync mode callbacks
@@ -220,7 +273,7 @@ export function ModernModal({
 				handleClose();
 			}
 		},
-		[isModalOpen, mode, closeOnEsc, onClose, onOpenChange],
+		[isModalOpen, mode, closeOnEsc, handleClose],
 	);
 
 	useEffect(() => {
@@ -240,6 +293,36 @@ export function ModernModal({
 		};
 	}, [isModalOpen, mode]);
 
+	// Keep modal comfortably within viewport when browser window is resized
+	useEffect(() => {
+		if (!isModalOpen || mode !== "normal") return;
+
+		const handleWindowResize = () => {
+			const maxW = Math.max(minWidth, window.innerWidth - 32);
+			const maxH = Math.max(minHeight, window.innerHeight - 32);
+
+			setDimensions((prev) => {
+				if (!prev.width && !prev.height) return prev;
+				const clampedW = prev.width ? Math.min(prev.width, maxW) : undefined;
+				const clampedH = prev.height ? Math.min(prev.height, maxH) : undefined;
+				if (clampedW === prev.width && clampedH === prev.height) return prev;
+				return { width: clampedW, height: clampedH };
+			});
+
+			setPosition((prev) => {
+				const maxOffsetX = Math.max(0, window.innerWidth / 2 - 80);
+				const maxOffsetY = Math.max(0, window.innerHeight / 2 - 80);
+				const clampedX = Math.max(-maxOffsetX, Math.min(maxOffsetX, prev.x));
+				const clampedY = Math.max(-maxOffsetY, Math.min(maxOffsetY, prev.y));
+				if (clampedX === prev.x && clampedY === prev.y) return prev;
+				return { x: clampedX, y: clampedY };
+			});
+		};
+
+		window.addEventListener("resize", handleWindowResize);
+		return () => window.removeEventListener("resize", handleWindowResize);
+	}, [isModalOpen, mode, minWidth, minHeight]);
+
 	// --- DRAG LOGIC ---
 	const handleDragStart = (e: React.PointerEvent) => {
 		if (!draggable || mode !== "normal") return;
@@ -250,47 +333,70 @@ export function ModernModal({
 		)
 			return;
 
+		e.preventDefault();
+		const rect = modalRef.current?.getBoundingClientRect();
+		if (!rect) return;
+
 		setIsDragging(true);
-		dragStartRef.current = {
-			startX: e.clientX,
-			startY: e.clientY,
-			posX: position.x,
-			posY: position.y,
+		isDraggingRef.current = true;
+
+		const startX = e.clientX;
+		const startY = e.clientY;
+		const startPosX = position.x;
+		const startPosY = position.y;
+		const modalW = rect.width;
+		const modalH = rect.height;
+
+		document.body.style.userSelect = "none";
+
+		const handlePointerMove = (moveEvent: PointerEvent) => {
+			if (!isDraggingRef.current) return;
+			const dx = moveEvent.clientX - startX;
+			const dy = moveEvent.clientY - startY;
+
+			const halfVw = window.innerWidth / 2;
+			const halfVh = window.innerHeight / 2;
+
+			// Keep title bar inside the screen with a safe margin
+			const minX = -halfVw + modalW / 2 + 16;
+			const maxX = halfVw - modalW / 2 - 16;
+			const minY = -halfVh + modalH / 2 + 16;
+			const maxY = halfVh - modalH / 2 - 16;
+
+			const clampedX =
+				minX <= maxX
+					? Math.max(minX, Math.min(maxX, startPosX + dx))
+					: startPosX + dx;
+			const clampedY =
+				minY <= maxY
+					? Math.max(minY, Math.min(maxY, startPosY + dy))
+					: startPosY + dy;
+
+			setPosition({ x: clampedX, y: clampedY });
 		};
-		(e.target as HTMLElement).setPointerCapture(e.pointerId);
-	};
 
-	const handleDragMove = (e: React.PointerEvent) => {
-		if (!isDragging) return;
-		const dx = e.clientX - dragStartRef.current.startX;
-		const dy = e.clientY - dragStartRef.current.startY;
-
-		// Viewport constraints
-		const maxOffset = Math.min(window.innerWidth / 2 - 100, 800);
-		const newX = Math.max(
-			-maxOffset,
-			Math.min(maxOffset, dragStartRef.current.posX + dx),
-		);
-		const newY = Math.max(
-			-maxOffset,
-			Math.min(maxOffset, dragStartRef.current.posY + dy),
-		);
-
-		setPosition({ x: newX, y: newY });
-	};
-
-	const handleDragEnd = (e: React.PointerEvent) => {
-		if (isDragging) {
+		const handlePointerUp = () => {
+			isDraggingRef.current = false;
 			setIsDragging(false);
-			try {
-				(e.target as HTMLElement).releasePointerCapture(e.pointerId);
-			} catch {
-				// ignore
-			}
-		}
+
+			window.removeEventListener("pointermove", handlePointerMove);
+			window.removeEventListener("pointerup", handlePointerUp);
+			window.removeEventListener("pointercancel", handlePointerUp);
+
+			document.body.style.userSelect = "";
+
+			justInteractedRef.current = true;
+			setTimeout(() => {
+				justInteractedRef.current = false;
+			}, 150);
+		};
+
+		window.addEventListener("pointermove", handlePointerMove);
+		window.addEventListener("pointerup", handlePointerUp);
+		window.addEventListener("pointercancel", handlePointerUp);
 	};
 
-	// --- RESIZE LOGIC ---
+	// --- 8-AXIS RESIZE LOGIC ---
 	const handleResizeStart = (direction: string, e: React.PointerEvent) => {
 		if (!resizable || mode !== "normal") return;
 		e.preventDefault();
@@ -300,67 +406,131 @@ export function ModernModal({
 		if (!rect) return;
 
 		setIsResizing(true);
-		resizeStartRef.current = {
-			startX: e.clientX,
-			startY: e.clientY,
-			startW: rect.width,
-			startH: rect.height,
-			posX: position.x,
-			posY: position.y,
-			direction,
-		};
-		(e.target as HTMLElement).setPointerCapture(e.pointerId);
-	};
+		isResizingRef.current = true;
 
-	const handleResizeMove = (e: React.PointerEvent) => {
-		if (!isResizing) return;
-		const { startX, startY, startW, startH, posX, posY, direction } =
-			resizeStartRef.current;
-		const dx = e.clientX - startX;
-		const dy = e.clientY - startY;
+		const startX = e.clientX;
+		const startY = e.clientY;
+		const startW = rect.width;
+		const startH = rect.height;
+		const startPosX = position.x;
+		const startPosY = position.y;
 
-		let newW = startW;
-		let newH = startH;
-		let newX = posX;
-		let newY = posY;
+		// Calculate initial edges in viewport coordinates
+		const centerStartX = window.innerWidth / 2 + startPosX;
+		const centerStartY = window.innerHeight / 2 + startPosY;
+		const startLeft = centerStartX - startW / 2;
+		const startRight = centerStartX + startW / 2;
+		const startTop = centerStartY - startH / 2;
+		const startBottom = centerStartY + startH / 2;
 
-		const maxW =
-			typeof maxWidth === "number" ? maxWidth : window.innerWidth - 40;
-		const maxH =
-			typeof maxHeight === "number" ? maxHeight : window.innerHeight - 40;
+		const resolvedMaxW = parseSizeToPixels(
+			maxWidth,
+			window.innerWidth,
+			window.innerWidth - 32,
+		);
+		const resolvedMaxH = parseSizeToPixels(
+			maxHeight,
+			window.innerHeight,
+			window.innerHeight - 32,
+		);
 
-		if (direction.includes("e"))
-			newW = Math.min(maxW, Math.max(minWidth, startW + dx));
-		if (direction.includes("s"))
-			newH = Math.min(maxH, Math.max(minHeight, startH + dy));
-		if (direction.includes("w")) {
-			const possibleW = Math.min(maxW, Math.max(minWidth, startW - dx));
-			newX = posX + (startW - possibleW) / 2;
-			newW = possibleW;
-		}
-		if (direction.includes("n")) {
-			const possibleH = Math.min(maxH, Math.max(minHeight, startH - dy));
-			newY = posY + (startH - possibleH) / 2;
-			newH = possibleH;
-		}
+		document.body.style.userSelect = "none";
+		document.body.style.cursor = getResizeCursor(direction);
 
-		setDimensions({ width: newW, height: newH });
-		setPosition({ x: newX, y: newY });
-	};
+		let finalW = startW;
+		let finalH = startH;
 
-	const handleResizeEnd = (e: React.PointerEvent) => {
-		if (isResizing) {
-			setIsResizing(false);
-			try {
-				(e.target as HTMLElement).releasePointerCapture(e.pointerId);
-			} catch {
-				// ignore
+		const handlePointerMove = (moveEvent: PointerEvent) => {
+			if (!isResizingRef.current) return;
+			const dx = moveEvent.clientX - startX;
+			const dy = moveEvent.clientY - startY;
+
+			let newW = startW;
+			let newH = startH;
+			let newX = startPosX;
+			let newY = startPosY;
+
+			// Horizontal Resize (East / West)
+			if (direction.includes("e")) {
+				// Right edge moves with cursor; left edge stays fixed at startLeft
+				const desiredW = startW + dx;
+				const maxAllowedW = Math.min(
+					resolvedMaxW,
+					window.innerWidth - 16 - startLeft,
+				);
+				newW = Math.max(minWidth, Math.min(maxAllowedW, desiredW));
+				newX = startPosX + (newW - startW) / 2;
+			} else if (direction.includes("w")) {
+				// Left edge moves with cursor; right edge stays fixed at startRight
+				const desiredW = startW - dx;
+				const maxAllowedW = Math.min(resolvedMaxW, startRight - 16);
+				newW = Math.max(minWidth, Math.min(maxAllowedW, desiredW));
+				newX = startPosX - (newW - startW) / 2;
 			}
-		}
+
+			// Vertical Resize (South / North)
+			if (direction.includes("s")) {
+				// Bottom edge moves with cursor; top edge stays fixed at startTop
+				const desiredH = startH + dy;
+				const maxAllowedH = Math.min(
+					resolvedMaxH,
+					window.innerHeight - 16 - startTop,
+				);
+				newH = Math.max(minHeight, Math.min(maxAllowedH, desiredH));
+				newY = startPosY + (newH - startH) / 2;
+			} else if (direction.includes("n")) {
+				// Top edge moves with cursor; bottom edge stays fixed at startBottom
+				const desiredH = startH - dy;
+				const maxAllowedH = Math.min(resolvedMaxH, startBottom - 16);
+				newH = Math.max(minHeight, Math.min(maxAllowedH, desiredH));
+				newY = startPosY - (newH - startH) / 2;
+			}
+
+			const isHoriz = direction.includes("e") || direction.includes("w");
+			const isVert = direction.includes("s") || direction.includes("n");
+
+			finalW = isHoriz ? newW : startW;
+			finalH = isVert ? newH : startH;
+
+			setDimensions((prev) => ({
+				width: isHoriz ? newW : prev.width,
+				height: isVert ? newH : prev.height,
+			}));
+			setPosition({ x: newX, y: newY });
+		};
+
+		const handlePointerUp = () => {
+			isResizingRef.current = false;
+			setIsResizing(false);
+
+			window.removeEventListener("pointermove", handlePointerMove);
+			window.removeEventListener("pointerup", handlePointerUp);
+			window.removeEventListener("pointercancel", handlePointerUp);
+
+			document.body.style.userSelect = "";
+			document.body.style.cursor = "";
+
+			onResize?.({ width: finalW, height: finalH });
+
+			justInteractedRef.current = true;
+			setTimeout(() => {
+				justInteractedRef.current = false;
+			}, 150);
+		};
+
+		window.addEventListener("pointermove", handlePointerMove);
+		window.addEventListener("pointerup", handlePointerUp);
+		window.addEventListener("pointercancel", handlePointerUp);
 	};
 
 	// Double click header to toggle maximize
-	const handleHeaderDoubleClick = () => {
+	const handleHeaderDoubleClick = (e: React.MouseEvent) => {
+		if (
+			(e.target as HTMLElement).closest(
+				"button, input, select, textarea, a, [data-nodrag]",
+			)
+		)
+			return;
 		if (!allowMaximize) return;
 		setMode((prev) => (prev === "maximized" ? "normal" : "maximized"));
 	};
@@ -408,11 +578,44 @@ export function ModernModal({
 	const isFullScreen = mode === "fullscreen";
 	const isMaximized = mode === "maximized";
 
-	let sizeClasses =
-		typeof maxWidth === "string" && maxWidth.startsWith("max-w-")
-			? maxWidth
-			: SIZE_MAP[size].width;
-	let heightClasses = SIZE_MAP[size].height;
+	const hasCustomWidth =
+		typeof dimensions.width === "number" && dimensions.width > 0;
+	const hasCustomHeight =
+		typeof dimensions.height === "number" && dimensions.height > 0;
+
+	const isModified =
+		hasCustomWidth ||
+		hasCustomHeight ||
+		position.x !== 0 ||
+		position.y !== 0;
+
+	const handleResetLayout = () => {
+		setPosition({ x: 0, y: 0 });
+		const initialW =
+			typeof defaultWidth === "number"
+				? defaultWidth
+				: typeof defaultWidth === "string"
+					? parseSizeToPixels(
+							defaultWidth,
+							typeof window !== "undefined" ? window.innerWidth : 1024,
+							0,
+						) || undefined
+					: undefined;
+		const initialH =
+			typeof defaultHeight === "number"
+				? defaultHeight
+				: typeof defaultHeight === "string"
+					? parseSizeToPixels(
+							defaultHeight,
+							typeof window !== "undefined" ? window.innerHeight : 768,
+							0,
+						) || undefined
+					: undefined;
+		setDimensions({ width: initialW, height: initialH });
+	};
+
+	let sizeClasses = "";
+	let heightClasses = "";
 
 	if (isFullScreen) {
 		sizeClasses =
@@ -422,7 +625,66 @@ export function ModernModal({
 		sizeClasses =
 			"w-[calc(100vw-2rem)] h-[calc(100vh-2rem)] max-w-none max-h-none";
 		heightClasses = "h-[calc(100vh-2rem)]";
+	} else {
+		// Normal Mode: only apply default size width/height when not overridden by custom resize
+		if (!hasCustomWidth) {
+			if (typeof maxWidth === "string") {
+				const trimmed = maxWidth.trim();
+				if (trimmed.startsWith("max-w-")) {
+					sizeClasses = `${trimmed} w-full`;
+				} else if (SIZE_MAP[trimmed as ModalSize]) {
+					sizeClasses = SIZE_MAP[trimmed as ModalSize].width;
+				} else if (
+					[
+						"sm",
+						"md",
+						"lg",
+						"xl",
+						"2xl",
+						"3xl",
+						"4xl",
+						"5xl",
+						"6xl",
+						"7xl",
+					].includes(trimmed)
+				) {
+					sizeClasses = `max-w-${trimmed} w-full`;
+				} else {
+					sizeClasses = SIZE_MAP[size]?.width || SIZE_MAP.md.width;
+				}
+			} else {
+				sizeClasses = SIZE_MAP[size]?.width || SIZE_MAP.md.width;
+			}
+		} else {
+			sizeClasses = "max-w-none";
+		}
+
+		if (!hasCustomHeight) {
+			heightClasses = SIZE_MAP[size]?.height || SIZE_MAP.md.height;
+		} else {
+			heightClasses = "max-h-none";
+		}
 	}
+
+	const resolvedExplicitMaxWidth =
+		typeof maxWidth === "number"
+			? `${maxWidth}px`
+			: typeof maxWidth === "string" &&
+				  (maxWidth.endsWith("px") ||
+						maxWidth.endsWith("%") ||
+						maxWidth.endsWith("vw"))
+				? maxWidth
+				: undefined;
+
+	const resolvedExplicitMaxHeight =
+		typeof maxHeight === "number"
+			? `${maxHeight}px`
+			: typeof maxHeight === "string" &&
+				  (maxHeight.endsWith("px") ||
+						maxHeight.endsWith("%") ||
+						maxHeight.endsWith("vh"))
+				? maxHeight
+				: undefined;
 
 	const inlineStyles: React.CSSProperties = {
 		transform:
@@ -430,12 +692,34 @@ export function ModernModal({
 				? `translate3d(${position.x}px, ${position.y}px, 0)`
 				: undefined,
 		width:
-			mode === "normal" && dimensions.width
+			mode === "normal" && hasCustomWidth
 				? `${dimensions.width}px`
 				: undefined,
 		height:
-			mode === "normal" && dimensions.height
+			mode === "normal" && hasCustomHeight
 				? `${dimensions.height}px`
+				: undefined,
+		minWidth:
+			mode === "normal"
+				? typeof minWidth === "number"
+					? `min(${minWidth}px, 100%)`
+					: undefined
+				: undefined,
+		minHeight:
+			mode === "normal"
+				? typeof minHeight === "number"
+					? `min(${minHeight}px, 100%)`
+					: undefined
+				: undefined,
+		maxWidth:
+			mode === "normal"
+				? resolvedExplicitMaxWidth ??
+				  (hasCustomWidth ? "calc(100vw - 2rem)" : undefined)
+				: undefined,
+		maxHeight:
+			mode === "normal"
+				? resolvedExplicitMaxHeight ??
+				  (hasCustomHeight ? "calc(100vh - 2rem)" : undefined)
 				: undefined,
 	};
 
@@ -473,7 +757,16 @@ export function ModernModal({
 			{/* BACKDROP OVERLAY */}
 			{showOverlay && (
 				<div
-					onClick={() => closeOnOutsideClick && handleClose()}
+					onClick={() => {
+						if (
+							closeOnOutsideClick &&
+							!justInteractedRef.current &&
+							!isDragging &&
+							!isResizing
+						) {
+							handleClose();
+						}
+					}}
 					className={cn(
 						"fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 dark:bg-slate-950/70",
 						overlayClassName,
@@ -499,63 +792,96 @@ export function ModernModal({
 			>
 				{/* RESIZE HANDLES (8-axis) */}
 				{resizable && mode === "normal" && (
-					<>
+					<div className="absolute inset-0 pointer-events-none z-50 overflow-hidden rounded-3xl">
+						{/* North edge */}
 						<div
 							onPointerDown={(e) => handleResizeStart("n", e)}
-							onPointerMove={handleResizeMove}
-							onPointerUp={handleResizeEnd}
-							className="absolute top-0 left-4 right-4 h-1.5 cursor-n-resize z-50 hover:bg-purple-500/40 transition-colors"
-						/>
+							className="absolute top-0 left-6 right-6 h-2.5 cursor-ns-resize pointer-events-auto touch-none group"
+							title="Resize height"
+						>
+							<div className="w-full h-1 bg-transparent group-hover:bg-purple-500/50 transition-colors rounded-full" />
+						</div>
+
+						{/* South edge */}
 						<div
 							onPointerDown={(e) => handleResizeStart("s", e)}
-							onPointerMove={handleResizeMove}
-							onPointerUp={handleResizeEnd}
-							className="absolute bottom-0 left-4 right-4 h-1.5 cursor-s-resize z-50 hover:bg-purple-500/40 transition-colors"
-						/>
+							className="absolute bottom-0 left-6 right-6 h-2.5 cursor-ns-resize pointer-events-auto touch-none group"
+							title="Resize height"
+						>
+							<div className="w-full h-1 bg-transparent group-hover:bg-purple-500/50 transition-colors rounded-full mt-1.5" />
+						</div>
+
+						{/* West edge */}
 						<div
 							onPointerDown={(e) => handleResizeStart("w", e)}
-							onPointerMove={handleResizeMove}
-							onPointerUp={handleResizeEnd}
-							className="absolute top-4 bottom-4 left-0 w-1.5 cursor-w-resize z-50 hover:bg-purple-500/40 transition-colors"
-						/>
+							className="absolute top-6 bottom-6 left-0 w-2.5 cursor-ew-resize pointer-events-auto touch-none group"
+							title="Resize width"
+						>
+							<div className="h-full w-1 bg-transparent group-hover:bg-purple-500/50 transition-colors rounded-full" />
+						</div>
+
+						{/* East edge */}
 						<div
 							onPointerDown={(e) => handleResizeStart("e", e)}
-							onPointerMove={handleResizeMove}
-							onPointerUp={handleResizeEnd}
-							className="absolute top-4 bottom-4 right-0 w-1.5 cursor-e-resize z-50 hover:bg-purple-500/40 transition-colors"
-						/>
+							className="absolute top-6 bottom-6 right-0 w-2.5 cursor-ew-resize pointer-events-auto touch-none group"
+							title="Resize width"
+						>
+							<div className="h-full w-1 bg-transparent group-hover:bg-purple-500/50 transition-colors rounded-full ml-1.5" />
+						</div>
+
+						{/* North-West corner */}
 						<div
 							onPointerDown={(e) => handleResizeStart("nw", e)}
-							onPointerMove={handleResizeMove}
-							onPointerUp={handleResizeEnd}
-							className="absolute top-0 left-0 h-3 w-3 cursor-nw-resize z-50 hover:bg-purple-500/60 rounded-tl-xl transition-colors"
-						/>
+							className="absolute top-0 left-0 h-6 w-6 cursor-nwse-resize pointer-events-auto touch-none rounded-tl-3xl group"
+							title="Resize"
+						>
+							<div className="absolute top-1 left-1 h-3 w-3 border-t-2 border-l-2 border-transparent group-hover:border-purple-500/70 transition-colors rounded-tl-sm" />
+						</div>
+
+						{/* North-East corner */}
 						<div
 							onPointerDown={(e) => handleResizeStart("ne", e)}
-							onPointerMove={handleResizeMove}
-							onPointerUp={handleResizeEnd}
-							className="absolute top-0 right-0 h-3 w-3 cursor-ne-resize z-50 hover:bg-purple-500/60 rounded-tr-xl transition-colors"
-						/>
+							className="absolute top-0 right-0 h-6 w-6 cursor-nesw-resize pointer-events-auto touch-none rounded-tr-3xl group"
+							title="Resize"
+						>
+							<div className="absolute top-1 right-1 h-3 w-3 border-t-2 border-r-2 border-transparent group-hover:border-purple-500/70 transition-colors rounded-tr-sm" />
+						</div>
+
+						{/* South-West corner */}
 						<div
 							onPointerDown={(e) => handleResizeStart("sw", e)}
-							onPointerMove={handleResizeMove}
-							onPointerUp={handleResizeEnd}
-							className="absolute bottom-0 left-0 h-3 w-3 cursor-sw-resize z-50 hover:bg-purple-500/60 rounded-bl-xl transition-colors"
-						/>
+							className="absolute bottom-0 left-0 h-6 w-6 cursor-nesw-resize pointer-events-auto touch-none rounded-bl-3xl group"
+							title="Resize"
+						>
+							<div className="absolute bottom-1 left-1 h-3 w-3 border-b-2 border-l-2 border-transparent group-hover:border-purple-500/70 transition-colors rounded-bl-sm" />
+						</div>
+
+						{/* South-East corner (Primary corner resize grip) */}
 						<div
 							onPointerDown={(e) => handleResizeStart("se", e)}
-							onPointerMove={handleResizeMove}
-							onPointerUp={handleResizeEnd}
-							className="absolute bottom-0 right-0 h-3 w-3 cursor-se-resize z-50 hover:bg-purple-500/60 rounded-br-xl transition-colors"
-						/>
-					</>
+							className="absolute bottom-0 right-0 h-6 w-6 cursor-nwse-resize pointer-events-auto touch-none rounded-br-3xl group flex items-end justify-end p-1"
+							title="Resize modal"
+						>
+							<svg
+								className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 group-hover:text-purple-500 transition-colors"
+								viewBox="0 0 16 16"
+								fill="currentColor"
+								aria-hidden="true"
+							>
+								<path d="M14 14H12V12H14V14ZM14 10H12V8H14V10ZM10 14H8V12H10V14ZM14 6H12V4H14V6ZM6 14H4V12H6V14ZM10 10H8V8H10V10Z" />
+							</svg>
+						</div>
+					</div>
+				)}
+
+				{/* BLOCK INTERACTION OVERLAY WHILE DRAGGING OR RESIZING */}
+				{(isDragging || isResizing) && (
+					<div className="absolute inset-0 z-40 cursor-inherit select-none bg-transparent" />
 				)}
 
 				{/* HEADER */}
 				<header
 					onPointerDown={handleDragStart}
-					onPointerMove={handleDragMove}
-					onPointerUp={handleDragEnd}
 					onDoubleClick={handleHeaderDoubleClick}
 					className={cn(
 						"sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-slate-200/80 bg-slate-50/80 px-6 py-4 transition-colors dark:border-slate-800/80 dark:bg-slate-900/80",
@@ -584,18 +910,30 @@ export function ModernModal({
 								</h3>
 							)}
 							{effectiveSubtitle && (
-								<p
+								<div
 									id={descriptionId}
 									className="text-xs font-normal text-slate-500 dark:text-slate-400 truncate"
 								>
 									{effectiveSubtitle}
-								</p>
+								</div>
 							)}
 						</div>
 					</div>
 
 					{/* WINDOW CONTROLS */}
 					<div className="flex items-center gap-1 shrink-0" data-nodrag>
+						{isModified && mode === "normal" && (
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={handleResetLayout}
+								className="h-8 w-8 rounded-lg text-slate-500 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-colors"
+								title="Reset window size and position"
+							>
+								<RotateCcw className="h-3.5 w-3.5" />
+							</Button>
+						)}
+
 						{allowMinimize && (
 							<Button
 								variant="ghost"
@@ -655,7 +993,7 @@ export function ModernModal({
 				{/* BODY - SCROLLABLE ONLY */}
 				<div
 					className={cn(
-						"relative flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700",
+						"relative flex-1 min-h-0 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700",
 						bodyClassName,
 					)}
 				>

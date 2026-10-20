@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
 	if (search) {
 		list = list.filter((a) =>
-			[a.username, a.displayName, a.email, a.notes].some((val) =>
+			[a.username, a.displayName, a.email, a.phoneNumber, a.notes].some((val) =>
 				String(val || "")
 					.toLowerCase()
 					.includes(search),
@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
 		username,
 		displayName,
 		email,
+		phoneNumber,
 		password,
 		isActive = true,
 		adminLevel = "SUPPORT",
@@ -88,10 +89,11 @@ export async function POST(request: NextRequest) {
 	const existing = (db.systemAdmins || []).find(
 		(a) =>
 			a.username.toLowerCase() === username.trim().toLowerCase() ||
-			a.email.toLowerCase() === email.trim().toLowerCase(),
+			a.email.toLowerCase() === email.trim().toLowerCase() ||
+			(phoneNumber && a.phoneNumber && a.phoneNumber.toLowerCase() === phoneNumber.trim().toLowerCase()),
 	);
 	if (existing) {
-		return fail("Username or email already in use", "DUPLICATE_ADMIN", 409);
+		return fail("Username, email, or phone number already in use", "DUPLICATE_ADMIN", 409);
 	}
 
 	const newId =
@@ -106,6 +108,7 @@ export async function POST(request: NextRequest) {
 		username: username.trim(),
 		displayName: displayName.trim(),
 		email: email.trim(),
+		phoneNumber: phoneNumber?.trim() || null,
 		isActive: isActive !== false,
 		isLocked: false,
 		loginAttempts: 0,

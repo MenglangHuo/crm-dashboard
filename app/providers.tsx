@@ -45,7 +45,6 @@ const ThemeCustomizerModal = dynamic(
 		),
 	{ ssr: false },
 );
-import { OneSignalProvider } from "@/components/providers/onesignal-provider";
 import { I18nProvider } from "@/lib/i18n/context";
 import type { Locale } from "@/types/i18n";
 
@@ -71,25 +70,23 @@ export function Providers({
 	return (
 		<ThemeProvider
 			attribute="class"
-			defaultTheme="system"
+			defaultTheme="light"
 			enableSystem
 			disableTransitionOnChange
 		>
 			<CustomThemeProvider>
 				<I18nProvider initialLocale={initialLocale}>
 					<QueryClientProvider client={queryClient}>
-						<OneSignalProvider>
-							<QuickActionProvider>
-								{children}
-								<CommandPalette />
-								<UnifiedLoanWizardModal />
-								<QuickPaymentModal />
-								<AbaKhqrModal />
-								<PrintReceiptModal />
-								<ThemeCustomizerModal />
-								<Toaster richColors position="top-right" />
-							</QuickActionProvider>
-						</OneSignalProvider>
+						<QuickActionProvider>
+							{children}
+							<CommandPalette />
+							<UnifiedLoanWizardModal />
+							<QuickPaymentModal />
+							<AbaKhqrModal />
+							<PrintReceiptModal />
+							<ThemeCustomizerModal />
+							<Toaster richColors position="top-right" />
+						</QuickActionProvider>
 					</QueryClientProvider>
 				</I18nProvider>
 			</CustomThemeProvider>

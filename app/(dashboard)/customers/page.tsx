@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customersApi } from "@/lib/api/endpoints";
 import { Customer, Province } from "@/lib/types";
@@ -93,6 +93,26 @@ export default function CustomersPage() {
 		id: number | string;
 		name: string;
 	} | null>(null);
+
+	// Global Command Palette Shortcut Listener & Query Param Handler
+	useEffect(() => {
+		const handleOpenCreate = () => {
+			setEditingCustomer(null);
+			setIsFormOpen(true);
+		};
+		window.addEventListener("crm:open-create-customer", handleOpenCreate);
+
+		if (typeof window !== "undefined") {
+			const params = new URLSearchParams(window.location.search);
+			if (params.get("action") === "create") {
+				handleOpenCreate();
+			}
+		}
+
+		return () => {
+			window.removeEventListener("crm:open-create-customer", handleOpenCreate);
+		};
+	}, []);
 
 	// Toggle Customer Status (Active -> DELETE /customers/{id}, Inactive -> PATCH /customers/{id}/restore)
 	const handleToggleStatus = async (
@@ -606,16 +626,29 @@ export default function CustomersPage() {
 	);
 
 	return (
-		<div className="space-y-4 pb-12">
+		<div className="space-y-6 pb-12">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+						<Users className="size-7 text-primary" />
+						<span>{t("customers.title", "Customer Management")}</span>
+					</h1>
+					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+						{t("customers.subtitle", "Manage client directory, shop locations, visit cycles, and balances")}
+					</p>
+				</div>
+			</div>
+
 			{/* Main View Mode Body */}
 			{viewMode === "nearby" ? (
 				<div className="space-y-4">
 					{/* Header Action Strip with Tabs and Province Select next to Add Customer */}
 					<div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
 						<div className="flex items-center gap-2.5">
-							<h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">
-								{t("customers.title")}
-							</h1>
+							<span className="text-sm font-bold text-slate-950 dark:text-white">
+								{t("sidebar.customerLocations", "Nearby & Map")}
+							</span>
 							<Badge
 								variant="outline"
 								className="text-xs font-bold px-2 py-0.5 border-slate-300 dark:border-slate-700"

@@ -117,14 +117,133 @@ export function MapProductUnitModal({
 
 	// Primary base unit finder
 	const primaryBaseUnit = useMemo(() => {
-		const fromMapped = existingMappedUnits.find((u: any) => u.isBase);
+		const fromMapped = existingMappedUnits.find(
+			(u: any) =>
+				u.isBase ||
+				u.is_base ||
+				(u.unitId && u.baseUnitId && String(u.unitId) === String(u.baseUnitId)),
+		);
 		if (fromMapped) return fromMapped;
-		const fromProductUnits = product?.units?.find((u: any) => u.isBase);
-		if (fromProductUnits) return fromProductUnits;
+
+		const productUnitsArr =
+			product?.units || product?.productUnits || product?.unitBreakdown || [];
+		if (Array.isArray(productUnitsArr) && productUnitsArr.length > 0) {
+			const fromProd = productUnitsArr.find(
+				(u: any) =>
+					u.isBase ||
+					u.is_base ||
+					(u.unitId && u.baseUnitId && String(u.unitId) === String(u.baseUnitId)),
+			);
+			if (fromProd) return fromProd;
+			return productUnitsArr[0];
+		}
+
 		if (existingMappedUnits.length > 0) return existingMappedUnits[0];
-		if (product?.units?.length > 0) return product.units[0];
+		if (product?.unit) return product.unit;
+		if (product?.unitId) {
+			const found = availableUnits.find(
+				(u) => String(u.id) === String(product.unitId),
+			);
+			if (found) return found;
+			return {
+				id: product.unitId,
+				unitId: product.unitId,
+				name: product.unitName || "Base Unit",
+				symbol: product.unitSymbol || "",
+				isBase: true,
+			};
+		}
 		return null;
-	}, [existingMappedUnits, product?.units]);
+	}, [existingMappedUnits, product, availableUnits]);
+
+	// Collect all existing units belonging to this product only
+	const existingProductUnits = useMemo(() => {
+		const map = new Map<string, any>();
+
+		const addUnit = (u: any, isExplicitBase = false) => {
+			if (!u) return;
+			const id = String(u.unitId ?? u.id ?? "");
+			if (!id || map.has(id)) return;
+
+			const globalMatch = availableUnits.find(
+				(au) => String(au.id) === String(id),
+			);
+			const name =
+				u.unitName ||
+				u.name ||
+				globalMatch?.name ||
+				(u.symbol ? `Unit (${u.symbol})` : "Unit");
+			const symbol =
+				u.symbol || u.unitSymbol || globalMatch?.symbol || "";
+			const isBase =
+				isExplicitBase ||
+				Boolean(u.isBase || u.is_base) ||
+				(primaryBaseUnit &&
+					String(primaryBaseUnit.unitId || primaryBaseUnit.id) === id);
+
+			map.set(id, {
+				...u,
+				id,
+				unitId: id,
+				name,
+				symbol,
+				isBase,
+				unitPrice:
+					u.finalPrice ??
+					u.unitPrice ??
+					u.sellPrice ??
+					u.price ??
+					u.basePrice ??
+					null,
+			});
+		};
+
+		// 1. Primary base unit first (highest priority)
+		if (primaryBaseUnit) {
+			addUnit(primaryBaseUnit, true);
+		}
+
+		// 2. Existing mapped units
+		if (Array.isArray(existingMappedUnits)) {
+			existingMappedUnits.forEach((u) => addUnit(u));
+		}
+
+		// 3. Product's units array
+		if (Array.isArray(product?.units)) {
+			product.units.forEach((u: any) => addUnit(u));
+		}
+
+		// 4. Product's productUnits / unitBreakdown array
+		const extraUnits = product?.productUnits || product?.unitBreakdown;
+		if (Array.isArray(extraUnits)) {
+			extraUnits.forEach((u: any) => addUnit(u));
+		}
+
+		// 5. Product unit object or unitId
+		if (product?.unit) {
+			addUnit(product.unit, true);
+		}
+		if (product?.unitId) {
+			const globalMatch = availableUnits.find(
+				(au) => String(au.id) === String(product.unitId),
+			);
+			if (globalMatch) {
+				addUnit(globalMatch, true);
+			} else {
+				addUnit(
+					{
+						id: product.unitId,
+						name: product.unitName || "Base Unit",
+						symbol: product.unitSymbol || "",
+						isBase: true,
+					},
+					true,
+				);
+			}
+		}
+
+		return Array.from(map.values());
+	}, [existingMappedUnits, product, primaryBaseUnit, availableUnits]);
 
 	// Initialize or reset form state when modal opens or initialUnit changes
 	useEffect(() => {
@@ -231,8 +350,8 @@ export function MapProductUnitModal({
 
 			const defaultBaseId = primaryBaseUnit
 				? String(primaryBaseUnit.unitId || primaryBaseUnit.id || "")
-				: availableUnits[0]?.id
-					? String(availableUnits[0].id)
+				: existingProductUnits.length > 0
+					? String(existingProductUnits[0].id)
 					: "";
 
 			const basePriceVal = primaryBaseUnit
@@ -277,6 +396,7 @@ export function MapProductUnitModal({
 		availableUnits,
 		existingMappedUnits,
 		primaryBaseUnit,
+		existingProductUnits,
 		productVariants,
 	]);
 
@@ -286,13 +406,31 @@ export function MapProductUnitModal({
 	}, [availableUnits, unitId]);
 
 	const baseUnitObj = useMemo(() => {
-		return (
-			availableUnits.find((u) => String(u.id) === String(baseUnitId)) ||
-			existingMappedUnits.find(
-				(u: any) => String(u.unitId || u.id) === String(baseUnitId),
-			)
+		const fromProduct = existingProductUnits.find(
+			(u: any) => String(u.unitId || u.id) === String(baseUnitId),
 		);
-	}, [availableUnits, existingMappedUnits, baseUnitId]);
+		const fromGlobal = availableUnits.find(
+			(u) => String(u.id) === String(baseUnitId),
+		);
+		if (fromProduct && fromGlobal) {
+			return {
+				...fromGlobal,
+				...fromProduct,
+				name: fromProduct.name || fromGlobal.name,
+				symbol: fromProduct.symbol || fromGlobal.symbol,
+			};
+		}
+		return fromProduct || fromGlobal || null;
+	}, [existingProductUnits, availableUnits, baseUnitId]);
+
+	const selectedBaseUnit = useMemo(() => {
+		if (!baseUnitId) return primaryBaseUnit;
+		return (
+			existingProductUnits.find(
+				(u: any) => String(u.unitId || u.id) === String(baseUnitId),
+			) || primaryBaseUnit
+		);
+	}, [baseUnitId, existingProductUnits, primaryBaseUnit]);
 
 	// Calculations
 	const numericQty = parseFloat(baseQuantity) || 1;
@@ -301,8 +439,12 @@ export function MapProductUnitModal({
 	const baseUnitPrice =
 		parseFloat(
 			String(
-				primaryBaseUnit?.finalPrice ??
+				selectedBaseUnit?.unitPrice ??
+					selectedBaseUnit?.finalPrice ??
+					selectedBaseUnit?.sellPrice ??
+					selectedBaseUnit?.price ??
 					primaryBaseUnit?.unitPrice ??
+					primaryBaseUnit?.finalPrice ??
 					primaryBaseUnit?.sellPrice ??
 					primaryBaseUnit?.price ??
 					product?.sellPrice ??
@@ -383,6 +525,39 @@ export function MapProductUnitModal({
 		const newQty = parseFloat(newQtyStr);
 		if (!isNaN(newQty) && newQty > 0 && baseUnitPrice > 0) {
 			const newListPrice = calculateUnitListPrice(baseUnitPrice, newQty);
+			const numericD = parseFloat(discount) || 0;
+			if (numericD > 0) {
+				const finalP = calculateUnitFinalPrice(
+					newListPrice,
+					numericD,
+					discountType,
+				);
+				setUnitPrice(finalP.toFixed(2));
+			} else {
+				setUnitPrice(newListPrice.toFixed(2));
+			}
+		}
+	};
+
+	// Main Form: Base Unit change
+	const handleBaseUnitChange = (newBaseId: string) => {
+		setBaseUnitId(newBaseId);
+		const newBaseObj = existingProductUnits.find(
+			(u: any) => String(u.unitId || u.id) === String(newBaseId),
+		);
+		const newBasePrice =
+			parseFloat(
+				String(
+					newBaseObj?.unitPrice ??
+						newBaseObj?.finalPrice ??
+						newBaseObj?.sellPrice ??
+						newBaseObj?.price ??
+						baseUnitPrice,
+				),
+			) || 0;
+
+		if (newBasePrice > 0 && numericQty > 0) {
+			const newListPrice = calculateUnitListPrice(newBasePrice, numericQty);
 			const numericD = parseFloat(discount) || 0;
 			if (numericD > 0) {
 				const finalP = calculateUnitFinalPrice(
@@ -664,6 +839,10 @@ export function MapProductUnitModal({
 			toast.error("Please select a unit to map.");
 			return;
 		}
+		if (baseUnitId && String(unitId) === String(baseUnitId)) {
+			toast.error("Target unit and base unit cannot be the same unit.");
+			return;
+		}
 		if (numericQty <= 0) {
 			toast.error("Multiplier base quantity must be greater than 0.");
 			return;
@@ -733,21 +912,24 @@ export function MapProductUnitModal({
 	}, [availableUnits]);
 
 	const baseUnitOptions = useMemo(() => {
-		const map = new Map<
-			string,
-			{
-				value: string;
-				label: string;
-				description?: string;
-				badge?: string;
-				icon?: React.ReactNode;
-			}
-		>();
-		availableUnits.forEach((u) => {
+		// Filter out the unit currently being mapped/edited (a unit cannot convert to itself)
+		const currentUnitId = String(
+			unitId || initialUnit?.unitId || initialUnit?.id || "",
+		);
+
+		const filtered = existingProductUnits.filter(
+			(u) => !currentUnitId || String(u.id) !== currentUnitId,
+		);
+
+		const candidateUnits = filtered.length > 0 ? filtered : existingProductUnits;
+
+		return candidateUnits.map((u) => {
 			const isPrimary =
-				primaryBaseUnit &&
-				String(primaryBaseUnit.unitId || primaryBaseUnit.id) === String(u.id);
-			map.set(String(u.id), {
+				u.isBase ||
+				(primaryBaseUnit &&
+					String(primaryBaseUnit.unitId || primaryBaseUnit.id) === String(u.id));
+
+			return {
 				value: String(u.id),
 				label: `${u.name} (${u.symbol || "Unit"})`,
 				description: isPrimary
@@ -757,26 +939,25 @@ export function MapProductUnitModal({
 						: undefined,
 				badge: isPrimary ? "Base" : undefined,
 				icon: <Boxes className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />,
-			});
+			};
 		});
-		existingMappedUnits.forEach((u: any) => {
-			const id = String(u.unitId || u.id);
-			if (id && !map.has(id)) {
-				const isPrimary =
-					u.isBase ||
-					(primaryBaseUnit &&
-						String(primaryBaseUnit.unitId || primaryBaseUnit.id) === id);
-				map.set(id, {
-					value: id,
-					label: `${u.unitName || u.name || "Unit"} (${u.symbol || "Base"})`,
-					description: isPrimary ? "Primary inventory base unit" : undefined,
-					badge: isPrimary ? "Base" : undefined,
-					icon: <Boxes className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />,
-				});
-			}
-		});
-		return Array.from(map.values());
-	}, [availableUnits, existingMappedUnits, primaryBaseUnit]);
+	}, [existingProductUnits, unitId, initialUnit, primaryBaseUnit]);
+
+	// Keep baseUnitId synchronized with valid options belonging to the existing product
+	useEffect(() => {
+		if (!isOpen || baseUnitOptions.length === 0) return;
+		const exists = baseUnitOptions.some((opt) => opt.value === baseUnitId);
+		if (!exists) {
+			const primaryOpt = primaryBaseUnit
+				? baseUnitOptions.find(
+						(opt) =>
+							opt.value ===
+							String(primaryBaseUnit.unitId || primaryBaseUnit.id),
+					)
+				: null;
+			setBaseUnitId(primaryOpt ? primaryOpt.value : baseUnitOptions[0].value);
+		}
+	}, [isOpen, baseUnitOptions, baseUnitId, primaryBaseUnit]);
 
 	return (
 		<ModernModal
@@ -941,7 +1122,7 @@ export function MapProductUnitModal({
 						<ModernSelect
 							label={t("products.baseUnit")}
 							value={baseUnitId}
-							onChange={(val) => setBaseUnitId(val)}
+							onChange={(val) => handleBaseUnitChange(val)}
 							options={baseUnitOptions}
 							searchable={baseUnitOptions.length > 4}
 							placeholder="Select base reference unit..."

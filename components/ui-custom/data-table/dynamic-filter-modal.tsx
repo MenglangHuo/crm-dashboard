@@ -35,6 +35,7 @@ import {
 	ModernSelect,
 	ModernSearchSelect,
 	ModernDatePicker,
+	CategoryTreeSelect,
 	type SearchSelectOption,
 	type SelectOption,
 } from "@/components/ui-custom/form-controls";
@@ -466,6 +467,10 @@ export function DynamicFilterModal({
 				</div>
 			}
 			size="xl"
+			defaultHeight={760}
+			minHeight={600}
+			className="h-[88vh] max-h-[840px] min-h-[640px]"
+			footerClassName="relative z-10"
 			footer={
 				<ModernModalFooter>
 					<Button
@@ -548,11 +553,15 @@ export function DynamicFilterModal({
 				)}
 
 				{/* Dynamic Fields Grid */}
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[460px] overflow-y-auto pr-1">
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-28">
 					{fields.map((fieldDef) => {
 						const criterion = getFieldCriterion(fieldDef);
 						const isStatus = isStatusField(fieldDef);
 						const asyncEntity = resolveAsyncEntity(fieldDef);
+						const isCategoryField =
+							asyncEntity === "category" ||
+							fieldDef.field.toLowerCase() === "category" ||
+							(fieldDef.type as string) === "category-tree";
 						const isSearchSelect =
 							fieldDef.type === "search-select" || !!asyncEntity;
 
@@ -593,6 +602,7 @@ export function DynamicFilterModal({
 									<div className="w-full">
 										<ModernSelect
 											selectSize="sm"
+											portal={true}
 											placeholder={
 												fieldDef.placeholder || `All ${fieldDef.label}s`
 											}
@@ -632,11 +642,56 @@ export function DynamicFilterModal({
 									</div>
 								)}
 
-								{/* 2. ASYNC SEARCH SELECT (Customer, Category, Brand, Warehouse, Branch, Supplier, etc.) */}
-								{isSearchSelect && (
+								{/* 2. CATEGORY TREE SELECT (Shows subcategories & hierarchy) */}
+								{isCategoryField && (
+									<div className="w-full">
+										<CategoryTreeSelect
+											selectSize="sm"
+											portal={true}
+											placeholder={
+												fieldDef.placeholder || "Select category or subcategory..."
+											}
+											searchPlaceholder="Search category or subcategory..."
+											value={criterion.value}
+											onChange={(val, selectedCat) => {
+												if (val === "" || val === null || val === undefined) {
+													clearField(fieldDef.field);
+												} else {
+													if (selectedCat) {
+														const catNode = selectedCat as {
+															path?: string[];
+															name?: string;
+														};
+														const displayLabel =
+															catNode.path && catNode.path.length > 1
+																? catNode.path.join(" › ")
+																: selectedCat.name;
+														setLabelCache((prev) => ({
+															...prev,
+															[val]: displayLabel,
+														}));
+													}
+													updateFieldCriterion(fieldDef.field, {
+														field: fieldDef.field,
+														operator: isStatus
+															? "EQUAL"
+															: criterion.operator ||
+																fieldDef.defaultOperator ||
+																"EQUAL",
+														value: val,
+													});
+												}
+											}}
+										/>
+									</div>
+								)}
+
+								{/* 2b. ASYNC SEARCH SELECT (Brand, Customer, Warehouse, Branch, Supplier, etc.) */}
+								{isSearchSelect && !isCategoryField && (
 									<div className="w-full">
 										<ModernSearchSelect
 											selectSize="sm"
+											portal={true}
 											placeholder={
 												fieldDef.placeholder ||
 												`Search & select ${fieldDef.label.toLowerCase()}...`
@@ -691,6 +746,7 @@ export function DynamicFilterModal({
 										<div className="w-28 shrink-0">
 											<ModernSelect
 												selectSize="sm"
+												portal={true}
 												value={criterion.operator || "EQUAL"}
 												onChange={(op) => {
 													updateFieldCriterion(fieldDef.field, {
@@ -716,6 +772,7 @@ export function DynamicFilterModal({
 												<div className="flex-1 min-w-0">
 													<ModernSelect
 														selectSize="sm"
+														portal={true}
 														placeholder={
 															fieldDef.placeholder || `All ${fieldDef.label}s`
 														}
