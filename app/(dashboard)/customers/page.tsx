@@ -54,6 +54,9 @@ import { LogVisitModal } from "@/components/customers/log-visit-modal";
 import { CustomerFormModal } from "@/components/customers/customer-form-modal";
 import { CustomerDetailsModal } from "@/components/customers/customer-details-modal";
 import { NearbyMapView } from "@/components/customers/nearby-map-view";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -72,6 +75,10 @@ export default function CustomersPage() {
 	const { t } = useTranslation();
 	const router = useRouter();
 	const queryClient = useQueryClient();
+	const { can } = usePermissions();
+	const canCreateCustomer = can("CUSTOMER", "CREATE");
+	const canUpdateCustomer = can("CUSTOMER", "UPDATE");
+	const canDeleteCustomer = can("CUSTOMER", "DELETE");
 	const { selectedCompanyId } = useCompanyContext();
 
 	const [viewMode, setViewMode] = useState<"list" | "nearby">("list");
@@ -626,7 +633,8 @@ export default function CustomersPage() {
 	);
 
 	return (
-		<div className="space-y-6 pb-12">
+		<PermissionGuard resource="CUSTOMER" action="READ">
+			<div className="space-y-6 pb-12">
 			{/* Page Header */}
 			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 				<div>
@@ -661,13 +669,15 @@ export default function CustomersPage() {
 							{modeSwitcherTabs}
 							{provinceSelectWidget}
 
-							<Button
-								onClick={openCreateModal}
-								className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
-							>
-								<Plus className="h-3.5 w-3.5" />
-								<span>{t("customers.addNewCustomer", "Add Customer")}</span>
-							</Button>
+							<PermissionGate resource="CUSTOMER" action="CREATE">
+								<Button
+									onClick={openCreateModal}
+									className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+								>
+									<Plus className="h-3.5 w-3.5" />
+									<span>{t("customers.addNewCustomer", "Add Customer")}</span>
+								</Button>
+							</PermissionGate>
 						</div>
 					</div>
 
@@ -698,17 +708,19 @@ export default function CustomersPage() {
 							<div className="flex items-center gap-2 flex-wrap">
 								{modeSwitcherTabs}
 								{provinceSelectWidget}
-								<Button
-									onClick={openCreateModal}
-									className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
-								>
-									<Plus className="h-3.5 w-3.5" />
-									<span>{t("customers.addNewCustomer", "Add Customer")}</span>
-								</Button>
+								<PermissionGate resource="CUSTOMER" action="CREATE">
+									<Button
+										onClick={openCreateModal}
+										className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+									>
+										<Plus className="h-3.5 w-3.5" />
+										<span>{t("customers.addNewCustomer", "Add Customer")}</span>
+									</Button>
+								</PermissionGate>
 							</div>
 						}
-						onEditRow={(row) => openEditModal(row)}
-						onDeleteRow={(row) => setDeletingId(row.id)}
+						onEditRow={canUpdateCustomer ? (row) => openEditModal(row) : undefined}
+						onDeleteRow={canDeleteCustomer ? (row) => setDeletingId(row.id) : undefined}
 						onViewRow={(row) => setViewingCustomer(row)}
 						customRowActions={customRowActions}
 						manualPagination={true}
@@ -778,5 +790,6 @@ export default function CustomersPage() {
 				</AlertDialogContent>
 			</AlertDialog>
 		</div>
+	</PermissionGuard>
 	);
 }

@@ -21,6 +21,8 @@ import {
 } from "@/components/ui-custom/status-filter-dropdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import { paymentsApi } from "@/lib/api/endpoints";
 import { useTranslation } from "@/lib/i18n/context";
 import { Payment } from "@/lib/types";
@@ -552,8 +554,10 @@ function PaymentsPageContent() {
 
 export default function PaymentsPage() {
 	return (
-		<Suspense fallback={<div className="p-8 text-center text-xs">Loading payments...</div>}>
-			<PaymentsPageContent />
-		</Suspense>
+		<PermissionGuard resource="PAYMENT" action="READ">
+			<Suspense fallback={<div className="p-8 text-center text-xs">Loading payments...</div>}>
+				<PaymentsPageContent />
+			</Suspense>
+		</PermissionGuard>
 	);
 }

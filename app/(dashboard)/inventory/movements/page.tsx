@@ -37,10 +37,14 @@ import {
 import { DataTable, ColumnDef } from "@/components/ui-custom/data-table";
 import type { StockMovement } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export default function StockMovementsPage() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const { can } = usePermissions();
+	const canAdjustStock = can("STOCK", "UPDATE") || can("STOCK", "MANAGE");
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
@@ -182,39 +186,40 @@ export default function StockMovementsPage() {
 	];
 
 	return (
-		<div className="space-y-6">
-			<div className="flex flex-col gap-1">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-						{t("sidebar.stockMovements")}
-					</h1>
-					<p className="text-sm text-slate-500">
-						{t("stocks.movementHistorySubtitle")}
-					</p>
+		<PermissionGuard anyPermissions={["STOCK:READ", "IMPORT:READ"]}>
+			<div className="space-y-6">
+				<div className="flex flex-col gap-1">
+					<div>
+						<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+							{t("sidebar.stockMovements")}
+						</h1>
+						<p className="text-sm text-slate-500">
+							{t("stocks.movementHistorySubtitle")}
+						</p>
+					</div>
 				</div>
-			</div>
 
-			<DataTable<StockMovement>
-				data={data?.items || []}
-				columns={columns}
-				getRowId={(item) => String(item.id)}
-				title={t("stocks.allMovements")}
-				searchPlaceholder={t("common.search")}
-				searchValue={search}
-				onSearchChange={(val) => {
-					setSearch(val);
-					setPage(1);
-				}}
-				createButtonLabel={t("stocks.adjustStock")}
-				onCreateNew={() => setIsDialogOpen(true)}
-				manualPagination={true}
-				totalCount={data?.total || 0}
-				page={page}
-				pageSize={pageSize}
-				onPageChange={setPage}
-				onPageSizeChange={setPageSize}
-				isLoading={isLoading}
-			/>
+				<DataTable<StockMovement>
+					data={data?.items || []}
+					columns={columns}
+					getRowId={(item) => String(item.id)}
+					title={t("stocks.allMovements")}
+					searchPlaceholder={t("common.search")}
+					searchValue={search}
+					onSearchChange={(val) => {
+						setSearch(val);
+						setPage(1);
+					}}
+					createButtonLabel={canAdjustStock ? t("stocks.adjustStock") : undefined}
+					onCreateNew={canAdjustStock ? () => setIsDialogOpen(true) : undefined}
+					manualPagination={true}
+					totalCount={data?.total || 0}
+					page={page}
+					pageSize={pageSize}
+					onPageChange={setPage}
+					onPageSizeChange={setPageSize}
+					isLoading={isLoading}
+				/>
 
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
 				<DialogContent className="sm:max-w-md rounded-2xl">
@@ -349,5 +354,6 @@ export default function StockMovementsPage() {
 				</DialogContent>
 			</Dialog>
 		</div>
+	</PermissionGuard>
 	);
 }

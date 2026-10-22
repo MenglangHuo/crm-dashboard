@@ -30,6 +30,7 @@ import {
 } from "@/components/ui-custom/modern-tabs";
 import { DataTable, ColumnDef } from "@/components/ui-custom/data-table";
 import { useTranslation } from "@/lib/i18n/context";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 
 export default function PermissionsPage() {
 	const { t } = useTranslation();
@@ -157,7 +158,8 @@ export default function PermissionsPage() {
 	);
 
 	return (
-		<div className="space-y-6">
+		<PermissionGuard resource="PERMISSION" action="READ">
+			<div className="space-y-6">
 			{/* Page Header */}
 			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 				<div>
@@ -347,5 +349,6 @@ export default function PermissionsPage() {
 				</ModernTabsContent>
 			</ModernTabs>
 		</div>
+	</PermissionGuard>
 	);
 }

@@ -304,6 +304,8 @@ export function AppSidebar() {
 		isMounted,
 		userProfile,
 		isLoading,
+		isAdmin,
+		can,
 	} = usePermissions();
 
 	const queryClient = useQueryClient();
@@ -321,14 +323,21 @@ export function AppSidebar() {
 	};
 
 	// Administrator visible ONLY when user login as ROLE_SYSTEM_ADMIN / platform system admin
-	const isSystemAdmin = isUserSystemAdmin(userProfile);
+	const isSystemAdmin = isUserSystemAdmin(userProfile) || (isMounted && isAdmin);
 
-	// 1. Sales & Finance Domain (Static frontend menu)
-	const salesFinanceSubItems: SubMenuItem[] = [
-		{ title: t("sidebar.order"), url: "/orders", icon: ShoppingCart },
-		{ title: t("sidebar.invoice"), url: "/invoices", icon: FileText },
-		{ title: t("sidebar.payments", "Payments"), url: "/payments", icon: CreditCard },
+	// Helper to safely evaluate permissions on client while preserving SSR hydration integrity
+	const isPermitted = (resource: string, action = "READ") => {
+		if (!isMounted) return true;
+		return can(resource, action);
+	};
+
+	// 1. Sales & Finance Domain: Filter /orders (ORDER:READ), /invoices (INVOICE:READ), /payments (PAYMENT:READ)
+	const rawSalesFinanceSubItems = [
+		{ title: t("sidebar.order"), url: "/orders", icon: ShoppingCart, allowed: isPermitted("ORDER", "READ") },
+		{ title: t("sidebar.invoice"), url: "/invoices", icon: FileText, allowed: isPermitted("INVOICE", "READ") },
+		{ title: t("sidebar.payments", "Payments"), url: "/payments", icon: CreditCard, allowed: isPermitted("PAYMENT", "READ") },
 	];
+	const salesFinanceSubItems: SubMenuItem[] = rawSalesFinanceSubItems.filter((i) => i.allowed);
 
 	const salesFinanceDomain: MenuItem = {
 		title: t("sidebar.saleAndFinance"),
@@ -336,12 +345,13 @@ export function AppSidebar() {
 		subItems: salesFinanceSubItems,
 	};
 
-	// 2. Product & Inventory Domain (Static frontend menu)
-	const productInventorySubItems: SubMenuItem[] = [
-		{ title: t("sidebar.allProducts"), url: "/products", icon: Package },
-		{ title: t("sidebar.stock"), url: "/inventory/stock", icon: Warehouse },
-		{ title: t("sidebar.import"), url: "/inventory/imports", icon: Truck },
+	// 2. Product & Inventory Domain: Filter /products (PRODUCT:READ), /inventory/stock (STOCK:READ), /inventory/imports (IMPORT:READ)
+	const rawProductInventorySubItems = [
+		{ title: t("sidebar.allProducts"), url: "/products", icon: Package, allowed: isPermitted("PRODUCT", "READ") },
+		{ title: t("sidebar.stock"), url: "/inventory/stock", icon: Warehouse, allowed: isPermitted("STOCK", "READ") },
+		{ title: t("sidebar.import"), url: "/inventory/imports", icon: Truck, allowed: isPermitted("IMPORT", "READ") },
 	];
+	const productInventorySubItems: SubMenuItem[] = rawProductInventorySubItems.filter((i) => i.allowed);
 
 	const productInventoryDomain: MenuItem = {
 		title: t("sidebar.productAndInventory"),
@@ -349,14 +359,15 @@ export function AppSidebar() {
 		subItems: productInventorySubItems,
 	};
 
-	// 3. Company Domain (Static frontend menu)
-	const companySubItems: SubMenuItem[] = [
-		{ title: t("sidebar.department"), url: "/departments", icon: Building },
-		{ title: t("sidebar.supplier"), url: "/suppliers", icon: Truck },
-		{ title: t("sidebar.delivery"), url: "/deliveries", icon: MapPin },
-		{ title: t("sidebar.customer"), url: "/customers", icon: Contact },
-		{ title: t("sidebar.feedback"), url: "/feedback", icon: MessageSquare },
+	// 3. Company Domain: Filter /departments (DEPARTMENT:READ), /suppliers (SUPPLIER:READ), /deliveries (DELIVERY:READ), /customers (CUSTOMER:READ), /feedback (FEEDBACK:READ)
+	const rawCompanySubItems = [
+		{ title: t("sidebar.department"), url: "/departments", icon: Building, allowed: isPermitted("DEPARTMENT", "READ") },
+		{ title: t("sidebar.supplier"), url: "/suppliers", icon: Truck, allowed: isPermitted("SUPPLIER", "READ") },
+		{ title: t("sidebar.delivery"), url: "/deliveries", icon: MapPin, allowed: isPermitted("DELIVERY", "READ") || isPermitted("LOCATION", "READ") },
+		{ title: t("sidebar.customer"), url: "/customers", icon: Contact, allowed: isPermitted("CUSTOMER", "READ") },
+		{ title: t("sidebar.feedback"), url: "/feedback", icon: MessageSquare, allowed: isPermitted("FEEDBACK", "READ") || isPermitted("CUSTOMER", "READ") },
 	];
+	const companySubItems: SubMenuItem[] = rawCompanySubItems.filter((i) => i.allowed);
 
 	const companyDomain: MenuItem = {
 		title: t("sidebar.company"),
@@ -364,12 +375,13 @@ export function AppSidebar() {
 		subItems: companySubItems,
 	};
 
-	// 4. User Management Domain (Static frontend menu)
-	const userManagementSubItems: SubMenuItem[] = [
-		{ title: t("sidebar.user"), url: "/users", icon: Users },
-		{ title: t("sidebar.role"), url: "/roles", icon: ShieldCheck },
-		{ title: t("sidebar.permission"), url: "/permissions", icon: KeyRound },
+	// 4. User Management Domain: Filter /users (USER:READ), /roles (ROLE:READ), /permissions (PERMISSION:READ)
+	const rawUserManagementSubItems = [
+		{ title: t("sidebar.user"), url: "/users", icon: Users, allowed: isPermitted("USER", "READ") },
+		{ title: t("sidebar.role"), url: "/roles", icon: ShieldCheck, allowed: isPermitted("ROLE", "READ") },
+		{ title: t("sidebar.permission"), url: "/permissions", icon: KeyRound, allowed: isPermitted("PERMISSION", "READ") },
 	];
+	const userManagementSubItems: SubMenuItem[] = rawUserManagementSubItems.filter((i) => i.allowed);
 
 	const userManagementDomain: MenuItem = {
 		title: t("sidebar.userManagement"),
@@ -377,24 +389,28 @@ export function AppSidebar() {
 		subItems: userManagementSubItems,
 	};
 
-	// 5. System Settings Domain (Static frontend menu)
-	const systemSettingsSubItems: SubMenuItem[] = [
+	// 5. System Settings Domain: Filter /configurations (COMPANY:READ), /subscriptions (SUBSCRIPTION:READ)
+	const rawSystemSettingsSubItems = [
 		{
 			title: t("sidebar.configurations"),
 			url: "/configurations",
 			icon: SlidersHorizontal,
+			allowed: isPermitted("COMPANY", "READ"),
 		},
 		{
 			title: t("sidebar.paymentTerms", "Payment Terms"),
 			url: "/payment-terms",
 			icon: Clock,
+			allowed: isPermitted("COMPANY", "READ") || isPermitted("INVOICE", "READ"),
 		},
 		{
 			title: t("sidebar.subscription"),
 			url: "/subscriptions",
 			icon: CreditCard,
+			allowed: isPermitted("SUBSCRIPTION", "READ") || isPermitted("COMPANY", "READ"),
 		},
 	];
+	const systemSettingsSubItems: SubMenuItem[] = rawSystemSettingsSubItems.filter((i) => i.allowed);
 
 	const systemSettingsDomain: MenuItem = {
 		title: t("sidebar.systemSettings"),
@@ -430,7 +446,15 @@ export function AppSidebar() {
 		],
 	};
 
-	const hasAnyManagementDomains = true;
+	// Auto-collapse/Hide Empty Groups: If all subItems in a domain group are unauthorized, hide the whole domain group
+	const hasAnyManagementDomains =
+		salesFinanceSubItems.length > 0 ||
+		productInventorySubItems.length > 0 ||
+		companySubItems.length > 0 ||
+		userManagementSubItems.length > 0 ||
+		systemSettingsSubItems.length > 0;
+
+	const canAccessDashboard = isPermitted("DASHBOARD", "READ");
 
 	return (
 		<Sidebar
@@ -474,38 +498,40 @@ export function AppSidebar() {
 			{/* Main Navigation Content */}
 			<SidebarContent className="px-3.5 py-2 space-y-4 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-1 group-data-[collapsible=icon]:space-y-1">
 				{/* Core Menu */}
-				<SidebarGroup className="p-0">
-					<SidebarGroupLabel
-						suppressHydrationWarning
-						className="text-[10px] font-bold tracking-wider text-slate-400 uppercase px-2 mb-1.5 group-data-[collapsible=icon]:hidden"
-					>
-						{t("sidebar.core")}
-					</SidebarGroupLabel>
-					<SidebarGroupContent>
-						<SidebarMenu className="space-y-1">
-							{/* Dashboard Item */}
-							<SidebarMenuItem className="flex group-data-[collapsible=icon]:justify-center my-1.5">
-								<SidebarMenuButton
-									render={<Link href="/" />}
-									isActive={pathname === "/"}
-									tooltip={t("sidebar.dashboard")}
-									className={`flex items-center gap-3 w-full h-10.5 rounded-xl px-3.5 transition-all border-l-2 ${
-										pathname === "/"
-											? "bg-primary/12 border-primary text-primary font-bold dark:bg-primary/20 shadow-2xs"
-											: "bg-slate-100/80 border-transparent text-slate-700 hover:bg-slate-200/80 hover:text-slate-900 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-slate-100 font-medium"
-									} group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-l-0`}
-								>
-									<LayoutDashboard
-										className={`size-4.5 ${pathname === "/" ? "text-primary" : "text-slate-500 dark:text-slate-400"}`}
-									/>
-									<span className="text-sm font-semibold group-data-[collapsible=icon]:hidden">
-										{t("sidebar.dashboard")}
-									</span>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
+				{canAccessDashboard && (
+					<SidebarGroup className="p-0">
+						<SidebarGroupLabel
+							suppressHydrationWarning
+							className="text-[10px] font-bold tracking-wider text-slate-400 uppercase px-2 mb-1.5 group-data-[collapsible=icon]:hidden"
+						>
+							{t("sidebar.core")}
+						</SidebarGroupLabel>
+						<SidebarGroupContent>
+							<SidebarMenu className="space-y-1">
+								{/* Dashboard Item */}
+								<SidebarMenuItem className="flex group-data-[collapsible=icon]:justify-center my-1.5">
+									<SidebarMenuButton
+										render={<Link href="/" />}
+										isActive={pathname === "/"}
+										tooltip={t("sidebar.dashboard")}
+										className={`flex items-center gap-3 w-full h-10.5 rounded-xl px-3.5 transition-all border-l-2 ${
+											pathname === "/"
+												? "bg-primary/12 border-primary text-primary font-bold dark:bg-primary/20 shadow-2xs"
+												: "bg-slate-100/80 border-transparent text-slate-700 hover:bg-slate-200/80 hover:text-slate-900 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-slate-100 font-medium"
+										} group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-l-0`}
+									>
+										<LayoutDashboard
+											className={`size-4.5 ${pathname === "/" ? "text-primary" : "text-slate-500 dark:text-slate-400"}`}
+										/>
+										<span className="text-sm font-semibold group-data-[collapsible=icon]:hidden">
+											{t("sidebar.dashboard")}
+										</span>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							</SidebarMenu>
+						</SidebarGroupContent>
+					</SidebarGroup>
+				)}
 
 				{/* Management & Domains */}
 				{hasAnyManagementDomains && (

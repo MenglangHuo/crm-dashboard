@@ -21,6 +21,8 @@ import {
 } from "@/components/ui-custom/data-table/search-filter-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import { PosOrderStudioModal } from "@/components/orders/pos-order-studio-modal";
 import { CreateOrderModal } from "@/components/orders/create-order-modal";
 import { OrderDetailsDrawer } from "@/components/orders/order-details-drawer";
@@ -1001,14 +1003,16 @@ function OrdersPageContent() {
 
 export default function OrdersPage() {
 	return (
-		<Suspense
-			fallback={
-				<div className="p-8 text-center text-xs text-muted-foreground">
-					Loading orders...
-				</div>
-			}
-		>
-			<OrdersPageContent />
-		</Suspense>
+		<PermissionGuard resource="ORDER" action="READ">
+			<Suspense
+				fallback={
+					<div className="p-8 text-center text-xs text-muted-foreground">
+						Loading orders...
+					</div>
+				}
+			>
+				<OrdersPageContent />
+			</Suspense>
+		</PermissionGuard>
 	);
 }

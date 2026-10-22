@@ -38,6 +38,8 @@ import {
 	Star,
 	Plus,
 	Filter,
+	TrendingUp,
+	BarChart3,
 } from "lucide-react";
 
 import {
@@ -213,6 +215,12 @@ function getBadgeStyle(type?: string): string {
 			return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25";
 		case "theme":
 			return "bg-pink-500/10 text-pink-700 dark:text-pink-300 border border-pink-500/25";
+		case "profit":
+			return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25";
+		case "charts":
+			return "bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25";
+		case "leaderboard":
+			return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25";
 		default:
 			return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
 	}
@@ -310,21 +318,92 @@ export function CommandPalette() {
 	const allItems: CommandActionItem[] = useMemo(() => {
 		return [
 			// ==========================================
-			// 1. ORDERS DOMAIN & SUB-SHORTCUTS
+			// 1. DASHBOARD & FINANCIAL ANALYTICS
+			// ==========================================
+			{
+				id: "nav-dashboard",
+				title: t("sidebar.dashboard", "Dashboard"),
+				rawTitle: "Dashboard",
+				description:
+					"Executive overview of revenue, gross profit, sales analytics, and business KPIs",
+				badge: "Home",
+				badgeType: "page",
+				shortcut: "D",
+				icon: LayoutDashboard,
+				color: "text-primary bg-primary/10 border-primary/20",
+				keywords:
+					"dashboard home overview profit gross profit net profit revenue net revenue gross sales income earnings profit margin financial kpi metrics sales cashflow stats analytics trends top products best sellers performance reports executive business summary",
+				url: "/",
+				isCommonlyUsed: true,
+			},
+			{
+				id: "sub-dashboard-revenue-profit",
+				title: "Revenue & Gross Profit",
+				rawTitle: "Revenue & Gross Profit",
+				description:
+					"Financial performance summaries, gross profit, net revenue, and margin metrics",
+				badge: "Profit",
+				badgeType: "profit",
+				icon: TrendingUp,
+				color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+				parentId: "nav-dashboard",
+				parentTitle: "Dashboard",
+				isSubItem: true,
+				keywords:
+					"revenue gross profit net revenue profit margin income earnings financial kpi metrics gross sales cashflow financial overview",
+				url: "/",
+			},
+			{
+				id: "sub-dashboard-analytics",
+				title: "Sales Analytics & Trends",
+				rawTitle: "Sales Analytics & Trends",
+				description:
+					"Time-series analytics charts, revenue growth tracking, and sales performance",
+				badge: "Charts",
+				badgeType: "charts",
+				icon: BarChart3,
+				color: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+				parentId: "nav-dashboard",
+				parentTitle: "Dashboard",
+				isSubItem: true,
+				keywords:
+					"sales analytics trends time series charts volume performance growth tracking statistics report graphs",
+				url: "/",
+			},
+			{
+				id: "sub-dashboard-top-products",
+				title: "Top Selling Products",
+				rawTitle: "Top Selling Products",
+				description:
+					"Leaderboard ranking of top products by revenue generated and units sold",
+				badge: "Leaderboard",
+				badgeType: "leaderboard",
+				icon: Sparkles,
+				color: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+				parentId: "nav-dashboard",
+				parentTitle: "Dashboard",
+				isSubItem: true,
+				keywords:
+					"top selling products best sellers revenue rank units quantity top items popular ranking products report",
+				url: "/",
+			},
+
+			// ==========================================
+			// 2. ORDERS DOMAIN & SUB-SHORTCUTS
 			// ==========================================
 			{
 				id: "nav-orders",
 				title: t("sidebar.order", "Order"),
 				rawTitle: "Order",
 				description:
-					"Customer sales orders, order fulfillment, and transaction history logs",
+					"Customer sales orders, POS checkout, order fulfillment, and transaction history",
 				badge: "Sales",
 				badgeType: "page",
 				shortcut: "O",
 				icon: ShoppingCart,
 				color: "text-blue-600 bg-blue-600/10 border-blue-600/20",
 				keywords:
-					"order orders sales pos checkout customer purchases items shopping cart fulfillment",
+					"order orders sales pos checkout customer purchases items shopping cart fulfillment quotation draft transactions booking sales log order tracking deals",
 				url: "/orders",
 				isCommonlyUsed: true,
 			},
@@ -342,7 +421,7 @@ export function CommandPalette() {
 				parentTitle: "Order",
 				isSubItem: true,
 				keywords:
-					"create order new order sales quotation draft customer purchase order modal shortcut",
+					"create order new order add order sales quotation draft customer purchase order modal shortcut form deal booking new sale",
 				perform: () => {
 					if (typeof window !== "undefined" && window.location.pathname === "/orders") {
 						window.dispatchEvent(new CustomEvent("crm:open-create-order"));
@@ -357,7 +436,7 @@ export function CommandPalette() {
 				title: "POS Order Studio",
 				rawTitle: "POS Order Studio",
 				description:
-					"Open Point-of-Sale studio for fast barcode scanning, cart building, and checkout",
+					"Open Point-of-Sale studio for fast barcode scanning, cart building, and cashier checkout",
 				badge: "POS",
 				badgeType: "pos",
 				icon: ShoppingCart,
@@ -366,7 +445,7 @@ export function CommandPalette() {
 				parentTitle: "Order",
 				isSubItem: true,
 				keywords:
-					"pos order studio point of sale quick checkout cart barcode scanner orders modal shortcut",
+					"pos order studio point of sale quick checkout cart barcode scanner orders cashier retail register quick sale pos modal shortcut",
 				perform: () => {
 					if (typeof window !== "undefined" && window.location.pathname === "/orders") {
 						window.dispatchEvent(new CustomEvent("crm:open-pos-order"));
@@ -388,25 +467,25 @@ export function CommandPalette() {
 				parentId: "nav-orders",
 				parentTitle: "Order",
 				isSubItem: true,
-				keywords: "filter orders status draft submitted approved invoiced stage sales shortcut",
+				keywords: "filter orders status draft submitted approved invoiced stage sales pipeline status search filter shortcut",
 				url: "/orders",
 			},
 
 			// ==========================================
-			// 2. PRODUCT & INVENTORY DOMAIN & SUB-SHORTCUTS
+			// 3. PRODUCT & INVENTORY DOMAIN & SUB-SHORTCUTS
 			// ==========================================
 			{
 				id: "nav-products",
 				title: t("sidebar.allProducts", "All Products"),
 				rawTitle: "All Products",
 				description:
-					"Browse complete product catalog, price histories, models, and serial numbers",
+					"Complete product catalog, asset models, serial numbers, price histories, and variants",
 				badge: "Catalog",
 				badgeType: "page",
 				shortcut: "P",
 				icon: Package,
 				color: "text-amber-600 bg-amber-600/10 border-amber-600/20",
-				keywords: "all products catalog inventory items goods models pricing assets",
+				keywords: "all products product products catalog inventory items goods models pricing assets catalog sku barcode units variants cost sell price price list warehouse stock commodities merchandise",
 				url: "/products",
 				isCommonlyUsed: true,
 			},
@@ -425,7 +504,7 @@ export function CommandPalette() {
 				parentTitle: "Product",
 				isSubItem: true,
 				keywords:
-					"create product new product add product asset item inventory sku price goods modal shortcut",
+					"create product new product add product asset item inventory sku price goods modal shortcut product form register item new asset",
 				perform: () => {
 					openAddProduct();
 					if (typeof window !== "undefined" && window.location.pathname === "/products") {
@@ -450,7 +529,7 @@ export function CommandPalette() {
 				parentTitle: "Product",
 				isSubItem: true,
 				keywords:
-					"filter products category brand stock price status catalog criteria dynamic filter modal shortcut",
+					"filter products category brand stock price status catalog criteria dynamic filter modal shortcut search filter find items",
 				perform: () => {
 					if (typeof window !== "undefined" && window.location.pathname === "/products") {
 						window.dispatchEvent(new CustomEvent("crm:open-filter-product"));
@@ -474,7 +553,7 @@ export function CommandPalette() {
 				parentTitle: "Product",
 				isSubItem: true,
 				keywords:
-					"product stock warehouse balance inventory quantity counts sku low stock items shortcut",
+					"product stock warehouse balance inventory quantity counts sku low stock items out of stock stocktake on hand stock levels physical inventory",
 				url: "/inventory/stock",
 			},
 			{
@@ -491,12 +570,12 @@ export function CommandPalette() {
 				parentTitle: "Product",
 				isSubItem: true,
 				keywords:
-					"product imports incoming goods shipments grn intake supplier receipts verification inventory shortcut",
+					"product imports incoming goods shipments grn intake supplier receipts verification inventory restock receiving freight delivery goods in",
 				url: "/inventory/imports",
 			},
 
 			// ==========================================
-			// 3. INVOICES DOMAIN & SUB-SHORTCUTS
+			// 4. INVOICES DOMAIN & SUB-SHORTCUTS
 			// ==========================================
 			{
 				id: "nav-invoices",
@@ -510,7 +589,7 @@ export function CommandPalette() {
 				icon: FileText,
 				color: "text-sky-600 bg-sky-600/10 border-sky-600/20",
 				keywords:
-					"invoice invoices sales billing statements dues payments collections statements finance",
+					"invoice invoices sales billing bill bills statements dues payments collections finance accounts receivable unpaid overdue partial payment due date tax receipt refund credit note statement debt",
 				url: "/invoices",
 				isCommonlyUsed: true,
 			},
@@ -529,7 +608,7 @@ export function CommandPalette() {
 				parentTitle: "Invoice",
 				isSubItem: true,
 				keywords:
-					"pay invoice collect payment khqr aba settlement billing statement dues modal shortcut",
+					"pay invoice collect payment khqr aba settlement billing statement dues modal shortcut instant checkout qr code scan to pay installment collection",
 				perform: () => {
 					openQuickPay();
 				},
@@ -549,7 +628,7 @@ export function CommandPalette() {
 				parentTitle: "Invoice",
 				isSubItem: true,
 				keywords:
-					"multi invoice settlement batch pay multiple invoices customer bulk payment modal shortcut",
+					"multi invoice settlement batch pay multiple invoices customer bulk payment modal shortcut consolidate invoices bulk settle balance",
 				url: "/invoices",
 			},
 			{
@@ -565,25 +644,25 @@ export function CommandPalette() {
 				parentId: "nav-invoices",
 				parentTitle: "Invoice",
 				isSubItem: true,
-				keywords: "filter invoices overdue paid unpaid billing status finance shortcut",
+				keywords: "filter invoices overdue paid unpaid billing status finance shortcut filter by due date payment status",
 				url: "/invoices",
 			},
 
 			// ==========================================
-			// 4. PAYMENTS DOMAIN & SUB-SHORTCUTS
+			// 5. PAYMENTS DOMAIN & SUB-SHORTCUTS
 			// ==========================================
 			{
 				id: "nav-payments",
 				title: t("sidebar.payments", "Payments"),
 				rawTitle: "Payments",
 				description:
-					"View payment records, settlement transactions, and bank reconciliations",
+					"Payment ledger records, settlement transactions, and bank reconciliations",
 				badge: "Finance",
 				badgeType: "page",
 				icon: CreditCard,
 				color: "text-emerald-600 bg-emerald-600/10 border-emerald-600/20",
 				keywords:
-					"payments settlements ledger bank reconciliation transactions receipts history finance",
+					"payments payment settlements ledger bank reconciliation transactions receipts history finance cash bank transfer aba bakong khqr installment deposit payout money collection paid accounts bookkeeping",
 				url: "/payments",
 				isCommonlyUsed: true,
 			},
@@ -602,7 +681,7 @@ export function CommandPalette() {
 				parentTitle: "Payments",
 				isSubItem: true,
 				keywords:
-					"collect payment pay aba khqr settlement receipt transaction customer payment finance modal shortcut",
+					"collect payment pay aba khqr settlement receipt transaction customer payment finance modal shortcut instant pay scan qr cash register installment",
 				perform: () => {
 					openQuickPay();
 				},
@@ -622,12 +701,12 @@ export function CommandPalette() {
 				parentTitle: "Payments",
 				isSubItem: true,
 				keywords:
-					"bulk reconciliation bank match payments statement ledger audit finance modal shortcut",
+					"bulk reconciliation bank match payments statement ledger audit finance modal shortcut bank statement import reconcile transactions accounts match",
 				url: "/payments",
 			},
 
 			// ==========================================
-			// 5. CUSTOMER DOMAIN & SUB-SHORTCUTS
+			// 6. CUSTOMER DOMAIN & SUB-SHORTCUTS
 			// ==========================================
 			{
 				id: "nav-customers",
@@ -640,7 +719,7 @@ export function CommandPalette() {
 				icon: Contact,
 				color: "text-violet-600 bg-violet-600/10 border-violet-600/20",
 				keywords:
-					"customer customers clients directory accounts contacts phone profile crm",
+					"customer customers clients directory accounts contacts phone profile crm borrowers members debtors address national id kyc loyalty leads individuals companies client management people",
 				url: "/customers",
 				isCommonlyUsed: true,
 			},
@@ -659,7 +738,7 @@ export function CommandPalette() {
 				parentTitle: "Customer",
 				isSubItem: true,
 				keywords:
-					"add customer create client borrower register profile contact phone kyc crm modal shortcut",
+					"add customer create client borrower register profile contact phone kyc crm modal shortcut new borrower new debtor add lead register member",
 				perform: () => {
 					openAddCustomer();
 					if (typeof window !== "undefined" && window.location.pathname === "/customers") {
@@ -684,39 +763,25 @@ export function CommandPalette() {
 				parentTitle: "Customer",
 				isSubItem: true,
 				keywords:
-					"filter customers kyc status province credit score active loans directory crm shortcut",
+					"filter customers kyc status province credit score active loans directory crm shortcut location filter province city",
 				url: "/customers",
 			},
 
 			// ==========================================
-			// 6. CORE DASHBOARD & COMPANY MANAGEMENT
+			// 7. COMPANY & LOGISTICS MANAGEMENT
 			// ==========================================
-			{
-				id: "nav-dashboard",
-				title: t("sidebar.dashboard", "Dashboard"),
-				rawTitle: "Dashboard",
-				description:
-					"Executive CRM overview, revenue summaries, sales KPIs, and activity analytics",
-				badge: "Home",
-				badgeType: "page",
-				shortcut: "D",
-				icon: LayoutDashboard,
-				color: "text-primary bg-primary/10 border-primary/20",
-				keywords: "dashboard home overview kpi analytics metrics revenue stats charts",
-				url: "/",
-			},
 			{
 				id: "nav-departments",
 				title: t("sidebar.department", "Department"),
 				rawTitle: "Department",
 				description:
-					"Internal corporate departments, organization teams, and operational structure",
+					"Internal corporate departments, organization teams, branches, and operational structure",
 				badge: "Org",
 				badgeType: "page",
 				icon: Building,
 				color: "text-slate-600 bg-slate-600/10 border-slate-600/20",
 				keywords:
-					"department departments organization teams corporate structure hierarchy company",
+					"department departments organization teams corporate structure hierarchy company divisions branches units employees staff offices internal management company org team members",
 				url: "/departments",
 			},
 			{
@@ -724,13 +789,13 @@ export function CommandPalette() {
 				title: t("sidebar.supplier", "Supplier"),
 				rawTitle: "Supplier",
 				description:
-					"Procurement partner directory, supplier profiles, and vendor contact info",
+					"Procurement partner directory, vendor profiles, and supply chain contact info",
 				badge: "Logistics",
 				badgeType: "page",
 				icon: Truck,
 				color: "text-cyan-600 bg-cyan-600/10 border-cyan-600/20",
 				keywords:
-					"supplier suppliers vendors procurement contacts partners logistics company",
+					"supplier suppliers vendors procurement contacts partners logistics company distributors manufacturers sourcing wholesale supply chain vendor directory contracts",
 				url: "/suppliers",
 			},
 			{
@@ -744,7 +809,7 @@ export function CommandPalette() {
 				icon: MapPin,
 				color: "text-blue-500 bg-blue-500/10 border-blue-500/20",
 				keywords:
-					"delivery deliveries dispatch fleet shipping driver route tracking tasks company logistics",
+					"delivery deliveries dispatch fleet shipping driver route tracking tasks company logistics shipment transport courier dispatch tracking destination shipping orders vans trucks",
 				url: "/deliveries",
 			},
 			{
@@ -758,12 +823,12 @@ export function CommandPalette() {
 				icon: MessageSquare,
 				color: "text-pink-500 bg-pink-500/10 border-pink-500/20",
 				keywords:
-					"feedback surveys reviews satisfaction customer questions csat metrics company",
+					"feedback surveys reviews satisfaction customer questions csat metrics company ratings nps client comments survey forms feedback responses evaluation quality",
 				url: "/feedback",
 			},
 
 			// ==========================================
-			// 7. USER MANAGEMENT (Only user-related data)
+			// 8. USER MANAGEMENT (Strictly user-related data)
 			// ==========================================
 			{
 				id: "nav-users",
@@ -776,7 +841,7 @@ export function CommandPalette() {
 				icon: Users,
 				color: "text-blue-600 bg-blue-600/10 border-blue-600/20",
 				keywords:
-					"user users accounts logins security profiles access status user management",
+					"user users accounts logins security profiles access status user management credentials authentication staff accounts operators email access members system users",
 				url: "/users",
 			},
 			{
@@ -790,7 +855,7 @@ export function CommandPalette() {
 				icon: ShieldCheck,
 				color: "text-emerald-600 bg-emerald-600/10 border-emerald-600/20",
 				keywords:
-					"role roles rbac permissions access matrix privileges security user management",
+					"role roles rbac permissions access matrix privileges security user management access control authority groups role assignments policies security roles permissions matrix",
 				url: "/roles",
 			},
 			{
@@ -804,12 +869,12 @@ export function CommandPalette() {
 				icon: KeyRound,
 				color: "text-amber-600 bg-amber-600/10 border-amber-600/20",
 				keywords:
-					"permission permissions access capabilities authority keys tokens user management",
+					"permission permissions access capabilities authority keys tokens user management feature privileges api access rbac rules security rights permission keys access grants",
 				url: "/permissions",
 			},
 
 			// ==========================================
-			// 8. SYSTEM SETTINGS & THEME SHORTCUTS
+			// 9. SYSTEM SETTINGS & THEME SHORTCUTS
 			// ==========================================
 			{
 				id: "nav-configurations",
@@ -822,7 +887,7 @@ export function CommandPalette() {
 				icon: SlidersHorizontal,
 				color: "text-indigo-600 bg-indigo-600/10 border-indigo-600/20",
 				keywords:
-					"configurations settings preferences parameters rules security ip discounts early payment system",
+					"configurations settings preferences parameters rules security ip discounts early payment system options config variables thresholds business rules global settings",
 				url: "/configurations",
 			},
 			{
@@ -832,14 +897,14 @@ export function CommandPalette() {
 				description:
 					"Switch between light and dark theme mode across the CRM dashboard",
 				badge: "Theme",
-				badgeType: "action",
+				badgeType: "theme",
 				shortcut: "T",
 				icon: SunMoon,
 				color: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
 				parentId: "nav-configurations",
 				parentTitle: "Configurations",
 				isSubItem: true,
-				keywords: "toggle theme mode dark light color appearance styling shortcut",
+				keywords: "toggle theme mode dark light color appearance styling shortcut dark mode light mode theme switcher night mode brightness display",
 				perform: () => {
 					setTheme(theme === "light" ? "dark" : "light");
 				},
@@ -858,7 +923,7 @@ export function CommandPalette() {
 				parentTitle: "Configurations",
 				isSubItem: true,
 				keywords:
-					"customize theme brand colors palette radius styling appearance customizer modal shortcut",
+					"customize theme brand colors palette radius styling appearance customizer modal shortcut brand theme custom colors primary color styling",
 				perform: () => {
 					setIsCustomizerOpen(true);
 				},
@@ -874,7 +939,7 @@ export function CommandPalette() {
 				icon: Clock,
 				color: "text-sky-600 bg-sky-600/10 border-sky-600/20",
 				keywords:
-					"payment terms installments credit policies schedules grace penalty settings finance",
+					"payment terms installments credit policies schedules grace penalty settings finance installment plans loan duration late fee terms conditions billing cycles grace days interest penalty fee",
 				url: "/payment-terms",
 			},
 			{
@@ -888,7 +953,7 @@ export function CommandPalette() {
 				icon: CreditCard,
 				color: "text-teal-600 bg-teal-600/10 border-teal-600/20",
 				keywords:
-					"subscription subscriptions plans tiers billing pricing features quotas settings",
+					"subscription subscriptions plans tiers billing pricing features quotas settings monthly annual upgrade downgrade renew license tenant quota payment plan SaaS plan active plan",
 				url: "/subscriptions",
 			},
 			{
@@ -901,12 +966,12 @@ export function CommandPalette() {
 				badgeType: "page",
 				icon: User,
 				color: "text-blue-500 bg-blue-500/10 border-blue-500/20",
-				keywords: "profile account me password avatar credentials user settings",
+				keywords: "profile account me password avatar credentials user settings my account change password security settings user profile personal details profile picture email update",
 				url: "/profile",
 			},
 
 			// ==========================================
-			// 9. ADMINISTRATOR ONLY
+			// 10. ADMINISTRATOR ONLY
 			// ==========================================
 			{
 				id: "nav-admin-user",
@@ -919,7 +984,7 @@ export function CommandPalette() {
 				icon: ShieldAlert,
 				color: "text-rose-600 bg-rose-600/10 border-rose-600/20",
 				keywords:
-					"super admin platform administrators root security credentials system admin user",
+					"super admin platform administrators root security credentials system admin user governance root access multi-tenant admin platform management platform owners",
 				url: "/super-admin/admins",
 				adminOnly: true,
 			},
@@ -934,7 +999,7 @@ export function CommandPalette() {
 				icon: Building2,
 				color: "text-amber-600 bg-amber-600/10 border-amber-600/20",
 				keywords:
-					"company management multi-tenant platform organizations onboarding companies admin",
+					"company management multi-tenant platform organizations onboarding companies admin tenants business entities corporate accounts registration tenant list clients",
 				url: "/super-admin/companies",
 				adminOnly: true,
 			},
@@ -949,7 +1014,7 @@ export function CommandPalette() {
 				icon: MapPin,
 				color: "text-emerald-600 bg-emerald-600/10 border-emerald-600/20",
 				keywords:
-					"locations provinces districts communes geography postal codes country master data admin",
+					"locations provinces districts communes geography postal codes country master data admin address lookup regions administrative areas khmer provinces cambodia locations",
 				url: "/locations",
 				adminOnly: true,
 			},
@@ -964,7 +1029,7 @@ export function CommandPalette() {
 				icon: ArrowLeftRight,
 				color: "text-violet-600 bg-violet-600/10 border-violet-600/20",
 				keywords:
-					"data migration import export etl database seeders transfer schema admin",
+					"data migration import export etl database seeders transfer schema admin backup restore data sync sql transfer database dump",
 				url: "/super-admin/migrations",
 				adminOnly: true,
 			},
@@ -1022,6 +1087,7 @@ export function CommandPalette() {
 				item.isCommonlyUsed ||
 				item.isSubItem ||
 				[
+					"nav-dashboard",
 					"nav-orders",
 					"nav-products",
 					"nav-invoices",
@@ -1132,7 +1198,7 @@ export function CommandPalette() {
 			{/* Top Header Search Input */}
 			<div className="relative border-b border-slate-100 dark:border-slate-800/80">
 				<CommandInput
-					placeholder="Search CRM features... (e.g. User, Create Product, Order, Filter, ⌘K)"
+					placeholder="Search CRM features... (e.g. Profit, Revenue, Orders, Products, ⌘K)"
 					value={search}
 					onValueChange={setSearch}
 					className="h-12 text-sm sm:text-base font-medium"
@@ -1162,7 +1228,7 @@ export function CommandPalette() {
 								No matching CRM features found for &ldquo;{search}&rdquo;
 							</p>
 							<p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm">
-								Try searching for &ldquo;User&rdquo;, &ldquo;Create Product&rdquo;, &ldquo;Order&rdquo;, &ldquo;Customer&rdquo;, or &ldquo;Filter&rdquo;.
+								Try searching for &ldquo;Profit&rdquo;, &ldquo;Revenue&rdquo;, &ldquo;Orders&rdquo;, &ldquo;User&rdquo;, or &ldquo;Products&rdquo;.
 							</p>
 						</div>
 					</CommandEmpty>

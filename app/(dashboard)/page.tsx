@@ -45,6 +45,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/context";
+import { usePermissions } from "@/hooks/use-permissions";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import type {
 	DashboardReportData,
 	TimeSeriesMetricItem,
@@ -77,6 +80,15 @@ export default function DashboardPage() {
 	const queryClient = useQueryClient();
 	const { selectedCompanyId, companies, isSystemAdmin } = useCompanyContext();
 	const { t } = useTranslation();
+	const { isAdmin, isSale, can } = usePermissions();
+
+	// Financial metrics and Income Comparison are only shown if permitted and not restricted sales representative
+	const canViewFinancials =
+		!isSale &&
+		(isAdmin ||
+			can("DASHBOARD", "READ") ||
+			can("REPORT", "READ") ||
+			can("INVOICE", "READ"));
 
 	// 1. Date Range & Preset Filter State (Today is default)
 	const initialToday = React.useMemo(() => getDateRangeForPreset("today"), []);
@@ -297,93 +309,100 @@ export default function DashboardPage() {
 	}, [submissionsData, templatesList]);
 
 	return (
-		<div className="space-y-6 pb-12">
-			{/* 1. Header with Live Status, Date Preset Selector, Staff Filter, Range Picker & Refresh Button */}
-			<DashboardHeader
-				title={t("dashboard.title")}
-				description={t("dashboard.description")}
-				lastUpdated={lastRefreshedTime}
-				isRefreshing={isRefreshing || isFetchingDashboard}
-				onRefresh={handleRefresh}
-				dateRange={dateRange}
-				onDateRangeChange={setDateRange}
-				selectedUserId={selectedUserId}
-				onUserIdChange={setSelectedUserId}
-				users={users}
-				isLoadingUsers={isLoadingUsers}
-				selectedCompanyName={isSystemAdmin ? selectedCompany?.name : null}
-			/>
-
-			{/* 2. Primary Financial & Operational KPI Cards Grid */}
-			<FinancialKpiGrid
-				data={finalDashboard}
-				isLoading={isLoadingDashboard && !dashboardData}
-			/>
-
-			{/* 3. Performance Timeline Chart & Top Products Row (Equal Height) */}
-			<section className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-stretch">
-				{/* Time-Series Analytics (7 cols) */}
-				<div className="lg:col-span-7 flex flex-col">
-					<TimeSeriesChart
-						data={finalTimeSeries}
-						isLoading={isLoadingTimeSeries && !timeSeriesData}
-					/>
-				</div>
-
-				{/* Top Performing Products (5 cols) */}
-				<div className="lg:col-span-5 flex flex-col">
-					<TopProductsCard
-						byRevenue={finalDashboard.topProductsByRevenue}
-						byQuantity={finalDashboard.topProductsByQuantity}
-						isLoading={isLoadingDashboard && !dashboardData}
-					/>
-				</div>
-			</section>
-
-			{/* 4. Income Variance & Period Comparison Analysis */}
-			<section>
-				<IncomeComparisonWidget
-					data={finalIncome}
-					isLoading={isLoadingIncome && !incomeData}
+		<PermissionGuard resource="DASHBOARD" action="READ">
+			<div className="space-y-6 pb-12">
+				{/* 1. Header with Live Status, Date Preset Selector, Staff Filter, Range Picker & Refresh Button */}
+				<DashboardHeader
+					title={t("dashboard.title")}
+					description={t("dashboard.description")}
+					lastUpdated={lastRefreshedTime}
+					isRefreshing={isRefreshing || isFetchingDashboard}
+					onRefresh={handleRefresh}
+					dateRange={dateRange}
+					onDateRangeChange={setDateRange}
+					selectedUserId={selectedUserId}
+					onUserIdChange={setSelectedUserId}
+					users={users}
+					isLoadingUsers={isLoadingUsers}
+					selectedCompanyName={isSystemAdmin ? selectedCompany?.name : null}
 				/>
-			</section>
 
-			{/* 5. Recent Customer Feedback & Evaluations Section */}
-			<section className="rounded-2xl border border-slate-200/80 bg-white/95 p-5 shadow-2xs backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/90 space-y-4 sm:p-6">
-				<div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-					<div>
-						<div className="flex items-center gap-2">
-							<div className="flex h-7 w-7 items-center justify-center rounded-lg bg-pink-500/10 text-pink-600 dark:bg-pink-500/15 dark:text-pink-400">
-								<MessageSquare className="h-4 w-4" />
+				{/* 2. Primary Financial & Operational KPI Cards Grid */}
+				<FinancialKpiGrid
+					data={finalDashboard}
+					isLoading={isLoadingDashboard && !dashboardData}
+					showFinancialKpis={canViewFinancials}
+				/>
+
+				{/* 3. Performance Timeline Chart & Top Products Row (Equal Height) */}
+				<section className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-stretch">
+					{/* Time-Series Analytics (7 cols) */}
+					<div className="lg:col-span-7 flex flex-col">
+						<TimeSeriesChart
+							data={finalTimeSeries}
+							isLoading={isLoadingTimeSeries && !timeSeriesData}
+						/>
+					</div>
+
+					{/* Top Performing Products (5 cols) */}
+					<div className="lg:col-span-5 flex flex-col">
+						<TopProductsCard
+							byRevenue={finalDashboard.topProductsByRevenue}
+							byQuantity={finalDashboard.topProductsByQuantity}
+							isLoading={isLoadingDashboard && !dashboardData}
+						/>
+					</div>
+				</section>
+
+				{/* 4. Income Variance & Period Comparison Analysis */}
+				{canViewFinancials && (
+					<section>
+						<IncomeComparisonWidget
+							data={finalIncome}
+							isLoading={isLoadingIncome && !incomeData}
+						/>
+					</section>
+				)}
+
+				{/* 5. Recent Customer Feedback & Evaluations Section */}
+				<PermissionGate anyPermissions={["FEEDBACK:READ", "CUSTOMER:READ"]}>
+					<section className="rounded-2xl border border-slate-200/80 bg-white/95 p-5 shadow-2xs backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/90 space-y-4 sm:p-6">
+						<div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+							<div>
+								<div className="flex items-center gap-2">
+									<div className="flex h-7 w-7 items-center justify-center rounded-lg bg-pink-500/10 text-pink-600 dark:bg-pink-500/15 dark:text-pink-400">
+										<MessageSquare className="h-4 w-4" />
+									</div>
+									<h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">
+										{t("dashboard.recentFeedback")}
+									</h2>
+								</div>
+								<p className="text-xs font-normal text-slate-400 dark:text-slate-500">
+									{t("dashboard.recentFeedbackSub")}
+								</p>
 							</div>
-							<h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">
-								{t("dashboard.recentFeedback")}
-							</h2>
+							<div className="flex items-center gap-2">
+								<Button
+									render={<Link href="/feedback" />}
+									variant="default"
+									size="sm"
+									className="h-9 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold shadow-2xs"
+								>
+									<MessageSquare className="mr-1.5 h-3.5 w-3.5" />{" "}
+									{t("dashboard.feedbackPortal")}
+								</Button>
+								<PermissionGate resource="DASHBOARD" action="EXPORT">
+									<Button
+										variant="outline"
+										size="sm"
+										className="h-9 rounded-xl border-slate-200/90 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700/80 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+									>
+										<Download className="mr-1.5 h-3.5 w-3.5 text-slate-400" />{" "}
+										{t("dashboard.exportData")}
+									</Button>
+								</PermissionGate>
+							</div>
 						</div>
-						<p className="text-xs font-normal text-slate-400 dark:text-slate-500">
-							{t("dashboard.recentFeedbackSub")}
-						</p>
-					</div>
-					<div className="flex items-center gap-2">
-						<Button
-							render={<Link href="/feedback" />}
-							variant="default"
-							size="sm"
-							className="h-9 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold shadow-2xs"
-						>
-							<MessageSquare className="mr-1.5 h-3.5 w-3.5" />{" "}
-							{t("dashboard.feedbackPortal")}
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							className="h-9 rounded-xl border-slate-200/90 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700/80 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors"
-						>
-							<Download className="mr-1.5 h-3.5 w-3.5 text-slate-400" />{" "}
-							{t("dashboard.exportData")}
-						</Button>
-					</div>
-				</div>
 
 				<div className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800">
 					<Table>
@@ -543,6 +562,8 @@ export default function DashboardPage() {
 					</Table>
 				</div>
 			</section>
+		</PermissionGate>
 		</div>
+	</PermissionGuard>
 	);
 }

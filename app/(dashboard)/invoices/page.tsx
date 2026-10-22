@@ -24,6 +24,8 @@ import {
 } from "@/components/ui-custom/status-filter-dropdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import { customersApi, financeApi, invoicesApi, paymentsApi } from "@/lib/api/endpoints";
 import { useTranslation } from "@/lib/i18n/context";
 import { Invoice } from "@/lib/types";
@@ -922,13 +924,15 @@ function InvoicesPageContent() {
 								<span>Pay Selected ({selectedIds.length})</span>
 							</Button>
 						)}
-						<Button
-							onClick={() => openQuickPay()}
-							className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
-						>
-							<Zap className="h-3.5 w-3.5" />
-							<span>{t("invoices.quickPay", "Quick Pay")}</span>
-						</Button>
+						<PermissionGate anyPermissions={["PAYMENT:CREATE", "INVOICE:UPDATE"]}>
+							<Button
+								onClick={() => openQuickPay()}
+								className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+							>
+								<Zap className="h-3.5 w-3.5" />
+								<span>{t("invoices.quickPay", "Quick Pay")}</span>
+							</Button>
+						</PermissionGate>
 					</div>
 				}
 				domainFilterFields={INVOICE_DOMAIN_FILTERS}
@@ -1055,14 +1059,16 @@ function InvoicesPageContent() {
 
 export default function InvoicesPage() {
 	return (
-		<Suspense
-			fallback={
-				<div className="p-8 text-center text-xs text-muted-foreground">
-					Loading invoices...
-				</div>
-			}
-		>
-			<InvoicesPageContent />
-		</Suspense>
+		<PermissionGuard resource="INVOICE" action="READ">
+			<Suspense
+				fallback={
+					<div className="p-8 text-center text-xs text-muted-foreground">
+						Loading invoices...
+					</div>
+				}
+			>
+				<InvoicesPageContent />
+			</Suspense>
+		</PermissionGuard>
 	);
 }
