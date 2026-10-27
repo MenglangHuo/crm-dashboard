@@ -10,6 +10,7 @@ import { useTheme } from "next-themes";
 import { authApi } from "@/lib/api/endpoints";
 import { setAuthCookies } from "@/app/actions/auth";
 import { clearClientSession, getErrorMessage } from "@/lib/api/client";
+import { getDeviceInfo } from "@/lib/device";
 import { toast } from "sonner";
 import {
 	Eye,
@@ -186,9 +187,11 @@ function SignInForm() {
 	async function onSubmit(values: z.infer<typeof formSchema>) {
 		setIsLoading(true);
 		try {
+			const deviceInfo = getDeviceInfo();
 			const response: any = await authApi.signIn({
 				username: values.username,
 				password: values.password,
+				deviceInfo,
 			});
 
 			const token =
@@ -199,6 +202,9 @@ function SignInForm() {
 
 			const refreshToken =
 				response?.refreshToken || response?.data?.refreshToken;
+
+			const sessionId =
+				response?.sessionId || response?.data?.sessionId;
 
 			const companyId = response?.company?.id || response?.data?.company?.id;
 
@@ -227,6 +233,10 @@ function SignInForm() {
 						document.cookie = `crm_refresh_token=${encodeURIComponent(refreshToken)}; path=/; max-age=2592000; SameSite=Lax`;
 						localStorage.setItem("crm_refresh_token", refreshToken);
 					}
+					if (sessionId) {
+						document.cookie = `crm_session_id=${encodeURIComponent(sessionId)}; path=/; max-age=2592000; SameSite=Lax`;
+						localStorage.setItem("crm_session_id", sessionId);
+					}
 					if (companyId != null) {
 						document.cookie = `crm_company_id=${encodeURIComponent(companyId)}; path=/; max-age=2592000; SameSite=Lax`;
 						localStorage.setItem("crm_company_id", String(companyId));
@@ -254,7 +264,7 @@ function SignInForm() {
 						} catch {}
 					}
 				}
-				await setAuthCookies(token, refreshToken, companyId);
+				await setAuthCookies(token, refreshToken, companyId, sessionId);
 				toast.success("Authentication successful! Welcome back.");
 
 				window.location.href = returnUrl;

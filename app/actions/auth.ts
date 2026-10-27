@@ -6,12 +6,14 @@ import { resolveProfile } from "@/lib/server/db";
 
 const ACCESS_COOKIE = "crm_access_token";
 const REFRESH_COOKIE = "crm_refresh_token";
+const SESSION_COOKIE = "crm_session_id";
 const COMPANY_COOKIE = "crm_company_id";
 const ACCESS_TTL = 1000 * 60 * 60;
 
 type RefreshResponse = {
 	accessToken?: string;
 	refreshToken?: string;
+	sessionId?: string;
 	token?: string;
 	data?: RefreshResponse;
 	success?: boolean;
@@ -54,6 +56,7 @@ export async function setAuthCookies(
 	accessToken: string,
 	refreshToken?: string,
 	companyId?: string | number,
+	sessionId?: string,
 ) {
 	const cookieStore = await cookies();
 
@@ -67,6 +70,16 @@ export async function setAuthCookies(
 
 	if (refreshToken) {
 		cookieStore.set(REFRESH_COOKIE, refreshToken, {
+			httpOnly: false,
+			secure: process.env.NODE_ENV === "production",
+			sameSite: "lax",
+			path: "/",
+			maxAge: 60 * 60 * 24 * 30, // 30 days
+		});
+	}
+
+	if (sessionId) {
+		cookieStore.set(SESSION_COOKIE, sessionId, {
 			httpOnly: false,
 			secure: process.env.NODE_ENV === "production",
 			sameSite: "lax",
@@ -90,6 +103,7 @@ export async function clearAuthCookies() {
 	const cookieStore = await cookies();
 	cookieStore.delete(ACCESS_COOKIE);
 	cookieStore.delete(REFRESH_COOKIE);
+	cookieStore.delete(SESSION_COOKIE);
 	cookieStore.delete(COMPANY_COOKIE);
 	cookieStore.delete("crm_is_system_admin");
 }
@@ -133,10 +147,13 @@ export async function refreshAuthCookies() {
 
 			const companyId =
 				body?.company?.id || cookieStore.get(COMPANY_COOKIE)?.value;
+			const sessionId =
+				body?.sessionId || cookieStore.get(SESSION_COOKIE)?.value;
 			await setAuthCookies(
 				accessToken,
 				body.refreshToken || refreshToken,
 				companyId,
+				sessionId,
 			);
 			return true;
 		} catch {

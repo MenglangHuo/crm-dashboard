@@ -84,29 +84,19 @@ import { isUserSystemAdmin } from "@/components/providers/company-context";
 import { useTranslation } from "@/lib/i18n/context";
 import { usePermissions } from "@/hooks/use-permissions";
 
-function SidebarEmblemSvg() {
+function SidebarLogo() {
 	return (
-		<div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/20 ring-2 ring-primary/20 transition-colors">
-			<svg
-				className="size-5"
-				viewBox="0 0 100 100"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle cx="50" cy="50" r="46" stroke="#ffffff" strokeWidth="6" />
-				<path
-					d="M50 20 L70 32 V54 C70 66 50 78 50 78 C50 78 30 66 30 54 V32 Z"
-					fill="#ffffff"
-					opacity="0.95"
-				/>
-				<path
-					d="M40 52 L47 58 L62 44"
-					stroke="var(--primary, #2252E9)"
-					strokeWidth="6"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-				/>
-			</svg>
+		<div className="flex size-9 shrink-0 items-center justify-center rounded-xl overflow-hidden shadow-sm shadow-primary/20 ring-2 ring-primary/20 bg-slate-100 dark:bg-slate-900 transition-colors">
+			<img
+				src="/images/logo-light.jpeg"
+				alt="CRM Logo"
+				className="size-full object-cover dark:hidden"
+			/>
+			<img
+				src="/images/logo-dark.jpeg"
+				alt="CRM Logo"
+				className="size-full object-cover hidden dark:block"
+			/>
 		</div>
 	);
 }
@@ -446,7 +436,7 @@ export function AppSidebar() {
 							href="/"
 							className="flex items-center gap-3 overflow-hidden rounded-xl p-1 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
 						>
-							<SidebarEmblemSvg />
+							<SidebarLogo />
 							<div className="flex flex-col leading-none group-data-[collapsible=icon]:hidden">
 								<span className="font-bold text-base tracking-tight text-slate-900 dark:text-white">
 									CRM <span className="text-primary">App</span>

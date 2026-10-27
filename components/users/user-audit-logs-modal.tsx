@@ -54,6 +54,7 @@ export function UserAuditLogsModal({
 				<UserAuditLogsSection
 					username={username}
 					userDisplayName={displayName}
+					isDrawerMode={true}
 				/>
 			</div>
 		</ModernModal>

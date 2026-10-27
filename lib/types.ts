@@ -378,11 +378,43 @@ export interface SignInResponse {
 	tokenType?: string;
 	expiresIn?: number;
 	user?: UserProfile;
+	sessionId?: string;
 	passwordResetRequired?: boolean;
 	passwordResetToken?: string;
 	isCompleteSetup?: boolean;
 	isCompletedSetup?: boolean;
 }
+
+// ------------------------------------------------------------
+// Multi-Device Session Management Types
+// ------------------------------------------------------------
+
+export type DeviceType = "MOBILE" | "DESKTOP" | "WEB" | "TABLET" | "UNKNOWN";
+
+export interface DeviceInfoRequest {
+	deviceId?: string;
+	deviceName?: string;
+	deviceType?: DeviceType;
+	platform?: string;
+}
+
+export interface ActiveSessionResponse {
+	sessionId: string;
+	deviceName: string;
+	deviceType: DeviceType;
+	platform: string;
+	ipAddress: string;
+	location?: string | null;
+	loginAt: string;
+	lastActiveAt: string;
+	isCurrent: boolean;
+	isNewDevice: boolean;
+}
+
+export interface UpdateDeviceNameRequest {
+	deviceName: string;
+}
+
 
 export interface UploadUrlResponse {
 	uploadUrl: string;

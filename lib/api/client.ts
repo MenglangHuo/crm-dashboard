@@ -110,12 +110,14 @@ export function clearClientSession() {
 	if (typeof window === "undefined") return;
 	deleteCookie("crm_access_token");
 	deleteCookie("crm_refresh_token");
+	deleteCookie("crm_session_id");
 	deleteCookie("crm_company_id");
 	deleteCookie("crm_is_system_admin");
 	deleteCookie("crm_is_complete_setup");
 	try {
 		localStorage.removeItem("crm_access_token");
 		localStorage.removeItem("crm_refresh_token");
+		localStorage.removeItem("crm_session_id");
 		localStorage.removeItem("crm_company_id");
 		localStorage.removeItem("crm_is_system_admin");
 		localStorage.removeItem("crm_user_profile");

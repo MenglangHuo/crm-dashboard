@@ -328,30 +328,7 @@ export function CommandPalette() {
 				url: "/orders",
 				isCommonlyUsed: true,
 			},
-			{
-				id: "sub-order-create",
-				title: "Create Order",
-				rawTitle: "Create Order",
-				description:
-					"Open modal dialog to create a new customer sales order or installment quotation",
-				badge: "Modal",
-				badgeType: "modal",
-				icon: Plus,
-				color: "text-blue-500 bg-blue-500/10 border-blue-500/20",
-				parentId: "nav-orders",
-				parentTitle: "Order",
-				isSubItem: true,
-				keywords:
-					"create order new order sales quotation draft customer purchase order modal shortcut",
-				perform: () => {
-					if (typeof window !== "undefined" && window.location.pathname === "/orders") {
-						window.dispatchEvent(new CustomEvent("crm:open-create-order"));
-					} else {
-						router.push("/orders?action=create");
-					}
-				},
-				isCommonlyUsed: true,
-			},
+			
 			{
 				id: "sub-order-pos",
 				title: "POS Order Studio",

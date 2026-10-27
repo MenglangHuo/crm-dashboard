@@ -11,6 +11,7 @@ import {
 	type UploaderStrategyType,
 } from "@/lib/services/file-uploader";
 import type {
+	ActiveSessionResponse,
 	AddVariantInput,
 	AddressInfo,
 	AdminResetPasswordResponse,
@@ -49,6 +50,7 @@ import type {
 	CustomerVisitRequest,
 	DashboardReportData,
 	DashboardStats,
+	DeviceInfoRequest,
 	Delivery,
 	DeliveryInput,
 	Department,
@@ -108,6 +110,7 @@ import type {
 	Unit,
 	UpdateAdministrativeDivisionInput,
 	UpdateAttachmentInput,
+	UpdateDeviceNameRequest,
 	UpdateInvoicePaymentTermRequest,
 	UpdateProductInput,
 	UpdateSystemAdminInput,
@@ -289,7 +292,11 @@ export async function fetchSearchList<T>(
 }
 
 export const authApi = {
-	signIn: async (body: { username: string; password: string }) => {
+	signIn: async (body: {
+		username: string;
+		password: string;
+		deviceInfo?: DeviceInfoRequest;
+	}) => {
 		try {
 			const res = await api.post<SignInResponse>("/auth/login", body);
 			return res.data;
@@ -341,6 +348,48 @@ export const authApi = {
 			.then((r) => r.data),
 };
 
+// ---- Multi-Device Session Management -------------------------
+export const sessionsApi = {
+	list: async (): Promise<ActiveSessionResponse[]> => {
+		const res = await api.get<any>("/sessions", {
+			headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+		});
+		return (res.data?.data || res.data || []) as ActiveSessionResponse[];
+	},
+	current: async (): Promise<ActiveSessionResponse> => {
+		const res = await api.get<any>("/sessions/current", {
+			headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+		});
+		return (res.data?.data || res.data) as ActiveSessionResponse;
+	},
+	count: async (): Promise<number> => {
+		const res = await api.get<any>("/sessions/count", {
+			headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+		});
+		const val = res.data?.data !== undefined ? res.data?.data : res.data;
+		return typeof val === "number" ? val : Number(val || 0);
+	},
+	getById: async (sessionId: string): Promise<ActiveSessionResponse> => {
+		const res = await api.get<any>(`/sessions/${sessionId}`);
+		return (res.data?.data || res.data) as ActiveSessionResponse;
+	},
+	revoke: async (sessionId: string): Promise<void> => {
+		await api.post(`/sessions/revoke-session/${sessionId}`);
+	},
+	revokeAll: async (): Promise<void> => {
+		await api.post("/sessions/revoke-all");
+	},
+	revokeOthers: async (): Promise<void> => {
+		await api.post("/sessions/revoke-others");
+	},
+	updateDeviceName: async (sessionId: string, deviceName: string): Promise<void> => {
+		await api.patch(`/sessions/${sessionId}/device-name`, { deviceName });
+	},
+	updateCurrentDeviceName: async (deviceName: string): Promise<void> => {
+		await api.patch("/sessions/current/device-name", { deviceName });
+	},
+};
+
 // ---- Profile -------------------------------------------------
 export const profileApi = {
 	me: async (): Promise<any> => {
@@ -379,6 +428,10 @@ export const profileApi = {
 			avatarUrl: up?.imageUrl || d?.imageUrl || "",
 			avatarKey: up?.imageUrl || d?.imageUrl || "",
 			bio: up?.bio || "",
+			nickName: up?.nickName || up?.nickname || d?.nickName || d?.nickname || "",
+			primaryPhone: up?.primaryPhone || up?.phone || up?.contact || phone,
+			secondaryPhone: up?.secondaryPhone || d?.secondaryPhone || "",
+			remark: up?.remark || up?.remarks || d?.remark || d?.remarks || "",
 			position: up?.position || "",
 			address: up?.address || "",
 			emergencyPhone: up?.emergencyPhone || "",
@@ -465,6 +518,11 @@ export const profileApi = {
 					"crm_user_profile",
 					JSON.stringify(profileResult),
 				);
+				localStorage.setItem(
+					"crm_is_complete_setup",
+					String(profileResult.isCompletedSetup),
+				);
+				document.cookie = `crm_is_complete_setup=${encodeURIComponent(String(profileResult.isCompletedSetup))}; path=/; max-age=604800; SameSite=Lax`;
 			} catch {}
 		}
 
@@ -493,30 +551,47 @@ export const profileApi = {
 		} catch {}
 	},
 	update: async (body: any) => {
-		const payload = {
-			firstname: body.firstName || body.firstname,
-			lastname: body.lastName || body.lastname,
-			phone: body.contact || body.phone,
-			primaryPhone: body.contact || body.phone,
-			imageUrl: body.avatarKey || body.imageUrl,
-			position: body.position,
-			address: body.address,
-			bio: body.bio,
-			gender: body.gender,
-			dob: body.dob,
-			emergencyPhone: body.emergencyPhone,
+		const payload: any = {
+			firstname: body.firstname || body.firstName,
+			lastname: body.lastname || body.lastName,
+			gender: body.gender || "MALE",
+			emergencyPhone: body.emergencyPhone || "",
+			imageUrl: body.imageUrl || body.avatarKey || body.avatarUrl || "",
+			bio: body.bio || "",
+			nickName: body.nickName || body.nickname || "",
+			address: body.address || "",
+			dob: body.dob || "",
+			remark: body.remark || "",
+			primaryPhone: body.primaryPhone || body.contact || body.phone || "",
+			secondaryPhone: body.secondaryPhone || "",
 		};
 
-		if (body.id) {
-			try {
-				return await api.put(`/users/${body.id}`, payload).then((r) => r.data);
-			} catch {}
+		if (payload.dob) {
+			const str = String(payload.dob).trim();
+			const dmy = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+			if (dmy) {
+				payload.dob = `${dmy[1].padStart(2, "0")}-${dmy[2].padStart(2, "0")}-${dmy[3]}`;
+			} else {
+				const ymd = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+				if (ymd) {
+					payload.dob = `${ymd[3].padStart(2, "0")}-${ymd[2].padStart(2, "0")}-${ymd[1]}`;
+				}
+			}
 		}
 
+		// Self-update complete-setup endpoint as requested: {{crm-url}}/api/v1/users/complete-setup
 		return api
-			.put("/users/complete-setup", payload)
+			.post("/users/complete-setup", payload)
+			.catch(() => api.put("/users/complete-setup", payload))
+			.catch(() => (body.id ? api.put(`/users/${body.id}`, payload) : Promise.reject("Update failed")))
 			.catch(() => api.put("/users/me/profile", payload))
-			.then((r) => r.data);
+			.then((r) => {
+				if (typeof window !== "undefined") {
+					localStorage.setItem("crm_is_complete_setup", "true");
+					document.cookie = `crm_is_complete_setup=true; path=/; max-age=604800; SameSite=Lax`;
+				}
+				return r.data;
+			});
 	},
 	updateAvatarUrl: async (userId: string | number, imageUrl: string) => {
 		return api

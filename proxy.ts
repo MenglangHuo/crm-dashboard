@@ -10,6 +10,48 @@ const AUTH_PAGES = [
 	"/register-company",
 ];
 
+const PROTECTED_ROUTES = [
+	"/attachments",
+	"/audit-logs",
+	"/branches",
+	"/brands",
+	"/categories",
+	"/company",
+	"/configurations",
+	"/customers",
+	"/deliveries",
+	"/departments",
+	"/divisions",
+	"/feedback",
+	"/finance",
+	"/inventory",
+	"/invoices",
+	"/loans",
+	"/locations",
+	"/migrations",
+	"/orders",
+	"/payments",
+	"/payment-terms",
+	"/permissions",
+	"/products",
+	"/profile",
+	"/roles",
+	"/staff",
+	"/subscriptions",
+	"/super-admin",
+	"/suppliers",
+	"/units",
+	"/users",
+	"/warehouses",
+];
+
+function isProtectedRoute(pathname: string): boolean {
+	if (pathname === "/") return true;
+	return PROTECTED_ROUTES.some(
+		(route) => pathname === route || pathname.startsWith(`${route}/`),
+	);
+}
+
 function isValidToken(token?: string): boolean {
 	if (!token || typeof token !== "string" || !token.trim()) return false;
 	try {
@@ -47,7 +89,7 @@ export function proxy(request: NextRequest) {
 	const hasSession = isValidToken(token) || isValidToken(refreshToken);
 	const isAuthPage = AUTH_PAGES.some((p) => pathname.startsWith(p));
 
-	if (!hasSession && !isAuthPage) {
+	if (!hasSession && isProtectedRoute(pathname)) {
 		const url = request.nextUrl.clone();
 		url.pathname = "/sign-in";
 		url.searchParams.set("from", pathname);
