@@ -121,6 +121,8 @@ import { getErrorMessage } from "@/lib/api/client";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/context";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 
 // Reusable Safe Product/Variant Image with Automatic Fallback Handling
 function StockProductImage({
@@ -1128,24 +1130,28 @@ function StockPageContent() {
 								)}
 							</Button>
 
-							<Button
-								onClick={() => {
-									setInitialAdjustItems(null);
-									setIsAdjustModalOpen(true);
-								}}
-								className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs gap-1.5"
-							>
-								<Scale className="h-4 w-4" />
-								<span>{t("stocks.adjustStock")}</span>
-							</Button>
+							<PermissionGate resource="STOCK" action="UPDATE">
+								<Button
+									onClick={() => {
+										setInitialAdjustItems(null);
+										setIsAdjustModalOpen(true);
+									}}
+									className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs gap-1.5"
+								>
+									<Scale className="h-4 w-4" />
+									<span>{t("stocks.adjustStock")}</span>
+								</Button>
+							</PermissionGate>
 
-							<Button
-								onClick={() => setIsImportDialogOpen(true)}
-								className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs gap-1.5"
-							>
-								<Truck className="h-4 w-4" />
-								<span>{t("stocks.importStock")}</span>
-							</Button>
+							<PermissionGate resource="IMPORT" action="CREATE">
+								<Button
+									onClick={() => setIsImportDialogOpen(true)}
+									className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs gap-1.5"
+								>
+									<Truck className="h-4 w-4" />
+									<span>{t("stocks.importStock")}</span>
+								</Button>
+							</PermissionGate>
 
 							{/* Global Sub-row View Mode Toggle */}
 							<div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700 h-10">
@@ -2883,14 +2889,16 @@ function StockPageContent() {
 
 export default function StockPage() {
 	return (
-		<Suspense
-			fallback={
-				<div className="p-8 text-center text-xs text-muted-foreground">
-					Loading stock inventory...
-				</div>
-			}
-		>
-			<StockPageContent />
-		</Suspense>
+		<PermissionGuard resource="STOCK" action="READ">
+			<Suspense
+				fallback={
+					<div className="p-8 text-center text-xs text-muted-foreground">
+						Loading stock inventory...
+					</div>
+				}
+			>
+				<StockPageContent />
+			</Suspense>
+		</PermissionGuard>
 	);
 }

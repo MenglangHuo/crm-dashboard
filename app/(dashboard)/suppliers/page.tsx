@@ -26,10 +26,17 @@ import { Button } from "@/components/ui/button";
 import { Truck, Phone, Building2, RotateCcw, Ban, Edit2, Plus } from "lucide-react";
 import type { Supplier } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export default function SuppliersPage() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const { can } = usePermissions();
+	const canCreateSupplier = can("SUPPLIER", "CREATE");
+	const canUpdateSupplier = can("SUPPLIER", "UPDATE");
+	const canDeleteSupplier = can("SUPPLIER", "DELETE");
 	const [search, setSearch] = useState("");
 	const [statusFilter, setStatusFilter] = useState<string | undefined>(
 		undefined,
@@ -297,53 +304,56 @@ export default function SuppliersPage() {
 	const isSaving = createMutation.isPending || updateMutation.isPending;
 
 	return (
-		<div className="space-y-6 pb-12">
-			{/* Page Header */}
-			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
-						<Truck className="size-7 text-primary" />
-						<span>{t("suppliers.title", "Suppliers Directory")}</span>
-					</h1>
-					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-						{t("suppliers.subtitle", "Manage procurement vendors, primary contact phones, and company accounts")}
-					</p>
+		<PermissionGuard resource="SUPPLIER" action="READ">
+			<div className="space-y-6 pb-12">
+				{/* Page Header */}
+				<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+					<div>
+						<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+							<Truck className="size-7 text-primary" />
+							<span>{t("suppliers.title", "Suppliers Directory")}</span>
+						</h1>
+						<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+							{t("suppliers.subtitle", "Manage procurement vendors, primary contact phones, and company accounts")}
+						</p>
+					</div>
 				</div>
-			</div>
 
-			{/* Data Table */}
-			<DataTable<Supplier>
-				data={suppliersData?.items || []}
-				columns={columns}
-				getRowId={(s) => String(s.id)}
-				hideHeader={true}
-				hideImportExport={true}
-				searchPlaceholder={t("suppliers.searchPlaceholder")}
-				searchValue={search}
-				onSearchChange={(val) => {
-					setSearch(val);
-					setPage(1);
-				}}
-				domainFilterFields={SUPPLIER_DOMAIN_FILTERS}
-				primaryAction={
-					<Button
-						onClick={openCreate}
-						className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
-					>
-						<Plus className="h-3.5 w-3.5" />
-						<span>{t("suppliers.addSupplier", "Add Supplier")}</span>
-					</Button>
-				}
-				manualPagination={true}
-				totalCount={suppliersData?.total || 0}
-				page={page}
-				pageSize={pageSize}
-				onPageChange={setPage}
-				onPageSizeChange={setPageSize}
-				isLoading={isLoading}
-				onEditRow={openEdit}
-				onDeleteRow={(s) => deleteMutation.mutate(s.id)}
-			/>
+				{/* Data Table */}
+				<DataTable<Supplier>
+					data={suppliersData?.items || []}
+					columns={columns}
+					getRowId={(s) => String(s.id)}
+					hideHeader={true}
+					hideImportExport={true}
+					searchPlaceholder={t("suppliers.searchPlaceholder")}
+					searchValue={search}
+					onSearchChange={(val) => {
+						setSearch(val);
+						setPage(1);
+					}}
+					domainFilterFields={SUPPLIER_DOMAIN_FILTERS}
+					primaryAction={
+						<PermissionGate resource="SUPPLIER" action="CREATE">
+							<Button
+								onClick={openCreate}
+								className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+							>
+								<Plus className="h-3.5 w-3.5" />
+								<span>{t("suppliers.addSupplier", "Add Supplier")}</span>
+							</Button>
+						</PermissionGate>
+					}
+					manualPagination={true}
+					totalCount={suppliersData?.total || 0}
+					page={page}
+					pageSize={pageSize}
+					onPageChange={setPage}
+					onPageSizeChange={setPageSize}
+					isLoading={isLoading}
+					onEditRow={canUpdateSupplier ? openEdit : undefined}
+					onDeleteRow={canDeleteSupplier ? (s) => deleteMutation.mutate(s.id) : undefined}
+				/>
 
 			{/* CREATE/EDIT MODAL */}
 			<ModernModal
@@ -410,5 +420,6 @@ export default function SuppliersPage() {
 				</form>
 			</ModernModal>
 		</div>
+	</PermissionGuard>
 	);
 }

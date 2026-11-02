@@ -23,6 +23,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import { DataTable, ColumnDef } from "@/components/ui-custom/data-table";
 import {
 	MessageSquare,
@@ -526,40 +528,43 @@ export default function FeedbackPage() {
 	];
 
 	return (
-		<div className="space-y-4 pb-12">
-			{/* Top Header */}
-			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-				<div>
-					<div className="flex items-center gap-2.5">
-						<div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-primary/20">
-							<MessageSquare className="h-5 w-5" />
-						</div>
-						<div>
-							<h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-								{t("feedback.title")}
-							</h1>
-							<p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-								{t("feedback.subtitle")}
-							</p>
+		<PermissionGuard anyPermissions={["FEEDBACK:READ", "CUSTOMER:READ"]}>
+			<div className="space-y-4 pb-12">
+				{/* Top Header */}
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+					<div>
+						<div className="flex items-center gap-2.5">
+							<div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-primary/20">
+								<MessageSquare className="h-5 w-5" />
+							</div>
+							<div>
+								<h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+									{t("feedback.title")}
+								</h1>
+								<p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+									{t("feedback.subtitle")}
+								</p>
+							</div>
 						</div>
 					</div>
-				</div>
 
-				{/* Global Action Buttons */}
-				<div className="flex items-center gap-2.5 flex-wrap">
-					<ModernButton
-						size="sm"
-						onClick={() => {
-							setEditingTemplate(null);
-							setIsTemplateModalOpen(true);
-						}}
-						className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20"
-						leftIcon={<Plus className="h-3.5 w-3.5" />}
-					>
-						{t("feedback.createTemplate")}
-					</ModernButton>
+					{/* Global Action Buttons */}
+					<div className="flex items-center gap-2.5 flex-wrap">
+						<PermissionGate resource="FEEDBACK" action="CREATE">
+							<ModernButton
+								size="sm"
+								onClick={() => {
+									setEditingTemplate(null);
+									setIsTemplateModalOpen(true);
+								}}
+								className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20"
+								leftIcon={<Plus className="h-3.5 w-3.5" />}
+							>
+								{t("feedback.createTemplate")}
+							</ModernButton>
+						</PermissionGate>
+					</div>
 				</div>
-			</div>
 
 			{/* KPI Overview Summary Banner (Powered by Real API data) */}
 			<FeedbackKpiSummary
@@ -1067,5 +1072,6 @@ export default function FeedbackPage() {
 				submission={selectedSubmission}
 			/>
 		</div>
+	</PermissionGuard>
 	);
 }

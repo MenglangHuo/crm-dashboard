@@ -33,6 +33,8 @@ import {
 import { FilterCriterion } from "@/components/ui-custom/data-table/search-filter-types";
 import type { InventoryImport, SupplierReturn } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import {
 	Truck,
 	Plus,
@@ -864,7 +866,8 @@ export default function InventoryImportsPage() {
 	];
 
 	return (
-		<div className="space-y-6">
+		<PermissionGuard resource="IMPORT" action="READ">
+			<div className="space-y-6">
 			{/* Page Header */}
 			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 				<div>
@@ -923,17 +926,19 @@ export default function InventoryImportsPage() {
 					}}
 					primaryAction={
 						<div className="flex items-center gap-2">
-							<Button
-								onClick={() => {
-									setEditingImport(null);
-									setIsStudioOpen(true);
-								}}
-								size="sm"
-								className="h-9 px-3.5 rounded-lg text-xs font-semibold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs cursor-pointer"
-							>
-								<Plus className="h-3.5 w-3.5" />
-								<span>New Import</span>
-							</Button>
+							<PermissionGate resource="IMPORT" action="CREATE">
+								<Button
+									onClick={() => {
+										setEditingImport(null);
+										setIsStudioOpen(true);
+									}}
+									size="sm"
+									className="h-9 px-3.5 rounded-lg text-xs font-semibold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs cursor-pointer"
+								>
+									<Plus className="h-3.5 w-3.5" />
+									<span>New Import</span>
+								</Button>
+							</PermissionGate>
 
 							<Button
 								variant="outline"
@@ -1162,5 +1167,6 @@ export default function InventoryImportsPage() {
 				}}
 			/>
 		</div>
+	</PermissionGuard>
 	);
 }

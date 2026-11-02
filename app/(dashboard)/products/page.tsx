@@ -49,6 +49,9 @@ import {
 import { useTranslation } from "@/lib/i18n/context";
 import { useCompanyContext } from "@/components/providers/company-context";
 import { useDebounce } from "@/hooks/use-debounce";
+import { usePermissions } from "@/hooks/use-permissions";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import {
 	Loader2,
 	Package,
@@ -216,58 +219,60 @@ export default function ProductsPage() {
 	>("products");
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<h2 className="text-3xl font-bold tracking-tight">
-					{t("products.title")}
-				</h2>
-				<p className="text-muted-foreground text-sm">
-					{t("products.subtitle")}
-				</p>
+		<PermissionGuard resource="PRODUCT" action="READ">
+			<div className="space-y-6">
+				<div>
+					<h2 className="text-3xl font-bold tracking-tight">
+						{t("products.title")}
+					</h2>
+					<p className="text-muted-foreground text-sm">
+						{t("products.subtitle")}
+					</p>
+				</div>
+
+				<ModernTabs value={mainTab} onValueChange={(val: any) => setMainTab(val)}>
+					<ModernTabsList variant="glass" size="md">
+						<ModernTabsTrigger
+							value="products"
+							icon={<Package className="h-4 w-4" />}
+						>
+							{t("sidebar.allProducts")}
+						</ModernTabsTrigger>
+						<ModernTabsTrigger
+							value="categories"
+							icon={<Tags className="h-4 w-4" />}
+						>
+							{t("sidebar.categories")}
+						</ModernTabsTrigger>
+						<ModernTabsTrigger
+							value="brands"
+							icon={<Bookmark className="h-4 w-4" />}
+						>
+							{t("sidebar.brands")}
+						</ModernTabsTrigger>
+						<ModernTabsTrigger value="units" icon={<Scale className="h-4 w-4" />}>
+							{t("sidebar.units")}
+						</ModernTabsTrigger>
+					</ModernTabsList>
+
+					<ModernTabsContent value="products">
+						<ProductsTab />
+					</ModernTabsContent>
+
+					<ModernTabsContent value="categories">
+						{mainTab === "categories" && <CategoriesTab />}
+					</ModernTabsContent>
+
+					<ModernTabsContent value="brands">
+						{mainTab === "brands" && <BrandsTab />}
+					</ModernTabsContent>
+
+					<ModernTabsContent value="units">
+						{mainTab === "units" && <UnitsTab />}
+					</ModernTabsContent>
+				</ModernTabs>
 			</div>
-
-			<ModernTabs value={mainTab} onValueChange={(val: any) => setMainTab(val)}>
-				<ModernTabsList variant="glass" size="md">
-					<ModernTabsTrigger
-						value="products"
-						icon={<Package className="h-4 w-4" />}
-					>
-						{t("sidebar.allProducts")}
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="categories"
-						icon={<Tags className="h-4 w-4" />}
-					>
-						{t("sidebar.categories")}
-					</ModernTabsTrigger>
-					<ModernTabsTrigger
-						value="brands"
-						icon={<Bookmark className="h-4 w-4" />}
-					>
-						{t("sidebar.brands")}
-					</ModernTabsTrigger>
-					<ModernTabsTrigger value="units" icon={<Scale className="h-4 w-4" />}>
-						{t("sidebar.units")}
-					</ModernTabsTrigger>
-				</ModernTabsList>
-
-				<ModernTabsContent value="products">
-					<ProductsTab />
-				</ModernTabsContent>
-
-				<ModernTabsContent value="categories">
-					{mainTab === "categories" && <CategoriesTab />}
-				</ModernTabsContent>
-
-				<ModernTabsContent value="brands">
-					{mainTab === "brands" && <BrandsTab />}
-				</ModernTabsContent>
-
-				<ModernTabsContent value="units">
-					{mainTab === "units" && <UnitsTab />}
-				</ModernTabsContent>
-			</ModernTabs>
-		</div>
+		</PermissionGuard>
 	);
 }
 
@@ -278,6 +283,10 @@ export default function ProductsPage() {
 function ProductsTab() {
 	const queryClient = useQueryClient();
 	const { t } = useTranslation();
+	const { can } = usePermissions();
+	const canCreateProduct = can("PRODUCT", "CREATE");
+	const canUpdateProduct = can("PRODUCT", "UPDATE");
+	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const { selectedCompanyId } = useCompanyContext();
 	const [search, setSearch] = useState("");
 	const debouncedSearch = useDebounce(search, 300);
@@ -1969,13 +1978,15 @@ function ProductsTab() {
 									<LayoutGrid className="h-3.5 w-3.5 mr-1" /> Grid
 								</Button>
 							</div>
-							<Button
-								onClick={openCreate}
-								className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
-							>
-								<Plus className="h-3.5 w-3.5" />
-								<span>{t("products.addNewProduct", "New Product")}</span>
-							</Button>
+							<PermissionGate resource="PRODUCT" action="CREATE">
+								<Button
+									onClick={openCreate}
+									className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+								>
+									<Plus className="h-3.5 w-3.5" />
+									<span>{t("products.addNewProduct", "New Product")}</span>
+								</Button>
+							</PermissionGate>
 						</div>
 					}
 					manualPagination={true}
@@ -2010,8 +2021,8 @@ function ProductsTab() {
 					isError={isError}
 					error={error}
 					onRetry={() => refetch()}
-					onEditRow={openEdit}
-					onDeleteRow={(p) => deleteMutation.mutate(p.id)}
+					onEditRow={canUpdateProduct ? openEdit : undefined}
+					onDeleteRow={canDeleteProduct ? (p) => deleteMutation.mutate(p.id) : undefined}
 					customRowActions={productActions}
 					activeDomainFilters={activeDomainFilters}
 					domainFilterFields={PRODUCT_DOMAIN_FILTERS}
@@ -2109,13 +2120,15 @@ function ProductsTab() {
 										</Badge>
 									)}
 								</Button>
-								<Button
-									onClick={openCreate}
-									className="h-9 px-3.5 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-xs gap-1.5 cursor-pointer"
-								>
-									<Plus className="h-3.5 w-3.5" />
-									<span>{t("products.addNewProduct", "New Product")}</span>
-								</Button>
+								<PermissionGate resource="PRODUCT" action="CREATE">
+									<Button
+										onClick={openCreate}
+										className="h-9 px-3.5 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-xs gap-1.5 cursor-pointer"
+									>
+										<Plus className="h-3.5 w-3.5" />
+										<span>{t("products.addNewProduct", "New Product")}</span>
+									</Button>
+								</PermissionGate>
 							</div>
 						</div>
 
@@ -5248,6 +5261,10 @@ function ProductsTab() {
 function CategoriesTab() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const { can } = usePermissions();
+	const canCreateProduct = can("PRODUCT", "CREATE");
+	const canUpdateProduct = can("PRODUCT", "UPDATE");
+	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(12);
@@ -5667,13 +5684,15 @@ function CategoriesTab() {
 					</div>
 
 					{/* Modern Add Category Button */}
-					<Button
-						onClick={() => openCreate()}
-						className="gap-1.5 text-xs font-bold h-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-xs cursor-pointer"
-					>
-						<Plus className="h-4 w-4" />
-						<span>{t("products.addCategory")}</span>
-					</Button>
+					<PermissionGate resource="PRODUCT" action="CREATE">
+						<Button
+							onClick={() => openCreate()}
+							className="gap-1.5 text-xs font-bold h-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-xs cursor-pointer"
+						>
+							<Plus className="h-4 w-4" />
+							<span>{t("products.addCategory")}</span>
+						</Button>
+					</PermissionGate>
 				</div>
 			</div>
 
@@ -5700,8 +5719,8 @@ function CategoriesTab() {
 					onPageChange={setPage}
 					onPageSizeChange={setPageSize}
 					isLoading={isLoading}
-					onEditRow={openEdit}
-					onDeleteRow={(c) => deleteMutation.mutate(c.id)}
+					onEditRow={canUpdateProduct ? openEdit : undefined}
+					onDeleteRow={canDeleteProduct ? (c) => deleteMutation.mutate(c.id) : undefined}
 					renderSubComponent={(category) => (
 						<CategoryChildrenAccordionSubRow
 							category={category}
@@ -6439,6 +6458,10 @@ function CategoryChildrenAccordionSubRow({
 function BrandsTab() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const { can } = usePermissions();
+	const canCreateProduct = can("PRODUCT", "CREATE");
+	const canUpdateProduct = can("PRODUCT", "UPDATE");
+	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(12);
@@ -6689,13 +6712,15 @@ function BrandsTab() {
 					</div>
 
 					{/* Modern Add Brand Button */}
-					<Button
-						onClick={openCreate}
-						className="gap-1.5 text-xs font-bold h-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-xs cursor-pointer"
-					>
-						<Plus className="h-4 w-4" />
-						<span>{t("products.addBrand")}</span>
-					</Button>
+					<PermissionGate resource="PRODUCT" action="CREATE">
+						<Button
+							onClick={openCreate}
+							className="gap-1.5 text-xs font-bold h-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-xs cursor-pointer"
+						>
+							<Plus className="h-4 w-4" />
+							<span>{t("products.addBrand")}</span>
+						</Button>
+					</PermissionGate>
 				</div>
 			</div>
 
@@ -6714,8 +6739,8 @@ function BrandsTab() {
 					onPageChange={setPage}
 					onPageSizeChange={setPageSize}
 					isLoading={isLoading}
-					onEditRow={openEdit}
-					onDeleteRow={(b) => deleteMutation.mutate(b.id)}
+					onEditRow={canUpdateProduct ? openEdit : undefined}
+					onDeleteRow={canDeleteProduct ? (b) => deleteMutation.mutate(b.id) : undefined}
 					exportFilename="product-brands"
 				/>
 			) : (
@@ -7022,6 +7047,10 @@ function BrandsTab() {
 function UnitsTab() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const { can } = usePermissions();
+	const canCreateProduct = can("PRODUCT", "CREATE");
+	const canUpdateProduct = can("PRODUCT", "UPDATE");
+	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(12);
@@ -7240,13 +7269,15 @@ function UnitsTab() {
 					</div>
 
 					{/* Modern Add Unit Button */}
-					<Button
-						onClick={openCreate}
-						className="gap-1.5 text-xs font-bold h-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-xs cursor-pointer"
-					>
-						<Plus className="h-4 w-4" />
-						<span>{t("products.addUnit")}</span>
-					</Button>
+					<PermissionGate resource="PRODUCT" action="CREATE">
+						<Button
+							onClick={openCreate}
+							className="gap-1.5 text-xs font-bold h-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-xs cursor-pointer"
+						>
+							<Plus className="h-4 w-4" />
+							<span>{t("products.addUnit")}</span>
+						</Button>
+					</PermissionGate>
 				</div>
 			</div>
 
@@ -7265,8 +7296,8 @@ function UnitsTab() {
 					onPageChange={setPage}
 					onPageSizeChange={setPageSize}
 					isLoading={isLoading}
-					onEditRow={openEdit}
-					onDeleteRow={(u) => deleteMutation.mutate(u.id)}
+					onEditRow={canUpdateProduct ? openEdit : undefined}
+					onDeleteRow={canDeleteProduct ? (u) => deleteMutation.mutate(u.id) : undefined}
 					exportFilename="units-of-measure"
 				/>
 			) : (

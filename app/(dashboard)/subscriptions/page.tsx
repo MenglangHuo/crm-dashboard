@@ -17,6 +17,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -326,14 +327,16 @@ function SubscriptionsContent() {
 
 export default function SubscriptionsPage() {
 	return (
-		<Suspense
-			fallback={
-				<div className="p-8 text-xs text-slate-400">
-					Loading subscription workspace...
-				</div>
-			}
-		>
-			<SubscriptionsContent />
-		</Suspense>
+		<PermissionGuard resource="SUBSCRIPTION" action="READ">
+			<Suspense
+				fallback={
+					<div className="p-8 text-xs text-slate-400">
+						Loading subscription workspace...
+					</div>
+				}
+			>
+				<SubscriptionsContent />
+			</Suspense>
+		</PermissionGuard>
 	);
 }

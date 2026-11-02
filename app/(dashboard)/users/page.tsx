@@ -28,6 +28,9 @@ import * as z from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/hooks/use-permissions";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 
 function formatSelectedPermissionsToPayload(
 	selectedIds: string[],
@@ -258,6 +261,11 @@ const registerFormSchema = z.object({
 export default function UsersPage() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const { can } = usePermissions();
+	const canCreateUser = can("USER", "CREATE");
+	const canUpdateUser = can("USER", "UPDATE");
+	const canDeleteUser = can("USER", "DELETE");
+
 	const [search, setSearch] = useState("");
 	const [statusFilter, setStatusFilter] = useState<string>("ALL");
 	const [page, setPage] = useState(1);
@@ -1084,122 +1092,131 @@ export default function UsersPage() {
 		},
 	];
 
-	const customActions: RowAction<User>[] = [
-		{
-			label: t("users.viewProfile"),
-			icon: <Eye className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />,
-			onClick: (user) => {
-				setViewingUser(user);
-				setActiveModalTab("profile");
+	const customActions: RowAction<User>[] = useMemo(() => {
+		const actions: RowAction<User>[] = [
+			{
+				label: t("users.viewProfile"),
+				icon: <Eye className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />,
+				onClick: (user) => {
+					setViewingUser(user);
+					setActiveModalTab("profile");
+				},
 			},
-		},
-		{
-			label: t("users.cloneUser", "Clone User"),
-			icon: (
-				<Copy className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-			),
-			onClick: (user) => openClone(user),
-		},
-		{
+		];
+		if (canCreateUser) {
+			actions.push({
+				label: t("users.cloneUser", "Clone User"),
+				icon: (
+					<Copy className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+				),
+				onClick: (user) => openClone(user),
+			});
+		}
+		actions.push({
 			label: t("users.auditLogs"),
 			icon: (
 				<Activity className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
 			),
 			onClick: (user) => setAuditLogsUser(user),
-		},
-		{
-			label: t("users.manageRolesStatus"),
-			icon: (
-				<UserCog className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-			),
-			onClick: (user) => openEdit(user),
-		},
-		{
-			label: t("users.manageDirectPermissions"),
-			icon: (
-				<Key className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-			),
-			onClick: (user) => openPermissions(user),
-		},
-		// {
-		//   label: "Custom Direct Permissions",
-		//   icon: <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />,
-		//   onClick: (user) => setCustomPermissionsUser(user),
-		// },
-		{
-			label: t("users.excludeActionGrants"),
-			icon: (
-				<ShieldAlert className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-			),
-			onClick: (user) => {
-				setExcludeGrantUser(user);
-				const firstMod =
-					(user.roles as any)?.[0]?.permissions?.[0]?.name || "Customer";
-				setExcludeGrantModule(firstMod);
-				setExcludeGrantActions(["delete"]);
-			},
-		},
-		{
-			label: t("users.resetPassword", "Reset Password"),
-			icon: <Lock className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />,
-			onClick: (user) => setResetPasswordUser(user),
-		},
-		{
-			label: t("users.deactivateUser"),
-			icon: <UserCheck className="h-3.5 w-3.5 text-muted-foreground" />,
-			onClick: (user) => toggleActive(user),
-		},
-	];
+		});
+		if (canUpdateUser) {
+			actions.push({
+				label: t("users.manageRolesStatus"),
+				icon: (
+					<UserCog className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+				),
+				onClick: (user) => openEdit(user),
+			});
+			actions.push({
+				label: t("users.manageDirectPermissions"),
+				icon: (
+					<Key className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+				),
+				onClick: (user) => openPermissions(user),
+			});
+			actions.push({
+				label: t("users.excludeActionGrants"),
+				icon: (
+					<ShieldAlert className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+				),
+				onClick: (user) => {
+					setExcludeGrantUser(user);
+					const firstMod =
+						(user.roles as any)?.[0]?.permissions?.[0]?.name || "Customer";
+					setExcludeGrantModule(firstMod);
+					setExcludeGrantActions(["delete"]);
+				},
+			});
+			actions.push({
+				label: t("users.resetPassword", "Reset Password"),
+				icon: <Lock className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />,
+				onClick: (user) => setResetPasswordUser(user),
+			});
+			actions.push({
+				label: t("users.deactivateUser"),
+				icon: <UserCheck className="h-3.5 w-3.5 text-muted-foreground" />,
+				onClick: (user) => toggleActive(user),
+			});
+		}
+		return actions;
+	}, [canCreateUser, canUpdateUser, t]);
 
 	return (
-		<div className="space-y-6 pb-12">
-			{/* Page Header */}
-			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
-						<UserCog className="size-7 text-primary" />
-						<span>{t("users.title", "User Management Directory")}</span>
-					</h1>
-					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-						{t("users.subtitle", "Manage company staff accounts, credentials, system access roles, and direct permission grants.")}
-					</p>
+		<PermissionGuard resource="USER" action="READ">
+			<div className="space-y-6 pb-12">
+				{/* Page Header */}
+				<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+					<div>
+						<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+							<UserCog className="size-7 text-primary" />
+							<span>{t("users.title", "User Management Directory")}</span>
+						</h1>
+						<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+							{t("users.subtitle", "Manage company staff accounts, credentials, system access roles, and direct permission grants.")}
+						</p>
+					</div>
 				</div>
-			</div>
 
-			{/* Reusable Data Table Component */}
-			<DataTable<User>
-				data={usersData?.items || []}
-				columns={columns}
-				getRowId={(u) => String(u.id)}
-				hideHeader={true}
-				hideImportExport={true}
-				searchPlaceholder={t("users.searchPlaceholder")}
-				searchValue={search}
-				onSearchChange={(val) => {
-					setSearch(val);
-					setPage(1);
-				}}
-				primaryAction={
-					<Button
-						onClick={openCreate}
-						className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
-					>
-						<UserPlus className="h-3.5 w-3.5" />
-						<span>{t("users.registerNewUser", "Register New User")}</span>
-					</Button>
-				}
-				manualPagination={true}
-				totalCount={usersData?.total || 0}
-				page={page}
-				pageSize={pageSize}
-				onPageChange={setPage}
-				onPageSizeChange={setPageSize}
-				isLoading={isLoading}
-				onRowClick={(u) => setViewingUser(u)}
-				onEditRow={(u) => openEdit(u)}
-				onDeleteRow={(u) => !u.isSuperAdmin && deleteMutation.mutate(u.id)}
-				customRowActions={customActions}
-			/>
+				{/* Reusable Data Table Component */}
+				<DataTable<User>
+					data={usersData?.items || []}
+					columns={columns}
+					getRowId={(u) => String(u.id)}
+					hideHeader={true}
+					hideImportExport={true}
+					searchPlaceholder={t("users.searchPlaceholder")}
+					searchValue={search}
+					onSearchChange={(val) => {
+						setSearch(val);
+						setPage(1);
+					}}
+					primaryAction={
+						<PermissionGate resource="USER" action="CREATE">
+							<Button
+								onClick={openCreate}
+								className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+							>
+								<UserPlus className="h-3.5 w-3.5" />
+								<span>{t("users.registerNewUser", "Register New User")}</span>
+							</Button>
+						</PermissionGate>
+					}
+					manualPagination={true}
+					totalCount={usersData?.total || 0}
+					page={page}
+					pageSize={pageSize}
+					onPageChange={setPage}
+					onPageSizeChange={setPageSize}
+					isLoading={isLoading}
+					onRowClick={(u) => setViewingUser(u)}
+					onEditRow={canUpdateUser ? (u) => openEdit(u) : undefined}
+					onDeleteRow={
+						canDeleteUser
+							? (u) => !u.isSuperAdmin && deleteMutation.mutate(u.id)
+							: undefined
+					}
+					customRowActions={customActions}
+				/>
 
 			{/* View Full Profile Details Modal */}
 			<ModernModal
@@ -2496,5 +2513,6 @@ export default function UsersPage() {
         }}
       /> */}
 		</div>
+	</PermissionGuard>
 	);
 }

@@ -51,6 +51,9 @@ import {
 } from "lucide-react";
 import type { Delivery, DeliveryInput } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
+import { usePermissions } from "@/hooks/use-permissions";
 
 const DELIVERY_TYPES = [
 	{
@@ -86,6 +89,10 @@ const DELIVERY_TYPES = [
 export default function DeliveriesPage() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const { canAny } = usePermissions();
+	const canCreateDelivery = canAny(["DELIVERY:CREATE", "LOCATION:CREATE"]);
+	const canUpdateDelivery = canAny(["DELIVERY:UPDATE", "LOCATION:UPDATE"]);
+	const canDeleteDelivery = canAny(["DELIVERY:DELETE", "LOCATION:DELETE"]);
 	const [search, setSearch] = useState("");
 	const [statusFilter, setStatusFilter] = useState<string | undefined>(
 		undefined,
@@ -640,7 +647,8 @@ export default function DeliveriesPage() {
 	const isSaving = createMutation.isPending || updateMutation.isPending;
 
 	return (
-		<div className="space-y-6 pb-12">
+		<PermissionGuard anyPermissions={["DELIVERY:READ", "LOCATION:READ"]}>
+			<div className="space-y-6 pb-12">
 			{/* Page Header */}
 			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 				<div>
@@ -736,13 +744,15 @@ export default function DeliveriesPage() {
 				}}
 				domainFilterFields={DELIVERY_DOMAIN_FILTERS}
 				primaryAction={
-					<Button
-						onClick={openCreate}
-						className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
-					>
-						<Plus className="h-3.5 w-3.5" />
-						<span>{t("deliveries.addCarrier", "Add Carrier")}</span>
-					</Button>
+					<PermissionGate anyPermissions={["DELIVERY:CREATE", "LOCATION:CREATE"]}>
+						<Button
+							onClick={openCreate}
+							className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+						>
+							<Plus className="h-3.5 w-3.5" />
+							<span>{t("deliveries.addCarrier", "Add Carrier")}</span>
+						</Button>
+					</PermissionGate>
 				}
 				manualPagination={true}
 				totalCount={deliveriesData?.total || 0}
@@ -751,8 +761,8 @@ export default function DeliveriesPage() {
 				onPageChange={setPage}
 				onPageSizeChange={setPageSize}
 				isLoading={isLoading}
-				onEditRow={openEdit}
-				onDeleteRow={(d) => deleteMutation.mutate(d.id)}
+				onEditRow={canUpdateDelivery ? openEdit : undefined}
+				onDeleteRow={canDeleteDelivery ? (d) => deleteMutation.mutate(d.id) : undefined}
 			/>
 
 			{/* CREATE & EDIT MODAL */}
@@ -1310,5 +1320,6 @@ export default function DeliveriesPage() {
 				)}
 			</ModernModal>
 		</div>
+	</PermissionGuard>
 	);
 }

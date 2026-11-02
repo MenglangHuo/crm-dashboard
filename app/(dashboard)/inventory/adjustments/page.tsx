@@ -5,6 +5,7 @@ import { StockAdjustmentsAuditView } from "@/components/inventory/stock-adjustme
 import { History, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 
 function StockAdjustmentsPageContent() {
 	return (
@@ -39,8 +40,10 @@ function StockAdjustmentsPageContent() {
 
 export default function StockAdjustmentsPage() {
 	return (
-		<Suspense fallback={<div className="p-8 text-center text-xs">Loading stock adjustments audit...</div>}>
-			<StockAdjustmentsPageContent />
-		</Suspense>
+		<PermissionGuard resource="STOCK" action="READ">
+			<Suspense fallback={<div className="p-8 text-center text-xs">Loading stock adjustments audit...</div>}>
+				<StockAdjustmentsPageContent />
+			</Suspense>
+		</PermissionGuard>
 	);
 }

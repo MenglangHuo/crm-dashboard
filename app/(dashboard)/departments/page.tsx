@@ -25,10 +25,17 @@ import {
 } from "@/components/ui-custom/form-controls";
 import type { Department } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export default function DepartmentsPage() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const { can } = usePermissions();
+	const canCreateDepartment = can("DEPARTMENT", "CREATE");
+	const canUpdateDepartment = can("DEPARTMENT", "UPDATE");
+	const canDeleteDepartment = can("DEPARTMENT", "DELETE");
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
@@ -188,52 +195,55 @@ export default function DepartmentsPage() {
 	];
 
 	return (
-		<div className="space-y-6 pb-12">
-			{/* Page Header */}
-			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
-						<Building2 className="size-7 text-primary" />
-						<span>{t("departments.title", "Departments Directory")}</span>
-					</h1>
-					<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-						{t("departments.subtitle", "Manage company operating departments and parent division assignments.")}
-					</p>
+		<PermissionGuard resource="DEPARTMENT" action="READ">
+			<div className="space-y-6 pb-12">
+				{/* Page Header */}
+				<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+					<div>
+						<h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
+							<Building2 className="size-7 text-primary" />
+							<span>{t("departments.title", "Departments Directory")}</span>
+						</h1>
+						<p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+							{t("departments.subtitle", "Manage company operating departments and parent division assignments.")}
+						</p>
+					</div>
 				</div>
-			</div>
 
-			<DataTable<Department>
-				data={data?.items || []}
-				columns={columns}
-				getRowId={(item) => String(item.id)}
-				hideHeader={true}
-				hideImportExport={true}
-				searchPlaceholder={t("departments.searchPlaceholder")}
-				searchValue={search}
-				onSearchChange={(val) => {
-					setSearch(val);
-					setPage(1);
-				}}
-				domainFilterFields={domainFilterFields}
-				primaryAction={
-					<Button
-						onClick={openCreateDialog}
-						className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
-					>
-						<Plus className="h-3.5 w-3.5" />
-						<span>{t("departments.addDepartment", "Add Department")}</span>
-					</Button>
-				}
-				manualPagination={true}
-				totalCount={data?.total || 0}
-				page={page}
-				pageSize={pageSize}
-				onPageChange={setPage}
-				onPageSizeChange={setPageSize}
-				isLoading={isLoading}
-				onEditRow={openEditDialog}
-				onDeleteRow={(item) => deleteMutation.mutate(item.id)}
-			/>
+				<DataTable<Department>
+					data={data?.items || []}
+					columns={columns}
+					getRowId={(item) => String(item.id)}
+					hideHeader={true}
+					hideImportExport={true}
+					searchPlaceholder={t("departments.searchPlaceholder")}
+					searchValue={search}
+					onSearchChange={(val) => {
+						setSearch(val);
+						setPage(1);
+					}}
+					domainFilterFields={domainFilterFields}
+					primaryAction={
+						<PermissionGate resource="DEPARTMENT" action="CREATE">
+							<Button
+								onClick={openCreateDialog}
+								className="h-9 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-xs gap-1.5 text-xs transition-all cursor-pointer"
+							>
+								<Plus className="h-3.5 w-3.5" />
+								<span>{t("departments.addDepartment", "Add Department")}</span>
+							</Button>
+						</PermissionGate>
+					}
+					manualPagination={true}
+					totalCount={data?.total || 0}
+					page={page}
+					pageSize={pageSize}
+					onPageChange={setPage}
+					onPageSizeChange={setPageSize}
+					isLoading={isLoading}
+					onEditRow={canUpdateDepartment ? openEditDialog : undefined}
+					onDeleteRow={canDeleteDepartment ? (item) => deleteMutation.mutate(item.id) : undefined}
+				/>
 
 			<ModernModal
 				isOpen={isDialogOpen}
@@ -292,5 +302,6 @@ export default function DepartmentsPage() {
 				</form>
 			</ModernModal>
 		</div>
+	</PermissionGuard>
 	);
 }

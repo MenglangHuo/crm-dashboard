@@ -68,6 +68,9 @@ import { PermissionSelector } from "@/components/ui-custom/permission-selector";
 import { RoleMatrixModal } from "@/components/ui-custom/role-matrix-modal";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/context";
+import { usePermissions } from "@/hooks/use-permissions";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PermissionGate } from "@/components/auth/permission-gate";
 
 const formSchema = z.object({
 	name: z.string().min(2, "Name is required"),
@@ -80,6 +83,11 @@ const formSchema = z.object({
 export default function RolesPage() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const { can } = usePermissions();
+	const canCreateRole = can("ROLE", "CREATE");
+	const canUpdateRole = can("ROLE", "UPDATE");
+	const canDeleteRole = can("ROLE", "DELETE");
+
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
@@ -469,28 +477,36 @@ export default function RolesPage() {
 		},
 	];
 
-	const customActions: RowAction<Role>[] = [
-		{
-			label: t("roles.editRole"),
-			icon: <Edit className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />,
-			onClick: (role) => openEdit(role),
-		},
-		{
-			label: t("roles.cloneRole", "Clone Role"),
-			icon: <Copy className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />,
-			onClick: (role) => openClone(role),
-		},
-		{
+	const customActions: RowAction<Role>[] = useMemo(() => {
+		const actions: RowAction<Role>[] = [];
+		if (canUpdateRole) {
+			actions.push({
+				label: t("roles.editRole"),
+				icon: <Edit className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />,
+				onClick: (role) => openEdit(role),
+			});
+		}
+		if (canCreateRole) {
+			actions.push({
+				label: t("roles.cloneRole", "Clone Role"),
+				icon: <Copy className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />,
+				onClick: (role) => openClone(role),
+			});
+		}
+		actions.push({
 			label: t("roles.viewDetails"),
 			icon: <Eye className="h-3.5 w-3.5 text-primary" />,
 			onClick: (role) => setSelectedRoleId(role.id),
-		},
-		{
-			label: t("roles.roleExclusions"),
-			icon: <ShieldAlert className="h-3.5 w-3.5 text-rose-500" />,
-			onClick: (role) => openExcludeModal(role),
-		},
-	];
+		});
+		if (canUpdateRole) {
+			actions.push({
+				label: t("roles.roleExclusions"),
+				icon: <ShieldAlert className="h-3.5 w-3.5 text-rose-500" />,
+				onClick: (role) => openExcludeModal(role),
+			});
+		}
+		return actions;
+	}, [canUpdateRole, canCreateRole, t]);
 
 	const toolbarActionsNode = (
 		<div className="flex items-center gap-2 flex-wrap">
@@ -523,18 +539,21 @@ export default function RolesPage() {
 			</div>
 
 			{/* Create Role Button */}
-			<Button
-				type="button"
-				onClick={openCreate}
-				className="h-9 px-3.5 text-xs font-bold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs rounded-lg cursor-pointer"
-			>
-				<Plus className="size-4" /> {t("roles.createRole")}
-			</Button>
+			<PermissionGate resource="ROLE" action="CREATE">
+				<Button
+					type="button"
+					onClick={openCreate}
+					className="h-9 px-3.5 text-xs font-bold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs rounded-lg cursor-pointer"
+				>
+					<Plus className="size-4" /> {t("roles.createRole")}
+				</Button>
+			</PermissionGate>
 		</div>
 	);
 
 	return (
-		<div className="space-y-6 pb-12">
+		<PermissionGuard resource="ROLE" action="READ">
+			<div className="space-y-6 pb-12">
 			{/* Page Header */}
 			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 				<div>
@@ -753,53 +772,59 @@ export default function RolesPage() {
 												>
 													<ShieldAlert className="size-3.5" />
 												</Button>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={() => openClone(role)}
-													className="h-8 px-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-													title={t("roles.cloneRole", "Clone Role")}
-												>
-													<Copy className="size-3.5" />
-												</Button>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={() => openEdit(role)}
-													className="h-8 px-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
-													title="Edit Role"
-												>
-													<Edit className="size-3.5" />
-												</Button>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={() => {
-														if (role.isSystemDefault || role.isSystem) {
-															toast.error(
-																"System default roles cannot be deleted.",
-															);
-															return;
+												<PermissionGate resource="ROLE" action="CREATE">
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														onClick={() => openClone(role)}
+														className="h-8 px-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+														title={t("roles.cloneRole", "Clone Role")}
+													>
+														<Copy className="size-3.5" />
+													</Button>
+												</PermissionGate>
+												<PermissionGate resource="ROLE" action="UPDATE">
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														onClick={() => openEdit(role)}
+														className="h-8 px-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+														title="Edit Role"
+													>
+														<Edit className="size-3.5" />
+													</Button>
+												</PermissionGate>
+												<PermissionGate resource="ROLE" action="DELETE">
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														onClick={() => {
+															if (role.isSystemDefault || role.isSystem) {
+																toast.error(
+																	"System default roles cannot be deleted.",
+																);
+																return;
+															}
+															deleteMutation.mutate(role.id);
+														}}
+														disabled={role.isSystemDefault || role.isSystem}
+														className={cn(
+															"h-8 px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40",
+															(role.isSystemDefault || role.isSystem) &&
+																"opacity-40 cursor-not-allowed hover:bg-transparent text-slate-400 dark:text-slate-600",
+														)}
+														title={
+															role.isSystemDefault || role.isSystem
+																? "System default roles cannot be deleted"
+																: "Delete Role"
 														}
-														deleteMutation.mutate(role.id);
-													}}
-													disabled={role.isSystemDefault || role.isSystem}
-													className={cn(
-														"h-8 px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40",
-														(role.isSystemDefault || role.isSystem) &&
-															"opacity-40 cursor-not-allowed hover:bg-transparent text-slate-400 dark:text-slate-600",
-													)}
-													title={
-														role.isSystemDefault || role.isSystem
-															? "System default roles cannot be deleted"
-															: "Delete Role"
-													}
-												>
-													<Trash2 className="size-3.5" />
-												</Button>
+													>
+														<Trash2 className="size-3.5" />
+													</Button>
+												</PermissionGate>
 											</div>
 										</div>
 									</div>
@@ -831,14 +856,18 @@ export default function RolesPage() {
 					onPageSizeChange={setPageSize}
 					isLoading={isLoading}
 					onRowClick={(r) => setSelectedRoleId(r.id)}
-					onEditRow={(r) => openEdit(r)}
-					onDeleteRow={(r) => {
-						if (r.isSystemDefault || r.isSystem) {
-							toast.error("System default roles cannot be deleted.");
-							return;
-						}
-						deleteMutation.mutate(r.id);
-					}}
+					onEditRow={canUpdateRole ? (r) => openEdit(r) : undefined}
+					onDeleteRow={
+						canDeleteRole
+							? (r) => {
+									if (r.isSystemDefault || r.isSystem) {
+										toast.error("System default roles cannot be deleted.");
+										return;
+									}
+									deleteMutation.mutate(r.id);
+								}
+							: undefined
+					}
 					customRowActions={customActions}
 				/>
 			)}
@@ -1044,5 +1073,6 @@ export default function RolesPage() {
 				/>
 			</ModernModal>
 		</div>
+	</PermissionGuard>
 	);
 }
