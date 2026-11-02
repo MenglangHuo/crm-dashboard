@@ -87,15 +87,15 @@ function SafeProductThumbnail({
 
 	if (!fullUrl || error) {
 		return (
-			<div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800/80 text-slate-400 shrink-0 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs">
-				<Package className="h-6 w-6 stroke-[1.25] text-slate-400/90" />
+			<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 shrink-0 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs">
+				<Package className="h-5 w-5 stroke-[1.5] text-slate-400/90" />
 			</div>
 		);
 	}
 
 	return (
 		<div
-			className="group/img relative h-14 w-14 rounded-xl overflow-hidden border border-slate-200/90 dark:border-slate-700/80 shadow-2xs shrink-0 cursor-pointer bg-slate-50 dark:bg-slate-900"
+			className="group/img relative h-10 w-10 rounded-lg overflow-hidden border border-slate-200/90 dark:border-slate-700/80 shadow-2xs shrink-0 cursor-pointer bg-slate-50 dark:bg-slate-900"
 			onClick={() => onPreview?.(fullUrl, alt)}
 			title="Click to zoom product image"
 		>
@@ -106,7 +106,7 @@ function SafeProductThumbnail({
 				className="h-full w-full object-cover transition-transform duration-200 group-hover/img:scale-105"
 			/>
 			<div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white">
-				<Maximize2 className="h-4 w-4 drop-shadow-xs" />
+				<Maximize2 className="h-3.5 w-3.5 drop-shadow-xs" />
 			</div>
 		</div>
 	);
@@ -714,15 +714,15 @@ export function OrderDetailsDrawer({
 							<ModernTabsContent value="orderitems" className="space-y-3">
 								<div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
 									<table className="w-full text-left text-xs">
-										<thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-200/80 dark:border-slate-800">
+										<thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-bold uppercase text-[11px] tracking-wider border-b border-slate-200/80 dark:border-slate-800">
 											<tr>
-												<th className="p-3 min-w-[260px]">Product Item</th>
-												<th className="p-3 w-20 text-center">Unit</th>
-												<th className="p-3 w-24 text-center">Qty</th>
-												<th className="p-3 w-28 text-right">Unit Price</th>
-												<th className="p-3 w-24 text-right">Discount</th>
-												<th className="p-3 w-32 text-right">Line Total</th>
-												<th className="p-3 w-32 text-center">Stock Check</th>
+												<th className="py-2.5 px-3 min-w-[260px]">Product Item</th>
+												<th className="py-2.5 px-3 w-20 text-center">Unit</th>
+												<th className="py-2.5 px-3 w-24 text-center">Qty</th>
+												<th className="py-2.5 px-3 w-28 text-right">Unit Price</th>
+												<th className="py-2.5 px-3 w-24 text-right">Discount</th>
+												<th className="py-2.5 px-3 w-32 text-right">Line Total</th>
+												<th className="py-2.5 px-3 w-32 text-center">Stock Check</th>
 											</tr>
 										</thead>
 										<tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
@@ -747,9 +747,9 @@ export function OrderDetailsDrawer({
 															key={item.id || idx}
 															className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
 														>
-															{/* Product Thumbnail & Details (HERO FOCUS) */}
-															<td className="p-3">
-																<div className="flex items-center gap-3.5">
+															{/* Product Thumbnail & Details */}
+															<td className="py-2 px-3">
+																<div className="flex items-center gap-3">
 																	<SafeProductThumbnail
 																		src={rawImage}
 																		alt={item.productName || "Product"}
@@ -758,20 +758,20 @@ export function OrderDetailsDrawer({
 																		}
 																	/>
 																	<div className="min-w-0 space-y-0.5">
-																		<div className="font-bold text-slate-900 dark:text-slate-100 text-sm truncate">
+																		<div className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-tight truncate">
 																			{item.productName || `Item #${item.id}`}
 																		</div>
 																		{item.availableStock !== undefined && (
 																			<div className="flex items-center gap-1.5 pt-0.5 text-xs">
 																				<span
-																					className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+																					className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
 																						item.availableStock < qty
-																							? "text-rose-600 dark:text-rose-400 font-semibold"
+																							? "text-rose-600 dark:text-rose-400"
 																							: "text-emerald-600 dark:text-emerald-400"
 																					}`}
 																				>
 																					<span
-																						className={`h-1.5 w-1.5 rounded-full ${
+																						className={`h-2 w-2 rounded-full shrink-0 ${
 																							item.availableStock < qty
 																								? "bg-rose-500 animate-pulse"
 																								: "bg-emerald-500"
@@ -788,14 +788,14 @@ export function OrderDetailsDrawer({
 															</td>
 
 															{/* Unit */}
-															<td className="p-3 text-center">
-																<span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+															<td className="py-2 px-3 text-center">
+																<span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
 																	{item.unitName || "PCS"}
 																</span>
 															</td>
 
 															{/* Quantity */}
-															<td className="p-3 text-center">
+															<td className="py-2 px-3 text-center">
 																{order.status === "DRAFT" && canCreateOrder ? (
 																	<input
 																		type="number"
@@ -808,17 +808,17 @@ export function OrderDetailsDrawer({
 																				Number(e.target.value),
 																			)
 																		}
-																		className="w-14 h-8 text-center rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs font-bold text-slate-900 dark:text-slate-100 shadow-2xs outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all mx-auto block"
+																		className="w-16 h-8 text-center rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-sm font-bold text-slate-900 dark:text-slate-100 shadow-2xs outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all mx-auto block"
 																	/>
 																) : (
-																	<span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-xs">
+																	<span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">
 																		{qty}
 																	</span>
 																)}
 															</td>
 
 															{/* Unit Price */}
-															<td className="p-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400 text-xs font-medium">
+															<td className="py-2 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 text-sm font-semibold">
 																$
 																{price.toLocaleString(undefined, {
 																	minimumFractionDigits: 2,
@@ -826,7 +826,7 @@ export function OrderDetailsDrawer({
 															</td>
 
 															{/* Discount */}
-															<td className="p-3 text-right">
+															<td className="py-2 px-3 text-right">
 																{order.status === "DRAFT" && canCreateOrder ? (
 																	<div className="inline-flex items-center justify-end">
 																		<div className="flex items-center h-8 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xs overflow-hidden focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
@@ -843,7 +843,7 @@ export function OrderDetailsDrawer({
 																						Number(e.target.value),
 																					)
 																				}
-																				className="w-12 h-full text-right px-1.5 font-mono text-xs font-medium text-slate-900 dark:text-slate-100 bg-transparent outline-none tabular-nums"
+																				className="w-12 h-full text-right px-1.5 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100 bg-transparent outline-none tabular-nums"
 																			/>
 																			<select
 																				value={item.discountType || "FLAT"}
@@ -854,7 +854,7 @@ export function OrderDetailsDrawer({
 																						e.target.value,
 																					)
 																				}
-																				className="h-full px-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+																				className="h-full px-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
 																			>
 																				<option value="FLAT">$</option>
 																				<option value="PERCENTAGE">%</option>
@@ -862,20 +862,20 @@ export function OrderDetailsDrawer({
 																		</div>
 																	</div>
 																) : disc > 0 ? (
-																	<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-mono">
+																	<span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-mono border border-emerald-200/80 dark:border-emerald-800">
 																		{item.discountType === "PERCENTAGE"
 																			? `${disc}% off`
 																			: `-$${disc.toFixed(2)}`}
 																	</span>
 																) : (
-																	<span className="text-slate-400 font-mono text-xs">
+																	<span className="text-slate-400 font-mono text-sm font-medium">
 																		—
 																	</span>
 																)}
 															</td>
 
 															{/* Line Total */}
-															<td className="p-3 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-slate-100 text-xs">
+															<td className="py-2 px-3 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-slate-100 text-sm">
 																$
 																{total.toLocaleString(undefined, {
 																	minimumFractionDigits: 2,
@@ -883,19 +883,19 @@ export function OrderDetailsDrawer({
 															</td>
 
 															{/* Stock Verification Status Badge */}
-															<td className="p-3 text-center">
+															<td className="py-2 px-3 text-center">
 																{item.isVerified ? (
 																	<Badge
 																		variant="outline"
-																		className="bg-emerald-50/70 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] gap-1 py-0.5"
+																		className="bg-emerald-50/80 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 text-xs font-semibold gap-1.5 py-0.5 px-2.5 shadow-2xs"
 																	>
-																		<CheckCircle2 className="h-3 w-3 text-emerald-600" />
+																		<CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
 																		<span>
 																			Verified ({item.verifiedQuantity ?? qty})
 																		</span>
 																	</Badge>
 																) : (
-																	<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+																	<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
 																		Unverified
 																	</span>
 																)}
@@ -928,16 +928,16 @@ export function OrderDetailsDrawer({
 										</div>
 										<div className="overflow-x-auto rounded-2xl border border-purple-200/80 dark:border-purple-900/60 bg-purple-50/20 dark:bg-purple-950/20 shadow-2xs">
 											<table className="w-full text-left text-xs">
-												<thead className="bg-purple-100/50 dark:bg-purple-900/40 text-purple-900 dark:text-purple-200 font-bold border-b border-purple-200 dark:border-purple-800">
+												<thead className="bg-purple-100/50 dark:bg-purple-900/40 text-purple-900 dark:text-purple-200 font-bold uppercase text-[11px] tracking-wider border-b border-purple-200 dark:border-purple-800">
 													<tr>
-														<th className="p-2.5">Add-On Item</th>
-														<th className="p-2.5 w-24 text-center">Unit</th>
-														<th className="p-2.5 w-20 text-center">Qty</th>
-														<th className="p-2.5 w-28 text-right">
+														<th className="py-2.5 px-3 min-w-[240px]">Add-On Item</th>
+														<th className="py-2.5 px-3 w-24 text-center">Unit</th>
+														<th className="py-2.5 px-3 w-20 text-center">Qty</th>
+														<th className="py-2.5 px-3 w-28 text-right">
 															Unit Price
 														</th>
-														<th className="p-2.5 w-28 text-right">Total</th>
-														<th className="p-2.5 w-32 text-center">
+														<th className="py-2.5 px-3 w-28 text-right">Total</th>
+														<th className="py-2.5 px-3 w-32 text-center">
 															Verification
 														</th>
 													</tr>
@@ -957,10 +957,10 @@ export function OrderDetailsDrawer({
 														return (
 															<tr
 																key={addon.id || aIdx}
-																className="hover:bg-purple-100/30 dark:hover:bg-purple-900/30"
+																className="hover:bg-purple-100/30 dark:hover:bg-purple-900/30 transition-colors"
 															>
-																<td className="p-2.5">
-																	<div className="flex items-center gap-2.5">
+																<td className="py-2 px-3">
+																	<div className="flex items-center gap-3">
 																		<SafeProductThumbnail
 																			src={aRawImg}
 																			alt={addon.productName || "Addon"}
@@ -968,16 +968,16 @@ export function OrderDetailsDrawer({
 																				setPreviewImage({ url, title })
 																			}
 																		/>
-																		<div>
-																			<div className="font-bold text-purple-950 dark:text-purple-200 text-xs">
+																		<div className="min-w-0 space-y-0.5">
+																			<div className="font-bold text-purple-950 dark:text-purple-200 text-sm leading-tight truncate">
 																				{addon.productName ||
 																					addon.name ||
 																					addon.description ||
 																					`Add-on #${addon.id || aIdx + 1}`}
 																			</div>
 																			{addon.availableStock !== undefined && (
-																				<div className="text-[9px] font-mono mt-0.5 flex items-center gap-1">
-																					<span className="text-purple-400">
+																				<div className="text-xs font-semibold flex items-center gap-1.5 pt-0.5">
+																					<span className="text-purple-500">
 																						Stock:
 																					</span>
 																					<strong
@@ -994,35 +994,32 @@ export function OrderDetailsDrawer({
 																		</div>
 																	</div>
 																</td>
-																<td className="p-2.5 text-center">
-																	<Badge
-																		variant="secondary"
-																		className="text-[10px] px-1.5 py-0 font-mono bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200"
-																	>
+																<td className="py-2 px-3 text-center">
+																	<span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold font-mono bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 border border-purple-200/60 dark:border-purple-800/60 shadow-2xs">
 																		{addon.unitName || "PCS"}
-																	</Badge>
+																	</span>
 																</td>
-																<td className="p-2.5 text-center font-mono font-bold text-purple-900 dark:text-purple-200">
+																<td className="py-2 px-3 text-center font-mono font-bold text-purple-900 dark:text-purple-200 text-sm">
 																	{aQty}
 																</td>
-																<td className="p-2.5 text-right font-mono text-purple-700 dark:text-purple-300">
+																<td className="py-2 px-3 text-right font-mono font-semibold text-purple-700 dark:text-purple-300 text-sm">
 																	{aPrice === 0
 																		? "FREE"
 																		: `$${aPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
 																</td>
-																<td className="p-2.5 text-right font-mono font-bold text-purple-900 dark:text-purple-200">
+																<td className="py-2 px-3 text-right font-mono font-bold text-purple-900 dark:text-purple-200 text-sm">
 																	{aTotal === 0
 																		? "FREE ($0.00)"
 																		: `$${aTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
 																</td>
-																<td className="p-2.5 text-center">
+																<td className="py-2 px-3 text-center">
 																	{addon.isVerified ? (
-																		<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
-																			<CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+																		<span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 shadow-2xs">
+																			<CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
 																			Verified ({addon.verifiedQuantity ?? aQty})
 																		</span>
 																	) : (
-																		<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+																		<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
 																			Unverified
 																		</span>
 																	)}

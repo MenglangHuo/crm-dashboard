@@ -1822,8 +1822,37 @@ export function PosOrderStudioModal({
 				{/* ========================================================================= */}
 				<div className="lg:col-span-6 flex flex-col h-full overflow-hidden bg-slate-50/70 dark:bg-slate-950/40 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2">
 					{/* Top Compact Customer & Delivery Bar (High Density) */}
-					<div className="shrink-0 space-y-1.5 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+					<div className="shrink-0 space-y-2 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+						<div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100 dark:border-slate-800/80">
+							<div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 min-w-0">
+								<User className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+								<span className="truncate">
+									{t("orders.customer")} & {t("orders.paymentTerm") || "Payment Term"}
+								</span>
+							</div>
+
+							{/* Delivery Accordion Button */}
+							<button
+								type="button"
+								onClick={() => setIsDeliveryAddressOpen((prev) => !prev)}
+								className={`h-7 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer ${
+									deliveryId || shippingCustomerAddress
+										? "border-purple-300 text-purple-700 bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:bg-purple-950/40 shadow-xs"
+										: "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300 hover:bg-slate-200/80"
+								}`}
+								title="Delivery & Destination Address"
+							>
+								<Truck className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+								<span>{t("orders.shippingAddress")}</span>
+								{isDeliveryAddressOpen ? (
+									<ChevronUp className="h-3 w-3 shrink-0" />
+								) : (
+									<ChevronDown className="h-3 w-3 shrink-0" />
+								)}
+							</button>
+						</div>
+
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-2 [&>*]:min-w-0">
 							<ModernSelect
 								label={`${t("orders.customer")} *`}
 								options={customerOptions}
@@ -1836,43 +1865,17 @@ export function PosOrderStudioModal({
 								leftIcon={<User className="h-3.5 w-3.5 text-indigo-500" />}
 							/>
 
-							<div className="flex items-end gap-1.5">
-								<div className="flex-1">
-									<ModernSelect
-										label={t("orders.paymentTerm") || "Payment Term"}
-										options={paymentTermOptions}
-										value={paymentTermId}
-										onChange={setPaymentTermId}
-										placeholder="Select payment term..."
-										searchable={true}
-										clearable={true}
-										selectSize="sm"
-										leftIcon={<Clock className="h-3.5 w-3.5 text-indigo-500" />}
-									/>
-								</div>
-
-								{/* Delivery Accordion Button */}
-								<button
-									type="button"
-									onClick={() => setIsDeliveryAddressOpen((prev) => !prev)}
-									className={`h-8 px-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border shrink-0 mb-0.5 ${
-										deliveryId || shippingCustomerAddress
-											? "border-purple-300 text-purple-700 bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:bg-purple-950/40"
-											: "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300"
-									}`}
-									title="Delivery & Destination Address"
-								>
-									<Truck className="h-3.5 w-3.5 text-purple-500" />
-									<span className="hidden xl:inline">
-										{t("orders.shippingAddress")}
-									</span>
-									{isDeliveryAddressOpen ? (
-										<ChevronUp className="h-3 w-3" />
-									) : (
-										<ChevronDown className="h-3 w-3" />
-									)}
-								</button>
-							</div>
+							<ModernSelect
+								label={t("orders.paymentTerm") || "Payment Term"}
+								options={paymentTermOptions}
+								value={paymentTermId}
+								onChange={setPaymentTermId}
+								placeholder="Select payment term..."
+								searchable={true}
+								clearable={true}
+								selectSize="sm"
+								leftIcon={<Clock className="h-3.5 w-3.5 text-indigo-500" />}
+							/>
 						</div>
 
 						{/* Payment Term Active Notice / Early Cash Discount */}
@@ -1897,7 +1900,7 @@ export function PosOrderStudioModal({
 
 						{/* Expandable Delivery & Address Panel */}
 						{isDeliveryAddressOpen && (
-							<div className="pt-2 mt-1 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-2 animate-in fade-in-50 duration-150">
+							<div className="pt-2 mt-1 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-2 [&>*]:min-w-0 animate-in fade-in-50 duration-150">
 								<ModernSelect
 									label={t("orders.selectDelivery")}
 									options={deliveryOptions}

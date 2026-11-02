@@ -2518,7 +2518,7 @@ export default function ProfilePage() {
 								userProfile?.username ||
 								"My Account"
 							}
-							isDrawerMode={true}
+							isDrawerMode={false}
 							hideActionTab={true}
 						/>
 					</div>
