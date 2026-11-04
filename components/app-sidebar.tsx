@@ -83,6 +83,7 @@ import {
 import { isUserSystemAdmin } from "@/components/providers/company-context";
 import { useTranslation } from "@/lib/i18n/context";
 import { usePermissions } from "@/hooks/use-permissions";
+import { env } from "@/lib/config/env";
 
 function SidebarLogo() {
 	return (
@@ -626,7 +627,7 @@ export function AppSidebar() {
 						{/* Live Health Dot in Collapsed */}
 						<div
 							className="size-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 my-1 shrink-0"
-							title={t("common.systemOnline", "System Online")}
+							title={`${t("common.systemOnline", "System Online")} (v${env.appVersion})`}
 						/>
 					</div>
 				) : (
@@ -643,7 +644,7 @@ export function AppSidebar() {
 								</span>
 							</div>
 							<span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200/50 dark:border-emerald-800/50">
-								v1.0.0
+								v{env.appVersion}
 							</span>
 						</div>
 

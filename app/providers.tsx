@@ -47,6 +47,7 @@ const ThemeCustomizerModal = dynamic(
 );
 import { I18nProvider } from "@/lib/i18n/context";
 import type { Locale } from "@/types/i18n";
+import { SplashScreen, SplashScreenProvider } from "@/components/splash-screen";
 
 export function Providers({
 	initialLocale,
@@ -75,20 +76,23 @@ export function Providers({
 			disableTransitionOnChange
 		>
 			<CustomThemeProvider>
-				<I18nProvider initialLocale={initialLocale}>
-					<QueryClientProvider client={queryClient}>
-						<QuickActionProvider>
-							{children}
-							<CommandPalette />
-							<UnifiedLoanWizardModal />
-							<QuickPaymentModal />
-							<AbaKhqrModal />
-							<PrintReceiptModal />
-							<ThemeCustomizerModal />
-							<Toaster richColors position="top-right" />
-						</QuickActionProvider>
-					</QueryClientProvider>
-				</I18nProvider>
+				<SplashScreenProvider>
+					<I18nProvider initialLocale={initialLocale}>
+						<QueryClientProvider client={queryClient}>
+							<QuickActionProvider>
+								<SplashScreen />
+								{children}
+								<CommandPalette />
+								<UnifiedLoanWizardModal />
+								<QuickPaymentModal />
+								<AbaKhqrModal />
+								<PrintReceiptModal />
+								<ThemeCustomizerModal />
+								<Toaster richColors position="top-right" />
+							</QuickActionProvider>
+						</QueryClientProvider>
+					</I18nProvider>
+				</SplashScreenProvider>
 			</CustomThemeProvider>
 		</ThemeProvider>
 	);

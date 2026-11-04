@@ -193,7 +193,7 @@ export const en = {
 		expand: "Expand sidebar",
 	},
 	auth: {
-		signInTitle: "Welcome back",
+		signInTitle: "Welcome",
 		signInSubtitle: "Sign in to your enterprise management dashboard",
 		usernameOrEmail: "Email Address or Username",
 		usernameOrEmailPlaceholder: "bronx@dmin or your.email@company.com",

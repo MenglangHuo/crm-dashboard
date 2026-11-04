@@ -11,6 +11,7 @@ import axios, { AxiosError } from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
 import { refreshAuthCookies } from "@/app/actions/auth";
 import type { ApiResponse } from "@/lib/types";
+import { env } from "@/lib/config/env";
 
 export class ApiError extends Error {
 	code: string;
@@ -25,58 +26,17 @@ export class ApiError extends Error {
 }
 
 function getBaseUrl(): string {
-	const rawBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
-	const isAbsoluteBase =
-		rawBaseUrl.startsWith("http://") || rawBaseUrl.startsWith("https://");
-
-	if (isAbsoluteBase) {
-		return rawBaseUrl.replace(/\/+$/, "");
-	}
-
-	const cleanBaseUrl = rawBaseUrl.startsWith("/")
-		? rawBaseUrl
-		: `/${rawBaseUrl}`;
-
 	if (typeof window !== "undefined") {
 		// In the browser, use relative path (/api/v1) by default so requests are same-origin.
 		// Next.js rewrites and route handlers proxy them to the backend server without browser CORS or mixed-content errors.
-		if (process.env.NEXT_PUBLIC_USE_DIRECT_API === "true") {
-			const directEndpoint =
-				process.env.NEXT_PUBLIC_API_BACKEND_URL ||
-				process.env.NEXT_PUBLIC_API_ENDPOINT ||
-				process.env.NEXT_PUBLIC_API_ENPOINT ||
-				"https://crmapi.bronxtechnology.site";
-			if (directEndpoint) {
-				let origin = directEndpoint.trim().replace(/\/+$/, "");
-				origin = origin.replace(/\/+(api(\/v1)?)?\/?$/, "");
-				if (!origin.startsWith("http://") && !origin.startsWith("https://")) {
-					origin = origin.includes("localhost") ? `http://${origin}` : `https://${origin}`;
-				}
-				return `${origin}${cleanBaseUrl}`;
-			}
+		if (env.isDirectApi) {
+			return `${env.apiBackendUrl}${env.apiBaseUrl}`;
 		}
-		return cleanBaseUrl;
+		return env.apiBaseUrl;
 	}
 
 	// On the server side (SSR / Node.js runtime), absolute URL is required
-	const backendUrl =
-		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
-		process.env.NEXT_PUBLIC_API_ENDPOINT ||
-		process.env.NEXT_PUBLIC_API_ENPOINT ||
-		process.env.CRM_URL ||
-		"https://crmapi.bronxtechnology.site";
-
-	let cleanBackend = backendUrl.trim().replace(/\/+$/, "");
-	cleanBackend = cleanBackend.replace(/\/+(api(\/v1)?)?\/?$/, "");
-	if (!cleanBackend.startsWith("http://") && !cleanBackend.startsWith("https://")) {
-		cleanBackend = cleanBackend.includes("localhost")
-			? `http://${cleanBackend}`
-			: `https://${cleanBackend}`;
-	}
-	if ((process.env.NODE_ENV === "production" || process.env.VERCEL) && cleanBackend.includes("localhost")) {
-		cleanBackend = "https://crmapi.bronxtechnology.site";
-	}
-	return `${cleanBackend}${cleanBaseUrl}`;
+	return `${env.apiBackendUrl}${env.apiBaseUrl}`;
 }
 
 const constructedBaseUrl = getBaseUrl();
@@ -223,9 +183,7 @@ function getRefreshRequest(): Promise<boolean> {
 
 export const api = axios.create({
 	baseURL: constructedBaseUrl,
-	timeout: process.env.NEXT_PUBLIC_API_TIMEOUT
-		? parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT, 10)
-		: 15000,
+	timeout: env.apiTimeout,
 	withCredentials: true,
 	headers: { "Content-Type": "application/json" },
 });

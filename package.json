@@ -1,12 +1,19 @@
 {
-	"name": "my-project",
-	"version": "0.1.0",
+	"name": "crm-admin-dashboard",
+	"version": "1.0.0",
 	"private": true,
 	"scripts": {
 		"dev": "next dev -p 4000",
+		"dev:prod": "dotenv -e .env.production -- next dev -p 4000",
 		"build": "next build",
-		"start": "next start",
-		"lint": "eslint ."
+		"build:prod": "next build",
+		"build:dev": "dotenv -e .env.development -- next build",
+		"start": "next start -p 4000",
+		"lint": "eslint .",
+		"typecheck": "tsc --noEmit",
+		"version:patch": "npm version patch --no-git-tag-version",
+		"version:minor": "npm version minor --no-git-tag-version",
+		"version:major": "npm version major --no-git-tag-version"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.5.0",
@@ -36,6 +43,8 @@
 		"@types/node": "^24",
 		"@types/react": "^19",
 		"@types/react-dom": "^19",
+		"cross-env": "^10.1.0",
+		"dotenv-cli": "^11.1.0",
 		"eslint-plugin-unused-imports": "^4.4.1",
 		"postcss": "^8.5",
 		"tailwindcss": "^4.3.3",

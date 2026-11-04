@@ -1,18 +1,21 @@
-function resolveBackendUrl() {
-	const raw =
-		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
-		process.env.NEXT_PUBLIC_API_ENDPOINT ||
-		process.env.NEXT_PUBLIC_API_ENPOINT ||
-		process.env.CRM_URL ||
-		"https://crmapi.bronxtechnology.site";
+// In local development, bypass certificate verification so devs can test against any backend without SSL blocks
+if (process.env.NODE_ENV === "development") {
+	process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
 
-	let url = (raw || "https://crmapi.bronxtechnology.site").trim();
-	if (!url.startsWith("http://") && !url.startsWith("https://")) {
-		url = url.includes("localhost") ? `http://${url}` : `https://${url}`;
+function resolveBackendUrl() {
+	let raw = (process.env.NEXT_PUBLIC_API_BACKEND_URL || "").trim();
+	if (!raw) {
+		raw = process.env.NODE_ENV === "production" ? "" : "http://localhost:8091";
 	}
-	// On Vercel / production, localhost is unreachable and rejected by Vercel edge proxy
-	if ((process.env.NODE_ENV === "production" || process.env.VERCEL) && url.includes("localhost")) {
-		url = "https://crmapi.bronxtechnology.site";
+	if (!raw) return "";
+
+	let url = raw;
+	if (!url.startsWith("http://") && !url.startsWith("https://")) {
+		url =
+			url.includes("localhost") || url.includes("127.0.0.1")
+				? `http://${url}`
+				: `https://${url}`;
 	}
 	// Strip trailing slashes and any trailing /api/v1 or /api
 	return url.replace(/\/+(api(\/v1)?)?\/?$/, "");
@@ -28,6 +31,8 @@ const nextConfig = {
 	},
 	async rewrites() {
 		const apiBackend = resolveBackendUrl();
+		if (!apiBackend) return [];
+
 		const rules = [
 			{
 				// Proxy all /api/v1/* calls to the Spring Boot backend
@@ -46,8 +51,6 @@ const nextConfig = {
 			},
 		];
 		return {
-			beforeFiles: rules,
-			afterFiles: rules,
 			fallback: rules,
 		};
 	},

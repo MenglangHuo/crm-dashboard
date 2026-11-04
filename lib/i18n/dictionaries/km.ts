@@ -195,7 +195,7 @@ export const km: Dictionary = {
 		expand: "ពង្រីករបារចំហៀង",
 	},
 	auth: {
-		signInTitle: "សូមស្វាគមន៍មកវិញ",
+		signInTitle: "ផ្ទាំងគ្រប់គ្រង CRM",
 		signInSubtitle: "ចូលប្រើប្រាស់ផ្ទាំងគ្រប់គ្រងសហគ្រាសរបស់អ្នក",
 		usernameOrEmail: "អាសយដ្ឋានអ៊ីមែល ឬ ឈ្មោះអ្នកប្រើ",
 		usernameOrEmailPlaceholder: "bronx@dmin ឬ name@company.com",
