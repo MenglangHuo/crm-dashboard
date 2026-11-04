@@ -18,3 +18,5 @@ node_modules
 .codex
 .next
 .vercel
+.env.development
+.env.production
