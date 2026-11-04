@@ -7,10 +7,22 @@ import packageJson from "@/package.json";
 
 export type AppEnvironment = "development" | "production" | "test";
 
+export const DEFAULT_PRODUCTION_BACKEND_URL = "https://crmapi.bronxtechnology.site";
+export const DEFAULT_DEVELOPMENT_BACKEND_URL = "http://localhost:8091";
+
 function normalizeBackendUrl(rawUrl?: string): string {
-	const raw = (rawUrl || "").trim();
+	const raw = (
+		rawUrl ||
+		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
+		process.env.API_BACKEND_URL ||
+		process.env.BACKEND_URL ||
+		""
+	).trim();
+
 	if (!raw) {
-		return process.env.NODE_ENV === "production" ? "" : "http://localhost:8091";
+		return process.env.NODE_ENV === "production"
+			? DEFAULT_PRODUCTION_BACKEND_URL
+			: DEFAULT_DEVELOPMENT_BACKEND_URL;
 	}
 
 	let url = raw;

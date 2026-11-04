@@ -3,10 +3,22 @@ if (process.env.NODE_ENV === "development") {
 	process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
+const DEFAULT_PRODUCTION_BACKEND_URL = "https://crmapi.bronxtechnology.site";
+const DEFAULT_DEVELOPMENT_BACKEND_URL = "http://localhost:8091";
+
 function resolveBackendUrl() {
-	let raw = (process.env.NEXT_PUBLIC_API_BACKEND_URL || "").trim();
+	let raw = (
+		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
+		process.env.API_BACKEND_URL ||
+		process.env.BACKEND_URL ||
+		""
+	).trim();
+
 	if (!raw) {
-		raw = process.env.NODE_ENV === "production" ? "" : "http://localhost:8091";
+		raw =
+			process.env.NODE_ENV === "production"
+				? DEFAULT_PRODUCTION_BACKEND_URL
+				: DEFAULT_DEVELOPMENT_BACKEND_URL;
 	}
 	if (!raw) return "";
 

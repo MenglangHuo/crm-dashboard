@@ -12,11 +12,15 @@ if (env.allowInsecureTls) {
  * are faithfully forwarded without local mock database interference or stale caching.
  */
 export async function proxyToBackend(req: NextRequest) {
-	let backendBase = env.apiBackendUrl;
+	let backendBase =
+		env.apiBackendUrl ||
+		(process.env.NODE_ENV === "production"
+			? "https://crmapi.bronxtechnology.site"
+			: "http://localhost:8091");
 
 	const url = new URL(req.url);
 
-	// Guard against self-proxying loop or missing backend configuration
+	// Guard against missing backend configuration
 	if (!backendBase) {
 		return NextResponse.json(
 			{
@@ -29,7 +33,20 @@ export async function proxyToBackend(req: NextRequest) {
 		);
 	}
 
-	if (backendBase.includes(`:${url.port}`) || backendBase === url.origin) {
+	let isSelfProxy = false;
+	try {
+		const targetParsed = new URL(backendBase);
+		isSelfProxy =
+			targetParsed.host === url.host ||
+			(Boolean(url.port) && backendBase.includes(`:${url.port}`)) ||
+			backendBase === url.origin;
+	} catch {
+		isSelfProxy =
+			(Boolean(url.port) && backendBase.includes(`:${url.port}`)) ||
+			backendBase === url.origin;
+	}
+
+	if (isSelfProxy) {
 		return NextResponse.json(
 			{
 				success: false,
