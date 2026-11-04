@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { decodeToken, encodeToken } from "@/lib/server/api";
 import { resolveProfile } from "@/lib/server/db";
 import { env } from "@/lib/config/env";
+import { getFetchOptions } from "@/lib/server/fetch-agent";
 
 const ACCESS_COOKIE = "crm_access_token";
 const REFRESH_COOKIE = "crm_refresh_token";
@@ -60,15 +61,18 @@ export async function POST(request: NextRequest) {
 
 		for (const backendRefreshUrl of candidateUrls) {
 			try {
-				const backendResponse = await fetch(backendRefreshUrl, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Cookie: `${REFRESH_COOKIE}=${encodeURIComponent(refreshToken)}`,
-					},
-					body: JSON.stringify({ refreshToken }),
-					cache: "no-store",
-				});
+				const backendResponse = await fetch(
+					backendRefreshUrl,
+					getFetchOptions({
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Cookie: `${REFRESH_COOKIE}=${encodeURIComponent(refreshToken)}`,
+						},
+						body: JSON.stringify({ refreshToken }),
+						cache: "no-store",
+					}),
+				);
 
 				if (backendResponse.ok) {
 					const data = await backendResponse.json().catch(() => null);

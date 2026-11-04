@@ -7,10 +7,22 @@ import packageJson from "@/package.json";
 
 export type AppEnvironment = "development" | "production" | "test";
 
+export const DEFAULT_PRODUCTION_BACKEND_URL = "https://crmapi.bronxtechnology.site";
+export const DEFAULT_DEVELOPMENT_BACKEND_URL = "http://localhost:8091";
+
 function normalizeBackendUrl(rawUrl?: string): string {
-	const raw = (rawUrl || "").trim();
+	const raw = (
+		rawUrl ||
+		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
+		process.env.API_BACKEND_URL ||
+		process.env.BACKEND_URL ||
+		""
+	).trim();
+
 	if (!raw) {
-		return process.env.NODE_ENV === "production" ? "" : "http://localhost:8091";
+		return process.env.NODE_ENV === "production"
+			? DEFAULT_PRODUCTION_BACKEND_URL
+			: DEFAULT_DEVELOPMENT_BACKEND_URL;
 	}
 
 	let url = raw;
@@ -43,8 +55,10 @@ export const env = {
 	apiTimeout: Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 15000,
 	isDirectApi: process.env.NEXT_PUBLIC_USE_DIRECT_API === "true",
 
-	// TLS & Certificate Bypass (strictly active only in development)
-	allowInsecureTls: process.env.NODE_ENV === "development",
+	// TLS & Certificate Bypass (enabled unless explicitly disabled so expired or renewing backend certs do not break API proxy)
+	allowInsecureTls:
+		process.env.ALLOW_INSECURE_TLS !== "false" &&
+		process.env.NEXT_PUBLIC_ALLOW_INSECURE_TLS !== "false",
 
 	// Debugging & Logging
 	enableDebugLogs:
