@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/config/env";
+import { getFetchOptions } from "@/lib/server/fetch-agent";
 
-// Enable development TLS bypass if configured
+// Enable TLS bypass if configured
 if (env.allowInsecureTls) {
 	process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
@@ -76,12 +77,15 @@ export async function proxyToBackend(req: NextRequest) {
 	}
 
 	try {
-		const res = await fetch(targetUrl, {
-			method,
-			headers,
-			body,
-			cache: "no-store",
-		});
+		const res = await fetch(
+			targetUrl,
+			getFetchOptions({
+				method,
+				headers,
+				body,
+				cache: "no-store",
+			}),
+		);
 
 		const resHeaders = new Headers(res.headers);
 		// Remove encoding headers that fetch handles automatically
@@ -100,6 +104,7 @@ export async function proxyToBackend(req: NextRequest) {
 			headers: resHeaders,
 		});
 	} catch (err: any) {
+		console.error(`[proxyToBackend] Failed to connect to ${targetUrl}:`, err);
 		return NextResponse.json(
 			{
 				success: false,

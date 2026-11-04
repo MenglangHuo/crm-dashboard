@@ -55,8 +55,10 @@ export const env = {
 	apiTimeout: Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 15000,
 	isDirectApi: process.env.NEXT_PUBLIC_USE_DIRECT_API === "true",
 
-	// TLS & Certificate Bypass (strictly active only in development)
-	allowInsecureTls: process.env.NODE_ENV === "development",
+	// TLS & Certificate Bypass (enabled unless explicitly disabled so expired or renewing backend certs do not break API proxy)
+	allowInsecureTls:
+		process.env.ALLOW_INSECURE_TLS !== "false" &&
+		process.env.NEXT_PUBLIC_ALLOW_INSECURE_TLS !== "false",
 
 	// Debugging & Logging
 	enableDebugLogs:

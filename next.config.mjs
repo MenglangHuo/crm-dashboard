@@ -1,5 +1,8 @@
-// In local development, bypass certificate verification so devs can test against any backend without SSL blocks
-if (process.env.NODE_ENV === "development") {
+// Bypass certificate verification so backend API SSL expiration/renewals never break proxy rewrites
+if (
+	process.env.ALLOW_INSECURE_TLS !== "false" &&
+	process.env.NEXT_PUBLIC_ALLOW_INSECURE_TLS !== "false"
+) {
 	process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 

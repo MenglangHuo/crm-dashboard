@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { decodeToken, encodeToken } from "@/lib/server/api";
 import { resolveProfile } from "@/lib/server/db";
 import { env } from "@/lib/config/env";
+import { getFetchOptions } from "@/lib/server/fetch-agent";
 
 const ACCESS_COOKIE = "crm_access_token";
 const REFRESH_COOKIE = "crm_refresh_token";
@@ -101,15 +102,18 @@ export async function refreshAuthCookies() {
 
 	if (apiBaseUrl) {
 		try {
-			const response = await fetch(`${apiBaseUrl}/auth/refresh-token`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Cookie: `${REFRESH_COOKIE}=${encodeURIComponent(refreshToken)}`,
-				},
-				body: JSON.stringify({ refreshToken }),
-				cache: "no-store",
-			});
+			const response = await fetch(
+				`${apiBaseUrl}/auth/refresh-token`,
+				getFetchOptions({
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Cookie: `${REFRESH_COOKIE}=${encodeURIComponent(refreshToken)}`,
+					},
+					body: JSON.stringify({ refreshToken }),
+					cache: "no-store",
+				}),
+			);
 
 			if (!response.ok) {
 				await clearAuthCookies();
