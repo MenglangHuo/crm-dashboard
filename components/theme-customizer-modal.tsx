@@ -8,13 +8,12 @@ import {
 	Moon,
 	Monitor,
 	Check,
-	RotateCcw,
 	Sparkles,
+	Play,
 } from "lucide-react";
 import {
 	ModernModal,
 	ModernModalFooter,
-	ModernModalCancelButton,
 } from "@/components/ui-custom/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useCustomTheme, THEME_PRESETS } from "./custom-theme-provider";
 import { ModernButton } from "./ui-custom/modern-button";
+import { useSplashScreen } from "@/components/splash-screen";
 
 export function ThemeCustomizerModal() {
 	const { theme, setTheme, resolvedTheme } = useTheme();
@@ -34,6 +34,11 @@ export function ThemeCustomizerModal() {
 		isCustomizerOpen,
 		setIsCustomizerOpen,
 	} = useCustomTheme();
+	const {
+		mode: splashMode,
+		setMode: setSplashMode,
+		showSplash,
+	} = useSplashScreen();
 
 	const isDark = resolvedTheme === "dark";
 
@@ -229,6 +234,58 @@ export function ThemeCustomizerModal() {
 							value="Sample Input with Focus Ring"
 							className="h-9 text-xs border-primary ring-2 ring-primary/20 rounded-xl"
 						/>
+					</div>
+				</div>
+
+				{/* 5. Splash Screen Experience */}
+				<div className="space-y-3 pt-2 border-t dark:border-slate-800">
+					<div className="flex items-center justify-between">
+						<div>
+							<span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 block">
+								Launch Splash Screen
+							</span>
+							<span className="text-[11px] font-medium text-slate-400">
+								Animated enterprise branded welcome experience
+							</span>
+						</div>
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							onClick={() => {
+								setIsCustomizerOpen(false);
+								setTimeout(() => {
+									showSplash({ preview: true });
+								}, 200);
+							}}
+							className="h-8 gap-1.5 text-xs font-semibold rounded-xl border-primary/30 text-primary hover:bg-primary/10 cursor-pointer shadow-2xs"
+						>
+							<Play className="h-3.5 w-3.5 fill-current" />
+							Preview Splash
+						</Button>
+					</div>
+
+					<div className="grid grid-cols-3 gap-2">
+						{(
+							[
+								{ key: "always", label: "Every Reload" },
+								{ key: "session", label: "Once per Session" },
+								{ key: "disabled", label: "Disabled" },
+							] as const
+						).map((opt) => (
+							<button
+								key={opt.key}
+								type="button"
+								onClick={() => setSplashMode(opt.key)}
+								className={`py-2 px-2.5 rounded-xl border text-center transition-all text-xs font-semibold cursor-pointer ${
+									splashMode === opt.key
+										? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20 shadow-2xs"
+										: "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 hover:border-slate-300"
+								}`}
+							>
+								{opt.label}
+							</button>
+						))}
 					</div>
 				</div>
 			</div>

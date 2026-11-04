@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/lib/config/env";
+
+// Enable development TLS bypass if configured
+if (env.allowInsecureTls) {
+	process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
 
 /**
  * Proxies Next.js API requests to the real backend server.
@@ -6,39 +12,35 @@ import { NextRequest, NextResponse } from "next/server";
  * are faithfully forwarded without local mock database interference or stale caching.
  */
 export async function proxyToBackend(req: NextRequest) {
-	let backendBase =
-		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
-		process.env.CRM_URL ||
-		(process.env.NEXT_PUBLIC_API_ENDPOINT
-			? process.env.NEXT_PUBLIC_API_ENDPOINT.startsWith("http")
-				? process.env.NEXT_PUBLIC_API_ENDPOINT
-				: `http://${process.env.NEXT_PUBLIC_API_ENDPOINT}`
-			: process.env.NEXT_PUBLIC_API_ENPOINT
-				? process.env.NEXT_PUBLIC_API_ENPOINT.startsWith("http")
-					? process.env.NEXT_PUBLIC_API_ENPOINT
-					: `http://${process.env.NEXT_PUBLIC_API_ENPOINT}`
-				: "https://crmapi.bronxtechnology.site");
+	let backendBase = env.apiBackendUrl;
 
 	const url = new URL(req.url);
 
-	// Guard against self-proxying: if backendBase is configured to the same host & port as this Next.js server
-	if (backendBase.includes(`:${url.port}`) || backendBase === url.origin) {
-		backendBase =
-			process.env.NEXT_PUBLIC_API_BACKEND_URL ||
-			"https://crmapi.bronxtechnology.site";
+	// Guard against self-proxying loop or missing backend configuration
+	if (!backendBase) {
+		return NextResponse.json(
+			{
+				success: false,
+				message:
+					"NEXT_PUBLIC_API_BACKEND_URL is not configured in environment.",
+				error: "BACKEND_NOT_CONFIGURED",
+			},
+			{ status: 500 },
+		);
 	}
 
-	let cleanBackendBase = backendBase.trim().replace(/\/+$/, "");
-	cleanBackendBase = cleanBackendBase.replace(/\/+(api(\/v1)?)?\/?$/, "");
-	if (!cleanBackendBase.startsWith("http://") && !cleanBackendBase.startsWith("https://")) {
-		cleanBackendBase = cleanBackendBase.includes("localhost")
-			? `http://${cleanBackendBase}`
-			: `https://${cleanBackendBase}`;
+	if (backendBase.includes(`:${url.port}`) || backendBase === url.origin) {
+		return NextResponse.json(
+			{
+				success: false,
+				message: `Misconfigured NEXT_PUBLIC_API_BACKEND_URL: points to Next.js server itself (${url.origin}). Set it to your backend API server.`,
+				error: "SELF_PROXY_LOOP_PREVENTED",
+			},
+			{ status: 500 },
+		);
 	}
-	if ((process.env.NODE_ENV === "production" || process.env.VERCEL) && cleanBackendBase.includes("localhost")) {
-		cleanBackendBase = "https://crmapi.bronxtechnology.site";
-	}
-	const targetUrl = `${cleanBackendBase}${url.pathname}${url.search}`;
+
+	const targetUrl = `${backendBase}${url.pathname}${url.search}`;
 
 	const headers = new Headers(req.headers);
 	headers.delete("host");

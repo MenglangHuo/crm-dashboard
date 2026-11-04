@@ -57,6 +57,7 @@ import { useCustomTheme } from "@/components/custom-theme-provider";
 import { usePermissions } from "@/hooks/use-permissions";
 import { isUserSystemAdmin } from "@/components/providers/company-context";
 import { useTranslation } from "@/lib/i18n/context";
+import { useSplashScreen } from "@/components/splash-screen";
 
 interface CommandActionItem {
 	id: string;
@@ -238,6 +239,7 @@ export function CommandPalette() {
 	const router = useRouter();
 	const { theme, setTheme } = useTheme();
 	const { setIsCustomizerOpen } = useCustomTheme();
+	const { showSplash } = useSplashScreen();
 	const { t } = useTranslation();
 	const { userProfile } = usePermissions();
 
@@ -926,6 +928,28 @@ export function CommandPalette() {
 					"customize theme brand colors palette radius styling appearance customizer modal shortcut brand theme custom colors primary color styling",
 				perform: () => {
 					setIsCustomizerOpen(true);
+				},
+			},
+			{
+				id: "action-preview-splash",
+				title: "Preview Splash Screen",
+				rawTitle: "Preview Splash Screen",
+				description:
+					"Play the enterprise animated launch splash screen experience",
+				badge: "Launch",
+				badgeType: "action",
+				icon: Sparkles,
+				color: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+				parentId: "nav-configurations",
+				parentTitle: "Configurations",
+				isSubItem: true,
+				keywords:
+					"splash screen launch animation preview welcome intro screen splashscreen animation play",
+				perform: () => {
+					setCommandPaletteOpen(false);
+					setTimeout(() => {
+						showSplash({ preview: true });
+					}, 200);
 				},
 			},
 			{

@@ -11,8 +11,12 @@ Modern, full-featured Customer Relationship Management (CRM) web dashboard built
 - [Tech Stack](#-tech-stack)
 - [Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
-  - [Installation & Local Run](#installation--local-run)
-- [Environment Variables](#-environment-variables)
+  - [Quick Start](#quick-start)
+- [Running Dev & Production Modes](#-running-dev--production-modes)
+- [Version Management](#-version-management)
+- [Environment Configuration](#-environment-configuration)
+- [Developer Tools & Ergonomics](#-developer-tools--ergonomics)
+- [Animated Splash Screen](#-animated-splash-screen)
 - [Deployment on Vercel](#-deployment-on-vercel)
 - [Troubleshooting: Vercel 404 API Error](#-troubleshooting-vercel-404-api-error)
 - [Project Structure](#-project-structure)
@@ -92,45 +96,118 @@ The CRM frontend is designed as a secure, high-performance single-page/server-re
 - **pnpm**: `v10.x` or `v11.x` (`npm install -g pnpm`)
 - Running Spring Boot Backend API (either local `http://localhost:8091` or remote `https://crmapi.bronxtechnology.site`)
 
-### Installation & Local Run
+### Quick Start
 
 1. **Clone the repository and navigate to `crm-dashboard`**:
    ```bash
    cd crm-dashboard
    ```
 
-2. **Set up Environment Variables**:
-   Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. **Install dependencies**:
+2. **Install dependencies**:
    ```bash
    pnpm install
+   # or npm install
    ```
 
-4. **Start the development server**:
+3. **Start local development**:
    ```bash
-   pnpm dev
-   ```
-   The application will start on **`http://localhost:4000`**.
-
-5. **Build for production**:
-   ```bash
-   pnpm build
-   pnpm start
+   npm run dev
+   # App will start on http://localhost:4000 targeting local API (http://localhost:8091)
    ```
 
 ---
 
-## ⚙️ Environment Variables
+## 🏃 Running Dev & Production Modes
 
-Create a `.env` file in the `crm-dashboard` root directory:
+The project cleanly separates development and production modes with dedicated npm scripts and scoped environment files:
+
+| Command | Target Backend API | Loaded Env File | Port | Purpose |
+|---|---|---|---|---|
+| `npm run dev` | `http://localhost:8091` | `.env.development` | `4000` | Local development against local Spring Boot |
+| `npm run dev:prod` | `https://crmapi.bronxtechnology.site` | `.env.production` | `4000` | Local development against remote Cloud API |
+| `npm run build` | `https://crmapi.bronxtechnology.site` | `.env.production` | - | Production build for deployment |
+| `npm run build:dev` | `http://localhost:8091` | `.env.development` | - | Staging/local production build verification |
+| `npm run start` | Built target | - | `4000` | Start production server after `build` |
+
+### How It Works Under the Hood
+- **`npm run dev`**: Runs Next.js standard dev server (`next dev -p 4000`), automatically loading `.env.development` where `NEXT_PUBLIC_API_BACKEND_URL=http://localhost:8091`.
+- **`npm run dev:prod`**: Uses `dotenv-cli` to pre-populate `process.env` from `.env.production` before Next.js initializes (`dotenv -e .env.production -- next dev -p 4000`), routing local requests to the live cloud backend.
+- **Node TLS Bypass in Dev**: In local development, `next.config.mjs` sets `NODE_TLS_REJECT_UNAUTHORIZED = '0'` so developers can test against any backend without SSL certificate blocks. In production builds, full TLS certificate verification is strictly enforced.
+
+---
+
+## 🔢 Version Management
+
+The system follows **Semantic Versioning (SemVer)**: `MAJOR.MINOR.PATCH` (e.g. `1.0.0`).
+
+### The Single Source of Truth
+The version is defined exclusively in [`package.json`](package.json) under `"version"`. It is directly imported by `lib/config/env.ts`, making it part of the React/Turbopack module dependency graph. When the version changes:
+- **Hot Module Reloading (Fast Refresh)**: Automatically detects the change and updates the UI live without server restarts.
+- **Admin Sidebar**: Displays `v{env.appVersion}` in the "System Online" health banner.
+- **Splash Screen**: Displays `v{env.appVersion}` under the animated progress bar.
+
+### How to Bump the Version
+
+#### Option 1: Built-in Helper Scripts (Recommended)
+```bash
+# Bump patch for bug fixes & minor tweaks: 1.0.0 -> 1.0.1
+npm run version:patch
+
+# Bump minor for new features: 1.0.1 -> 1.1.0
+npm run version:minor
+
+# Bump major for breaking changes: 1.1.0 -> 2.0.0
+npm run version:major
+```
+
+#### Option 2: Standard npm / pnpm CLI
+```bash
+# Set specific version without git commit/tag:
+npm version 1.2.0 --no-git-tag-version
+
+# Or standard semver:
+npm version patch --no-git-tag-version
+```
+
+#### Option 3: Manual Edit
+Open [`package.json`](package.json) and edit line 3:
+```json
+{
+  "name": "crm-admin-dashboard",
+  "version": "1.0.0",
+  ...
+}
+```
+
+---
+
+## ⚙️ Environment Configuration
+
+### Centralized Architecture (`lib/config/env.ts`)
+Instead of reading raw `process.env` scattered across components, all runtime configuration is strongly typed and validated through a single module:
+
+```typescript
+import { env } from "@/lib/config/env";
+
+console.log(env.apiBackendUrl); // Fully normalized target backend URL
+console.log(env.appVersion);    // Reactive app version from package.json
+console.log(env.isDev);         // Boolean true only in development
+```
+
+### Environment Files
+
+| File | Purpose | Committed to Git? |
+|---|---|:---:|
+| `.env.development` | Default variables for local dev (`http://localhost:8091`) | Yes |
+| `.env.production` | Production variables for cloud deployment (`https://crmapi.bronxtechnology.site`) | Yes |
+| `.env` | Local overrides (takes highest priority in Next.js) | No (gitignored) |
+| `.env.example` | Template reference with setup instructions | Yes |
+
+### Environment Variables Reference
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `NEXT_PUBLIC_API_BACKEND_URL` | **Yes** | `http://localhost:8091` | The target Spring Boot API server URL used by Next.js rewrites and server proxy. **Set to `https://crmapi.bronxtechnology.site` in production.** |
+| `NEXT_PUBLIC_API_BACKEND_URL` | **Yes** | `http://localhost:8091` | The target Spring Boot API server URL used by Next.js rewrites and server proxy. Set to `https://crmapi.bronxtechnology.site` in production. |
 | `NEXT_PUBLIC_API_BASE_URL` | **Yes** | `/api/v1` | Relative base path for browser API client calls (same-origin). |
 | `NEXT_PUBLIC_API_TIMEOUT` | No | `15000` | Axios HTTP timeout in milliseconds. |
 | `NEXT_PUBLIC_COMPANY_NAME` | No | `Crm` | Company display name in the navigation header. |
@@ -142,6 +219,28 @@ Create a `.env` file in the `crm-dashboard` root directory:
 | `NEXT_PUBLIC_COMPANY_SUPPORT_EMAIL` | No | `support@crm.com` | Support contact email displayed in help links. |
 
 ---
+
+## 🩺 Developer Tools & Ergonomics
+
+### Header Live API Target Badge
+When running in **development mode**, an interactive telemetry badge is displayed in the navigation header:
+- **Local Dev (`npm run dev`)**: Amber badge `DEV • http://localhost:8091`.
+- **Remote Dev (`npm run dev:prod`)**: Rose warning badge `DEV (REMOTE) • https://crmapi.bronxtechnology.site`, providing immediate visual feedback that operations mutate live cloud data.
+- **Click-to-Copy**: Click the badge to copy the active backend URL to your clipboard with a confirmation toast.
+- **Production Safety**: In production mode (`NODE_ENV === "production"`), the badge component returns `null` and is tree-shaken from the production bundle (0 DOM elements, 0 bundle overhead).
+
+---
+
+## 🎨 Animated Splash Screen
+
+An enterprise, Meta-grade animated splash screen displays upon application entry:
+- **Smooth Entry Sequence**: Subtle ambient background blur aura, floating glassmorphic brand card, and animated progress bar with a light-pass shimmer.
+- **Intelligent Caching**: Configured via `SplashScreenProvider` with three lifecycle policies:
+  - `session` (default): Displays once per browser session via `sessionStorage`.
+  - `always`: Re-runs on every full page refresh.
+  - `disabled`: Bypasses the splash screen.
+- **Accessibility & Escape**: Respects `prefers-reduced-motion` and supports instant skipping via the `Esc` key or the "Skip" action button.
+- **Preview Triggers**: Can be previewed anytime from **Theme Customizer** or the **Command Palette (`Cmd + K` / `Ctrl + K` → "Preview Splash Screen")**.
 
 ## 🚢 Deployment on Vercel
 
@@ -294,10 +393,18 @@ crm-dashboard/
 
 In the project directory, you can run:
 
-- `pnpm dev`: Runs the app in development mode on `http://localhost:4000`.
-- `pnpm build`: Builds the production bundle.
-- `pnpm start`: Starts the Next.js production server.
-- `pnpm lint`: Runs ESLint to check for code style and syntax issues.
+| Script | Command | Description |
+|---|---|---|
+| `dev` | `next dev -p 4000` | Start dev server on port 4000 with local backend (`.env.development`) |
+| `dev:prod` | `dotenv -e .env.production -- next dev -p 4000` | Start dev server on port 4000 with remote cloud backend (`.env.production`) |
+| `build` / `build:prod` | `next build` | Create optimized production bundle targeting production API |
+| `build:dev` | `dotenv -e .env.development -- next build` | Create production bundle targeting local development API |
+| `start` | `next start -p 4000` | Start production server on port 4000 after building |
+| `typecheck` | `tsc --noEmit` | Validate TypeScript types across the entire project |
+| `lint` | `eslint .` | Check for code quality and syntax issues |
+| `version:patch` | `npm version patch --no-git-tag-version` | Bump patch version in `package.json` (`1.0.0` → `1.0.1`) |
+| `version:minor` | `npm version minor --no-git-tag-version` | Bump minor version in `package.json` (`1.0.1` → `1.1.0`) |
+| `version:major` | `npm version major --no-git-tag-version` | Bump major version in `package.json` (`1.1.0` → `2.0.0`) |
 
 ---
 

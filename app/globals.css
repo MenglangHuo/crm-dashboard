@@ -164,3 +164,180 @@
     @apply font-heading;
   }
 }
+
+/* Splash Screen TripAdvisor-Inspired Motion Choreography */
+@keyframes splash-spring-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes splash-ring-expand {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  30% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+@keyframes splash-gleam {
+  0% {
+    transform: translateX(-180%) skewX(-25deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(260%) skewX(-25deg);
+    opacity: 0;
+  }
+}
+
+@keyframes splash-slide-up {
+  0% {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes splash-pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.4;
+  }
+}
+
+@keyframes splash-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.splash-spring {
+  animation: splash-spring-in 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.splash-ring-1 {
+  animation: splash-ring-expand 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-delay: 0s;
+  @media (prefers-reduced-motion: reduce) { display: none; }
+}
+
+.splash-ring-2 {
+  animation: splash-ring-expand 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-delay: 0.35s;
+  @media (prefers-reduced-motion: reduce) { display: none; }
+}
+
+.splash-ring-3 {
+  animation: splash-ring-expand 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-delay: 0.7s;
+  @media (prefers-reduced-motion: reduce) { display: none; }
+}
+
+.splash-ring-4 {
+  animation: splash-ring-expand 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-delay: 1.05s;
+  @media (prefers-reduced-motion: reduce) { display: none; }
+}
+
+.splash-ring-5 {
+  animation: splash-ring-expand 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-delay: 1.4s;
+  @media (prefers-reduced-motion: reduce) { display: none; }
+}
+
+.splash-ring-6 {
+  animation: splash-ring-expand 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-delay: 1.75s;
+  @media (prefers-reduced-motion: reduce) { display: none; }
+}
+
+.splash-ring-7 {
+  animation: splash-ring-expand 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-delay: 2.1s;
+  @media (prefers-reduced-motion: reduce) { display: none; }
+}
+
+.splash-ring-8 {
+  animation: splash-ring-expand 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-delay: 2.45s;
+  @media (prefers-reduced-motion: reduce) { display: none; }
+}
+
+.splash-gleam {
+  animation: splash-gleam 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-delay: 0.3s;
+  @media (prefers-reduced-motion: reduce) {
+    display: none;
+  }
+}
+
+.splash-slide-up {
+  animation: splash-slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.splash-slide-up-delay {
+  animation: splash-slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.splash-glow {
+  animation: splash-pulse-glow 3.5s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0.25;
+  }
+}
+
+.splash-float {
+  animation: splash-float 3.5s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: none;
+  }
+}

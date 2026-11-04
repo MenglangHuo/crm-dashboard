@@ -265,7 +265,7 @@ function SignInForm() {
 					}
 				}
 				await setAuthCookies(token, refreshToken, companyId, sessionId);
-				toast.success("Authentication successful! Welcome back.");
+				toast.success("Authentication successful! Welcome To Dashboard Admin.");
 
 				window.location.href = returnUrl;
 			} else {
@@ -392,7 +392,7 @@ function SignInForm() {
 									required
 									placeholder={t(
 										"auth.usernameOrEmailPlaceholder",
-										"bronx@dmin or your.email@company.com",
+										"username or phone number",
 									)}
 									{...form.register("username")}
 									className="h-11 sm:h-12 rounded-xl border-slate-200/90 bg-slate-50/50 pl-11 pr-4 text-sm text-slate-900 transition-all placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-600/10 dark:border-slate-800 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-950"

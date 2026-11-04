@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeToken, encodeToken } from "@/lib/server/api";
 import { resolveProfile } from "@/lib/server/db";
+import { env } from "@/lib/config/env";
 
 const ACCESS_COOKIE = "crm_access_token";
 const REFRESH_COOKIE = "crm_refresh_token";
@@ -8,40 +9,15 @@ const COMPANY_COOKIE = "crm_company_id";
 const ACCESS_TTL = 1000 * 60 * 60; // 1 hour
 
 function getBackendRefreshUrls(): string[] {
-	const backendUrl =
-		process.env.NEXT_PUBLIC_API_BACKEND_URL ||
-		process.env.CRM_URL ||
-		"https://crmapi.bronxtechnology.site";
-	let cleanBackend = backendUrl.endsWith("/")
-		? backendUrl.slice(0, -1)
-		: backendUrl;
-	if ((process.env.NODE_ENV === "production" || process.env.VERCEL) && cleanBackend.includes("localhost")) {
-		cleanBackend = "https://crmapi.bronxtechnology.site";
-	}
-	const apiEndpoint =
-		process.env.NEXT_PUBLIC_API_ENDPOINT ||
-		process.env.NEXT_PUBLIC_API_ENPOINT;
-	const cleanEndpoint = apiEndpoint
-		? apiEndpoint.startsWith("http")
-			? apiEndpoint.replace(/\/+$/, "")
-			: `http://${apiEndpoint.replace(/\/+$/, "")}`
-		: null;
-
-	const roots = [cleanBackend, ...(cleanEndpoint ? [cleanEndpoint] : [])];
+	const root = env.apiBackendUrl;
+	if (!root) return [];
 	const paths = [
 		"/api/v1/auth/refresh-token",
 		"/api/auth/refresh-token",
 		"/v1/auth/refresh-token",
 		"/auth/refresh-token",
 	];
-
-	const urls: string[] = [];
-	for (const root of roots) {
-		for (const p of paths) {
-			urls.push(`${root}${p}`);
-		}
-	}
-	return urls;
+	return paths.map((p) => `${root}${p}`);
 }
 
 export async function POST(request: NextRequest) {

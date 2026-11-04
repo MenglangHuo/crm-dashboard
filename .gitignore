@@ -16,7 +16,10 @@ node_modules
 .env
 .agents
 .codex
-.next
 .vercel
 .env.development
+<<<<<<< HEAD
 .env.production
+=======
+.env.production
+>>>>>>> 2e8f51818cc724690b712b3a9283d480c3494eaa

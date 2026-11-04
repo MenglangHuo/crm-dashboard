@@ -22,6 +22,7 @@ import { clearClientSession } from "@/lib/api/client";
 import { authApi, fileUrl, profileApi } from "@/lib/api/endpoints";
 import { useTranslation } from "@/lib/i18n/context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { env } from "@/lib/config/env";
 import {
 	ChevronDown,
 	HelpCircle,
@@ -91,9 +92,56 @@ function HeaderGreeting() {
 
 	return (
 		<>
-		
 			<span suppressHydrationWarning>{greetingText}</span>
 		</>
+	);
+}
+
+/**
+ * Development-only API endpoint badge.
+ * Strictly returns null in production builds (zero DOM and bundle footprint in prod).
+ * Allows developers in dev mode to see the live target backend and click to copy.
+ */
+function DevApiBadge() {
+	if (!env.isDev) {
+		return null;
+	}
+
+	const rawUrl = env.apiBackendUrl || "http://localhost:8091";
+	const isLocal =
+		!env.apiBackendUrl ||
+		env.apiBackendUrl.includes("localhost") ||
+		env.apiBackendUrl.includes("127.0.0.1");
+
+	const handleCopy = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		if (typeof navigator !== "undefined" && navigator.clipboard) {
+			navigator.clipboard.writeText(rawUrl);
+			toast.info(`Copied API endpoint: ${rawUrl}`);
+		}
+	};
+
+	return (
+		<button
+			type="button"
+			onClick={handleCopy}
+			className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border shadow-2xs max-w-[340px] truncate cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] select-none ${
+				isLocal
+					? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20"
+					: "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/20"
+			}`}
+			title={`Development Mode • Backend API: ${rawUrl}\nClick to copy URL`}
+		>
+			<span
+				className={`size-1.5 rounded-full animate-pulse shrink-0 ${
+					isLocal ? "bg-amber-500" : "bg-rose-500"
+				}`}
+			/>
+			<span className="shrink-0 font-extrabold">
+				{isLocal ? "DEV •" : "DEV (REMOTE) •"}
+			</span>
+			<span className="truncate lowercase font-normal">{rawUrl}</span>
+		</button>
 	);
 }
 
@@ -157,7 +205,7 @@ export function Header() {
 				<div className="hidden sm:block">
 					<h2 className="text-base font-bold leading-snug tracking-tight text-slate-950 dark:text-white flex items-center gap-2">
 						<HeaderGreeting />
-						<span className="inline-flex items-center gap-1">
+						<span className="inline-flex items-center gap-1.5">
 							{userName ? (
 								<span>• {userName}</span>
 							) : userProfile?.username ? (
@@ -165,6 +213,7 @@ export function Header() {
 							) : isLoadingProfile && !userProfile ? (
 								<Skeleton className="h-4 w-28 ml-1 inline-block align-middle" />
 							) : null}
+							<DevApiBadge />
 						</span>
 					</h2>
 					<div className="text-xs font-medium text-slate-400 dark:text-slate-500 min-h-[18px] flex items-center">
