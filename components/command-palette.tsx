@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
 	Search,
@@ -237,6 +237,15 @@ export function CommandPalette() {
 	} = useQuickActions();
 
 	const router = useRouter();
+	const pathname = usePathname();
+	const isAuthPage = Boolean(
+		pathname &&
+			(pathname.startsWith("/sign-in") ||
+				pathname.startsWith("/forgot-password") ||
+				pathname.startsWith("/reset-password") ||
+				pathname.startsWith("/register-company") ||
+				pathname.startsWith("/set-new-password")),
+	);
 	const { theme, setTheme } = useTheme();
 	const { setIsCustomizerOpen } = useCustomTheme();
 	const { showSplash } = useSplashScreen();
@@ -1209,6 +1218,10 @@ export function CommandPalette() {
 			</CommandItem>
 		);
 	};
+
+	if (isAuthPage) {
+		return null;
+	}
 
 	return (
 		<CommandDialog

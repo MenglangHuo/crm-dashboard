@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/config/env";
+import { getFetchOptions } from "@/lib/server/fetch-agent";
 
-// Enable development TLS bypass if configured
+// Enable TLS bypass if configured
 if (env.allowInsecureTls) {
 	process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
@@ -12,11 +13,15 @@ if (env.allowInsecureTls) {
  * are faithfully forwarded without local mock database interference or stale caching.
  */
 export async function proxyToBackend(req: NextRequest) {
-	let backendBase = env.apiBackendUrl;
+	let backendBase =
+		env.apiBackendUrl ||
+		(process.env.NODE_ENV === "production"
+			? "https://crmapi.bronxtechnology.site"
+			: "http://localhost:8091");
 
 	const url = new URL(req.url);
 
-	// Guard against self-proxying loop or missing backend configuration
+	// Guard against missing backend configuration
 	if (!backendBase) {
 		return NextResponse.json(
 			{
@@ -29,7 +34,20 @@ export async function proxyToBackend(req: NextRequest) {
 		);
 	}
 
-	if (backendBase.includes(`:${url.port}`) || backendBase === url.origin) {
+	let isSelfProxy = false;
+	try {
+		const targetParsed = new URL(backendBase);
+		isSelfProxy =
+			targetParsed.host === url.host ||
+			(Boolean(url.port) && backendBase.includes(`:${url.port}`)) ||
+			backendBase === url.origin;
+	} catch {
+		isSelfProxy =
+			(Boolean(url.port) && backendBase.includes(`:${url.port}`)) ||
+			backendBase === url.origin;
+	}
+
+	if (isSelfProxy) {
 		return NextResponse.json(
 			{
 				success: false,
@@ -59,12 +77,15 @@ export async function proxyToBackend(req: NextRequest) {
 	}
 
 	try {
-		const res = await fetch(targetUrl, {
-			method,
-			headers,
-			body,
-			cache: "no-store",
-		});
+		const res = await fetch(
+			targetUrl,
+			getFetchOptions({
+				method,
+				headers,
+				body,
+				cache: "no-store",
+			}),
+		);
 
 		const resHeaders = new Headers(res.headers);
 		// Remove encoding headers that fetch handles automatically
@@ -83,6 +104,7 @@ export async function proxyToBackend(req: NextRequest) {
 			headers: resHeaders,
 		});
 	} catch (err: any) {
+		console.error(`[proxyToBackend] Failed to connect to ${targetUrl}:`, err);
 		return NextResponse.json(
 			{
 				success: false,
