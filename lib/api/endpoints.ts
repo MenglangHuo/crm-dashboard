@@ -393,6 +393,23 @@ export const sessionsApi = {
 // ---- Profile -------------------------------------------------
 export const profileApi = {
 	me: async (): Promise<any> => {
+		if (typeof window !== "undefined") {
+			const hasToken =
+				Boolean(localStorage.getItem("crm_access_token")) ||
+				document.cookie.includes("crm_access_token");
+			const path = window.location.pathname;
+			const isAuthPage =
+				path.startsWith("/sign-in") ||
+				path.startsWith("/forgot-password") ||
+				path.startsWith("/reset-password") ||
+				path.startsWith("/register-company") ||
+				path.startsWith("/set-new-password");
+
+			if (!hasToken || isAuthPage) {
+				return null;
+			}
+		}
+
 		const res = await api.get<any>("/me", {
 			headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
 		});

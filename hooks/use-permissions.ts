@@ -2,6 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import { profileApi } from "@/lib/api/endpoints";
 import {
 	extractAllAuthorities,
@@ -12,6 +13,7 @@ import {
 	checkCanAny,
 	checkCanAll,
 	normalizePermissionKey,
+	getClientAccessToken,
 	PermissionResource,
 	PermissionAction,
 	type PermissionCheckItem,
@@ -26,11 +28,23 @@ export {
 const emptySubscribe = () => () => {};
 
 export function usePermissions() {
+	const pathname = usePathname();
+	const isAuthPage = Boolean(
+		pathname &&
+			(pathname.startsWith("/sign-in") ||
+				pathname.startsWith("/forgot-password") ||
+				pathname.startsWith("/reset-password") ||
+				pathname.startsWith("/register-company") ||
+				pathname.startsWith("/set-new-password")),
+	);
+
 	const isMounted = useSyncExternalStore(
 		emptySubscribe,
 		() => true,
 		() => false,
 	);
+
+	const hasToken = isMounted && !isAuthPage && Boolean(getClientAccessToken());
 
 	const {
 		data: userProfile,
@@ -39,6 +53,7 @@ export function usePermissions() {
 	} = useQuery({
 		queryKey: ["profile"],
 		queryFn: profileApi.me,
+		enabled: hasToken,
 		staleTime: 5 * 60 * 1000,
 	});
 
