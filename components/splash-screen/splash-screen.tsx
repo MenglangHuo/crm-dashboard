@@ -204,20 +204,7 @@ export function SplashScreen() {
 				</div>
 
 				{/* Brand Typography & Tagline (Smooth Staggered Slide-Up) */}
-				<div className="space-y-2 splash-slide-up pt-1">
-					<div className="flex items-center justify-center gap-2.5">
-						<h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-heading text-slate-900 dark:text-white">
-							CRM Dashboard
-						</h1>
-						<span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
-							<span className="size-1.5 rounded-full bg-primary animate-pulse" />
-							PRO
-						</span>
-					</div>
-					<p className="text-xs sm:text-sm font-normal text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed mx-auto splash-slide-up-delay">
-						Enterprise Resource Planning & Multi-Tenant Operations
-					</p>
-				</div>
+				
 
 				{/* Subtle Ambient Live Status Pill */}
 				<div className="splash-slide-up-delay pt-0.5">

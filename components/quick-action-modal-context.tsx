@@ -160,9 +160,21 @@ export function QuickActionProvider({
 		[],
 	);
 
-	// Listen for Ctrl+K or Cmd+K
+	// Listen for Ctrl+K or Cmd+K (disabled on auth pages)
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
+			if (typeof window !== "undefined") {
+				const path = window.location.pathname;
+				if (
+					path.startsWith("/sign-in") ||
+					path.startsWith("/forgot-password") ||
+					path.startsWith("/reset-password") ||
+					path.startsWith("/register-company") ||
+					path.startsWith("/set-new-password")
+				) {
+					return;
+				}
+			}
 			if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
 				e.preventDefault();
 				setCommandPaletteOpenState((prev) => !prev);

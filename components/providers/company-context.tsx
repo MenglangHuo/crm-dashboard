@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { companiesApi, profileApi } from "@/lib/api/endpoints";
+import { getClientAccessToken } from "@/lib/auth-permissions";
 import { Company } from "@/lib/types";
 
 interface CompanyContextType {
@@ -166,9 +167,12 @@ function setStoredIsSystemAdmin(isAdmin: boolean) {
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
 	const queryClient = useQueryClient();
 
+	const hasToken =
+		typeof window !== "undefined" && Boolean(getClientAccessToken());
 	const { data: userProfile } = useQuery({
 		queryKey: ["profile"],
 		queryFn: profileApi.me,
+		enabled: hasToken,
 		staleTime: 5 * 60 * 1000,
 	});
 

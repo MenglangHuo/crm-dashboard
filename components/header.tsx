@@ -20,6 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { clearClientSession } from "@/lib/api/client";
 import { authApi, fileUrl, profileApi } from "@/lib/api/endpoints";
+import { getClientAccessToken } from "@/lib/auth-permissions";
 import { useTranslation } from "@/lib/i18n/context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { env } from "@/lib/config/env";
@@ -152,9 +153,12 @@ export function Header() {
 	const { t } = useTranslation();
 	const { setCommandPaletteOpen } = useQuickActions();
 
+	const hasToken =
+		typeof window !== "undefined" && Boolean(getClientAccessToken());
 	const { data: userProfile, isLoading: isLoadingProfile } = useQuery({
 		queryKey: ["profile"],
 		queryFn: profileApi.me,
+		enabled: hasToken,
 		staleTime: 5 * 60 * 1000,
 	});
 
