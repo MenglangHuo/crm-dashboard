@@ -75,7 +75,6 @@ export function PermissionGuard({
 }: PermissionGuardProps) {
 	const { t } = useTranslation();
 	const {
-		isMounted,
 		isLoading,
 		userProfile,
 		isAdmin,
@@ -84,11 +83,28 @@ export function PermissionGuard({
 		canAll,
 	} = usePermissions();
 
-	// Guard against hydration mismatch or initial unpopulated state:
-	// Render graceful loading state before mounting or while fetching the user's profile
-	if (!isMounted || (isLoading && !userProfile)) {
+	const [isClient, setIsClient] = React.useState(false);
+	React.useEffect(() => {
+		setIsClient(true);
+	}, []);
+
+	// Render children during SSR and initial client hydration pass to ensure identical DOM tree
+	if (!isClient) {
+		return <>{children}</>;
+	}
+
+	// Platform administrators bypass all business permission checks
+	if (isAdmin) {
+		return <>{children}</>;
+	}
+
+	// While fetching the user's profile on client, show graceful loading state if not loaded yet
+	if (isLoading && !userProfile) {
 		return (
-			<div className="flex flex-col items-center justify-center min-h-[420px] w-full p-8 space-y-4">
+			<div
+				suppressHydrationWarning
+				className="flex flex-col items-center justify-center min-h-[420px] w-full p-8 space-y-4"
+			>
 				<div className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse">
 					<Lock className="size-6 text-slate-400 dark:text-slate-500" />
 				</div>
@@ -98,11 +114,6 @@ export function PermissionGuard({
 				</div>
 			</div>
 		);
-	}
-
-	// Platform administrators bypass all business permission checks
-	if (isAdmin) {
-		return <>{children}</>;
 	}
 
 	let allowed = true;

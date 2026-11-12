@@ -466,7 +466,7 @@ export function AppSidebar() {
 								<span className="font-bold text-base tracking-tight text-slate-900 dark:text-white">
 									CRM <span className="text-primary">App</span>
 								</span>
-								<span
+								<div
 									suppressHydrationWarning
 									className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-0.5 truncate"
 								>
@@ -479,7 +479,7 @@ export function AppSidebar() {
 									) : (
 										t("common.operationalPortal", "Operational Portal")
 									)}
-								</span>
+								</div>
 							</div>
 						</Link>
 					</SidebarMenuItem>
