@@ -214,6 +214,7 @@ export function SubscribeTab({
 	const { data: featureCatalog = [] } = useQuery({
 		queryKey: ["subscription-features-list"],
 		queryFn: () => featuresApi.list(),
+		enabled: Boolean(isSystemAdmin),
 		staleTime: 10 * 60 * 1000,
 	});
 

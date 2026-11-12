@@ -162,6 +162,11 @@ export function Header() {
 		staleTime: 5 * 60 * 1000,
 	});
 
+	const [isMounted, setIsMounted] = React.useState(false);
+	React.useEffect(() => {
+		setIsMounted(true);
+	}, []);
+
 	const isSystemAdmin = isUserSystemAdmin(userProfile);
 	const userName = userProfile?.firstName
 		? `${userProfile.firstName} ${userProfile.lastName || ""}`.trim()
@@ -175,6 +180,12 @@ export function Header() {
 			: userProfile?.roles?.[0]?.name
 				? `@${userProfile.roles[0].name.toLowerCase()}`
 				: "";
+
+	const showProfileSkeleton = isMounted && isLoadingProfile && !userProfile;
+	const displayedUserName = isMounted ? userName : "";
+	const displayedUsername = isMounted ? userProfile?.username : undefined;
+	const displayedCompanyName = isMounted ? companyName : "";
+	const displayedUserRole = isMounted ? userRole : "";
 
 	const queryClient = useQueryClient();
 
@@ -194,11 +205,12 @@ export function Header() {
 		}
 	};
 
-	const avatarSrc =
-		userProfile?.avatarUrl ||
-		userProfile?.imageUrl ||
-		fileUrl(userProfile?.avatarKey) ||
-		"";
+	const avatarSrc = isMounted
+		? userProfile?.avatarUrl ||
+			userProfile?.imageUrl ||
+			fileUrl(userProfile?.avatarKey) ||
+			""
+		: "";
 
 	return (
 		<header className="sticky top-0 z-20 flex h-20 shrink-0 items-center justify-between border-b border-slate-200/70 bg-white/82 px-4 shadow-sm shadow-slate-200/40 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/82 dark:shadow-black/20 md:px-8">
@@ -209,23 +221,23 @@ export function Header() {
 				<div className="hidden sm:block">
 					<h2 className="text-base font-bold leading-snug tracking-tight text-slate-950 dark:text-white flex items-center gap-2">
 						<HeaderGreeting />
-						<span className="inline-flex items-center gap-1.5">
-							{userName ? (
-								<span>• {userName}</span>
-							) : userProfile?.username ? (
-								<span>• {userProfile.username}</span>
-							) : isLoadingProfile && !userProfile ? (
+						<span suppressHydrationWarning className="inline-flex items-center gap-1.5">
+							{displayedUserName ? (
+								<span>• {displayedUserName}</span>
+							) : displayedUsername ? (
+								<span>• {displayedUsername}</span>
+							) : showProfileSkeleton ? (
 								<Skeleton className="h-4 w-28 ml-1 inline-block align-middle" />
 							) : null}
 							<DevApiBadge />
 						</span>
 					</h2>
-					<div className="text-xs font-medium text-slate-400 dark:text-slate-500 min-h-[18px] flex items-center">
-						{isLoadingProfile && !userProfile ? (
+					<div suppressHydrationWarning className="text-xs font-medium text-slate-400 dark:text-slate-500 min-h-[18px] flex items-center">
+						{showProfileSkeleton ? (
 							<Skeleton className="h-3 w-40 my-0.5" />
-						) : companyName ? (
-							<span>{companyName} • {t("common.operationalPortal", "Operational Portal")}</span>
-						) : isSystemAdmin ? (
+						) : displayedCompanyName ? (
+							<span>{displayedCompanyName} • {t("common.operationalPortal", "Operational Portal")}</span>
+						) : isMounted && isSystemAdmin ? (
 							<span>{t("common.systemAdminPortal", "System Admin Portal")}</span>
 						) : (
 							<span>{t("common.operationalPortal", "Operational Portal")}</span>
@@ -312,11 +324,11 @@ export function Header() {
 									<AvatarFallback
 										className="rounded-xl bg-primary/10 text-xs font-bold text-primary"
 									>
-										{userProfile?.firstName?.[0] ||
-										userProfile?.username?.[0] ? (
+										{displayedUsername?.[0] ||
+										displayedUserName?.[0] ? (
 											(
-												userProfile.firstName?.[0] ||
-												userProfile.username?.[0]
+												displayedUsername?.[0] ||
+												displayedUserName?.[0]
 											).toUpperCase()
 										) : (
 											<User className="h-4 w-4" />
@@ -326,22 +338,25 @@ export function Header() {
 								<span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-950" />
 							</div>
 
-							<div className="hidden sm:flex flex-col text-left">
+							<div
+								suppressHydrationWarning
+								className="hidden sm:flex flex-col text-left"
+							>
 								<span className="text-xs font-bold leading-tight text-slate-950 dark:text-white max-w-[130px] truncate">
-									{isLoadingProfile && !userProfile ? (
+									{showProfileSkeleton ? (
 										<Skeleton className="h-3 w-16 my-0.5" />
 									) : (
-										companyName ||
-										userName ||
-										userProfile?.username ||
+										displayedCompanyName ||
+										displayedUserName ||
+										displayedUsername ||
 										t("header.myAccount")
 									)}
 								</span>
 								<span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 flex items-center gap-1">
-									{isLoadingProfile && !userProfile ? (
+									{showProfileSkeleton ? (
 										<Skeleton className="h-2 w-12" />
 									) : (
-										userRole || ""
+										displayedUserRole || ""
 									)}
 								</span>
 							</div>
