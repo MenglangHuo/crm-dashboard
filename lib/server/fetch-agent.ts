@@ -7,16 +7,19 @@ if (env.allowInsecureTls) {
 		process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 	}
 	try {
+		// Use dynamic require so bundlers without undici installed during build won't fail
 		// eslint-disable-next-line @typescript-eslint/no-require-imports
-		const { Agent, setGlobalDispatcher } = require("undici");
-		cachedDispatcher = new Agent({
-			connect: {
-				rejectUnauthorized: false,
-			},
-		});
-		setGlobalDispatcher(cachedDispatcher);
+		const undici = require("undici");
+		if (undici && undici.Agent && undici.setGlobalDispatcher) {
+			cachedDispatcher = new undici.Agent({
+				connect: {
+					rejectUnauthorized: false,
+				},
+			});
+			undici.setGlobalDispatcher(cachedDispatcher);
+		}
 	} catch {
-		// Ignore if undici is not directly requireable
+		// Ignore if undici is not directly requireable in the runtime environment
 	}
 }
 
