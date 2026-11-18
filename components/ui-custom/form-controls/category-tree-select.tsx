@@ -1,32 +1,32 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { categoriesApi } from "@/lib/api/endpoints";
+import { Category } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import {
+	Check,
+	ChevronDown,
+	ChevronRight,
+	CornerDownRight,
+	Folder,
+	FolderOpen,
+	Layers,
+	Loader2,
+	Search,
+	Tag,
+	X,
+} from "lucide-react";
 import React, {
-	useState,
+	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
-	useCallback,
+	useState,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-	Folder,
-	FolderOpen,
-	Tag,
-	ChevronRight,
-	ChevronDown,
-	Check,
-	Search,
-	X,
-	Loader2,
-	Layers,
-	CornerDownRight,
-} from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { categoriesApi } from "@/lib/api/endpoints";
-import { Category } from "@/lib/types";
 const useIsomorphicLayoutEffect =
 	typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
 
@@ -194,7 +194,7 @@ export function CategoryTreeSelect({
 	className,
 	selectSize = "sm",
 	portal = true,
-	allowSelectParent = true,
+	allowSelectParent: _allowSelectParent = true,
 }: CategoryTreeSelectProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");

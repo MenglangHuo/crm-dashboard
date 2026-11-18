@@ -95,8 +95,8 @@ export default function CompaniesPage() {
 	const [statusFilter, setStatusFilter] = useState<string>("ALL");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
-	const [sortBy, setSortBy] = useState("createdAt");
-	const [orderBy, setOrderBy] = useState<"ASC" | "DESC">("DESC");
+	const [sortBy, _setSortBy] = useState("createdAt");
+	const [orderBy, _setOrderBy] = useState<"ASC" | "DESC">("DESC");
 
 	// Modals & Interactivity State
 	const [isCreateOpen, setIsCreateOpen] = useState(false);

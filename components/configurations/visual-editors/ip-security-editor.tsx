@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldCheck, Plus, X, Globe, Network, Lock, Info } from "lucide-react";
+import { ShieldCheck, Plus, X, Globe, Network } from "lucide-react";
 
 export interface IpSecurityConfig {
 	enabled: boolean;

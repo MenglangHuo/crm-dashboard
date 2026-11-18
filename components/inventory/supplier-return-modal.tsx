@@ -6,7 +6,6 @@ import {
 	InventoryImport,
 	SupplierReturn,
 	CreateSupplierReturnRequest,
-	SupplierReturnItemInput,
 } from "@/lib/types";
 import { supplierReturnsApi } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";
@@ -24,22 +23,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-	Truck,
-	Building2,
-	Calendar,
-	DollarSign,
 	Boxes,
 	RotateCcw,
-	AlertTriangle,
-	FileText,
 	CheckCircle2,
-	Package,
-	Layers,
 	Copy,
 	CheckCheck,
 	Printer,
-	ChevronRight,
-	Sparkles,
 } from "lucide-react";
 
 interface SupplierReturnModalProps {

@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import type { Attachment } from "@/lib/types";
 import { useAttachments } from "@/hooks/use-attachments";
-import { AttachmentCard, formatBytes } from "./attachment-card";
+import { AttachmentCard } from "./attachment-card";
 import { AttachmentDropzone, CATEGORY_OPTIONS } from "./attachment-dropzone";
 import { useTranslation } from "@/lib/i18n/context";
 

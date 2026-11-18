@@ -50,10 +50,10 @@ function getMockIncomeData() {
 	};
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
 	return ok(getMockIncomeData());
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
 	return ok(getMockIncomeData());
 }

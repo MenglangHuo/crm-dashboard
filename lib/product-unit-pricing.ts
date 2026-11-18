@@ -69,22 +69,23 @@ export function validateProductAddUnitsInput(input: ProductAddUnitsInput): void 
 		if (unitIds.has(unitId)) throw new Error(`Duplicate product unit: ${unitId}`);
 		unitIds.add(unitId);
 
-		const quantity = Number(unit.baseQuantity ?? 1);
-		const price = Number(unit.unitPrice);
-		if (!Number.isFinite(quantity) || quantity <= 0) {
-			throw new Error("Base quantity must be greater than zero");
-		}
-		if (!Number.isFinite(price) || price < 0) {
-			throw new Error("Unit price must be zero or greater");
+		const hasVariantPrices = Array.isArray(unit.variantPrices) && unit.variantPrices.length > 0;
+		if (!hasVariantPrices || (unit.unitPrice !== null && unit.unitPrice !== undefined)) {
+			const price = Number(unit.unitPrice);
+			if (!Number.isFinite(price) || price < 0) {
+				throw new Error("Unit price must be zero or greater");
+			}
 		}
 
-		const discountType = normalizeDiscountType(unit.discountType);
-		const discount = Number(unit.discount ?? 0);
-		if (!Number.isFinite(discount) || discount < 0) {
-			throw new Error("Unit discount must be zero or greater");
-		}
-		if (discountType === "PERCENTAGE" && discount > 100) {
-			throw new Error("Percentage discount cannot exceed 100%");
+		const unitDiscountType = normalizeDiscountType(unit.discountType);
+		if (unit.discount !== null && unit.discount !== undefined) {
+			const discount = Number(unit.discount ?? 0);
+			if (!Number.isFinite(discount) || discount < 0) {
+				throw new Error("Unit discount must be zero or greater");
+			}
+			if (unitDiscountType === "PERCENTAGE" && discount > 100) {
+				throw new Error("Percentage discount cannot exceed 100%");
+			}
 		}
 
 		for (const variantPrice of unit.variantPrices ?? []) {
@@ -93,7 +94,7 @@ export function validateProductAddUnitsInput(input: ProductAddUnitsInput): void 
 				throw new Error("Variant unit price must be zero or greater");
 			}
 			const variantDiscount = Number(variantPrice.discount ?? 0);
-			const variantType = normalizeDiscountType(variantPrice.discountType ?? discountType);
+			const variantType = normalizeDiscountType(variantPrice.discountType ?? unitDiscountType);
 			if (!Number.isFinite(variantDiscount) || variantDiscount < 0) {
 				throw new Error("Variant unit discount must be zero or greater");
 			}
@@ -138,7 +139,7 @@ export function normalizeUnitPricingForApi(
 		selling = list;
 	}
 
-	if (disc <= 0 || selling >= list) {
+	if (selling >= list || (selling <= 0 && disc <= 0)) {
 		return {
 			unitPrice: list,
 			discount: 0,

@@ -20,7 +20,6 @@ import {
 import { ModernButton } from "@/components/ui-custom/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/permission-guard";
@@ -41,16 +40,9 @@ import {
 	Edit3,
 	Trash2,
 	Layers,
-	Sparkles,
-	Filter,
-	ArrowRight,
-	Clock,
 	User,
 	Quote,
-	CheckSquare,
-	ListOrdered,
 	RotateCw,
-	Calendar,
 	Check,
 	Inbox,
 } from "lucide-react";

@@ -7,19 +7,8 @@ import {
 	Check,
 	X,
 	SlidersHorizontal,
-	Calendar,
-	DollarSign,
-	Sparkles,
-	Code,
 	Tag,
 	CheckSquare,
-	ChevronDown,
-	Layers,
-	Building2,
-	Users,
-	Package,
-	Store,
-	Truck,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -37,7 +26,6 @@ import {
 	ModernDatePicker,
 	CategoryTreeSelect,
 	type SearchSelectOption,
-	type SelectOption,
 } from "@/components/ui-custom/form-controls";
 import {
 	customersApi,
@@ -57,7 +45,6 @@ import {
 	FilterCriterion,
 	FilterOperator,
 	AsyncFilterEntityType,
-	buildSearchFilterPayload,
 } from "./search-filter-types";
 import { cn } from "@/lib/utils";
 
@@ -319,9 +306,9 @@ export function DynamicFilterModal({
 	fields = [],
 	activeFilters = [],
 	onApplyFilters,
-	onResetFilters,
+	onResetFilters: _onResetFilters,
 	domainTitle = "Domain Filter Studio",
-	searchValue = "",
+	searchValue: _searchValue = "",
 }: DynamicFilterModalProps) {
 	// Local state for draft filters before applying
 	const [draftFilters, setDraftFilters] = useState<

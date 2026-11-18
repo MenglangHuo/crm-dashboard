@@ -21,14 +21,9 @@ import {
 	ModernTextarea,
 	ModernCheckbox,
 } from "@/components/ui-custom/form-controls";
-import { Badge } from "@/components/ui/badge";
 import {
 	RotateCcw,
 	FileText,
-	DollarSign,
-	PackageCheck,
-	AlertOctagon,
-	CheckCircle2,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 

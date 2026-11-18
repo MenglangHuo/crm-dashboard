@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/config/env";
 import { getFetchOptions } from "@/lib/server/fetch-agent";
+import { NextRequest, NextResponse } from "next/server";
 
 // Enable TLS bypass if configured
 if (env.allowInsecureTls) {
@@ -13,7 +13,7 @@ if (env.allowInsecureTls) {
  * are faithfully forwarded without local mock database interference or stale caching.
  */
 export async function proxyToBackend(req: NextRequest) {
-	let backendBase =
+	const backendBase =
 		env.apiBackendUrl ||
 		(process.env.NODE_ENV === "production"
 			? "https://crmapi.bronxtechnology.site"

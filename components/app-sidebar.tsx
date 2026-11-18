@@ -1,48 +1,50 @@
 "use client";
 
-import * as React from "react";
+import { clearClientSession } from "@/lib/api/client";
+import { useQueryClient } from "@tanstack/react-query";
 import {
+	ArrowLeftRight,
+	Boxes,
+	Building,
 	Building2,
-	Users,
-	Briefcase,
-	MapPin,
-	ShieldAlert,
-	LayoutDashboard,
-	LogOut,
-	Settings,
-	Contact,
-	Package,
-	Landmark,
-	Receipt,
-	FileText,
-	Clock,
-	ChevronRight,
 	ChevronLeft,
-	Folder,
-	ShieldCheck,
+	ChevronRight,
+	Clock,
+	Contact,
+	CreditCard,
+	FileText,
 	KeyRound,
 	Layers,
-	Boxes,
-	SlidersHorizontal,
-	ShoppingCart,
-	Tag,
-	Ruler,
-	Warehouse,
-	ArrowLeftRight,
-	Truck,
+	LayoutDashboard,
+	MapPin,
 	MessageSquare,
-	GitFork,
-	Building,
-	Activity,
-	CreditCard,
-	User as UserIcon,
+	Package,
+	Settings,
+	ShieldAlert,
+	ShieldCheck,
+	ShoppingCart,
+	SlidersHorizontal,
+	Truck,
+	Users,
+	Warehouse
 } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
-import { clearClientSession } from "@/lib/api/client";
-import { useQuery } from "@tanstack/react-query";
+import { usePathname, useRouter } from "next/navigation";
+import * as React from "react";
 
+import { clearAuthCookies } from "@/app/actions/auth";
+import { isUserSystemAdmin } from "@/components/providers/company-context";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
 	Sidebar,
 	SidebarContent,
@@ -54,36 +56,20 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	SidebarMenuSub,
-	SidebarMenuSubItem,
 	SidebarMenuSubButton,
 	SidebarRail,
-	useSidebar,
+	useSidebar
 } from "@/components/ui/sidebar";
-import {
-	Collapsible,
-	CollapsibleTrigger,
-	CollapsibleContent,
-} from "@/components/ui/collapsible";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { profileApi, authApi, fileUrl } from "@/lib/api/endpoints";
-import { clearAuthCookies } from "@/app/actions/auth";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { isUserSystemAdmin } from "@/components/providers/company-context";
-import { useTranslation } from "@/lib/i18n/context";
 import { usePermissions } from "@/hooks/use-permissions";
+import { authApi } from "@/lib/api/endpoints";
 import { env } from "@/lib/config/env";
+import { useTranslation } from "@/lib/i18n/context";
 
 function SidebarLogo() {
 	return (
@@ -287,7 +273,7 @@ function SidebarCollapsibleGroup({
 
 export function AppSidebar() {
 	const pathname = usePathname();
-	const router = useRouter();
+	const _router = useRouter();
 	const { state, toggleSidebar } = useSidebar();
 	const isCollapsed = state === "collapsed";
 	const { t } = useTranslation();
@@ -295,13 +281,13 @@ export function AppSidebar() {
 		isMounted,
 		userProfile,
 		isLoading,
-		isAdmin,
+		isAdmin: _isAdmin,
 		can,
 	} = usePermissions();
 
 	const queryClient = useQueryClient();
 
-	const handleSignOut = async () => {
+	const _handleSignOut = async () => {
 		try {
 			await authApi.signOut().catch(() => {});
 		} catch {
@@ -314,7 +300,7 @@ export function AppSidebar() {
 	};
 
 	// Administrator visible ONLY when user login as ROLE_SYSTEM_ADMIN / platform system admin
-	const isSystemAdmin = isUserSystemAdmin(userProfile) || (isMounted && isAdmin);
+	const isSystemAdmin = isUserSystemAdmin(userProfile);
 
 	// Helper to safely evaluate permissions on client while preserving SSR hydration integrity
 	const isPermitted = (resource: string, action = "READ") => {

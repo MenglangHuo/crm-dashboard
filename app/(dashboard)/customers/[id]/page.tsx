@@ -3,14 +3,11 @@
 import React, { use, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { customersApi, ordersApi, financeApi, invoicesApi } from "@/lib/api/endpoints";
-import { Customer } from "@/lib/types";
+import { customersApi } from "@/lib/api/endpoints";
 import { toast } from "sonner";
 import {
 	User,
-	Phone,
 	MapPin,
-	Building2,
 	Users,
 	Zap,
 	ArrowLeft,
@@ -21,9 +18,6 @@ import {
 	Trash2,
 	RotateCcw,
 	Truck,
-	ShieldCheck,
-	FileText,
-	DollarSign,
 	ShoppingCart,
 	Navigation,
 	Image as ImageIcon,
@@ -71,7 +65,7 @@ export default function CustomerProfilePage({
 	const [isEditOpen, setIsEditOpen] = useState(false);
 	const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
 	const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-	const [visitPage, setVisitPage] = useState(0);
+	const [visitPage, _setVisitPage] = useState(0);
 
 	// 1. Fetch Customer 360 Details
 	const { data: customer, isLoading: isLoadingCustomer } = useQuery({

@@ -8,25 +8,15 @@ import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
 import {
 	Sparkles,
-	Plus,
-	Search,
-	CheckCircle2,
 	Trash2,
 	Edit,
 	RotateCcw,
-	Key,
-	ShieldCheck,
 	Zap,
-	Filter,
-	Check,
 	AlertCircle,
-	Tag,
-	Layers,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
 	DataTable,
 	ColumnDef,
@@ -44,11 +34,11 @@ import {
 } from "@/components/ui-custom/form-controls";
 import { useTranslation } from "@/lib/i18n/context";
 
-export function FeaturesTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
+export function FeaturesTab({ isSystemAdmin: _isSystemAdmin }: { isSystemAdmin: boolean }) {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
-	const [search, setSearch] = useState("");
-	const [statusFilter, setStatusFilter] = useState<string>("ALL");
+	const [search, _setSearch] = useState("");
+	const [statusFilter, _setStatusFilter] = useState<string>("ALL");
 	const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 	const [editingFeature, setEditingFeature] = useState<FeatureItem | null>(
 		null,
@@ -67,7 +57,7 @@ export function FeaturesTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 	const {
 		data: featuresData = [],
 		isLoading,
-		refetch,
+		refetch: _refetch,
 	} = useQuery({
 		queryKey: ["subscription-features"],
 		queryFn: () => featuresApi.list(),
@@ -183,7 +173,7 @@ export function FeaturesTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 	}, [featuresData, search, statusFilter]);
 
 	// Summary Metrics
-	const metrics = useMemo(() => {
+	const _metrics = useMemo(() => {
 		const total = featuresData.length;
 		const active = featuresData.filter(
 			(f) => f.status === "Active" && !f.deletedAt,

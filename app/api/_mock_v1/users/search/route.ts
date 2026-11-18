@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 	const page = (typeof body.page === "number" ? body.page : 0) + 1;
 	const size = typeof body.size === "number" ? body.size : 20;
 
-	let items = db.users.filter(
+	const items = db.users.filter(
 		(u) => !u.companyId || u.companyId === profile.companyId,
 	);
 

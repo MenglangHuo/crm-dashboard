@@ -38,7 +38,6 @@ import {
 	Tag,
 	Sparkles,
 	Boxes,
-	RotateCcw,
 	SlidersHorizontal,
 	Trash2,
 	Loader2,
@@ -163,7 +162,9 @@ export function MapProductUnitModal({
 		const addUnit = (u: any, isExplicitBase = false) => {
 			if (!u) return;
 			const id = String(u.unitId ?? u.id ?? "");
-			if (!id || map.has(id)) return;
+			if (!id) return;
+
+			const existing = map.get(id);
 
 			const globalMatch = availableUnits.find(
 				(au) => String(au.id) === String(id),
@@ -171,29 +172,37 @@ export function MapProductUnitModal({
 			const name =
 				u.unitName ||
 				u.name ||
+				existing?.name ||
 				globalMatch?.name ||
 				(u.symbol ? `Unit (${u.symbol})` : "Unit");
 			const symbol =
-				u.symbol || u.unitSymbol || globalMatch?.symbol || "";
+				u.symbol || u.unitSymbol || existing?.symbol || globalMatch?.symbol || "";
 			const isBase =
 				isExplicitBase ||
 				Boolean(u.isBase || u.is_base) ||
+				Boolean(existing?.isBase) ||
 				(primaryBaseUnit &&
 					String(primaryBaseUnit.unitId || primaryBaseUnit.id) === id);
 
 			map.set(id, {
+				...existing,
 				...u,
 				id,
 				unitId: id,
 				name,
 				symbol,
 				isBase,
+				variantPrices:
+					u.variantPrices && Array.isArray(u.variantPrices) && u.variantPrices.length > 0
+						? u.variantPrices
+						: existing?.variantPrices,
 				unitPrice:
 					u.finalPrice ??
 					u.unitPrice ??
 					u.sellPrice ??
 					u.price ??
 					u.basePrice ??
+					existing?.unitPrice ??
 					null,
 			});
 		};
@@ -436,40 +445,258 @@ export function MapProductUnitModal({
 	const numericQty = parseFloat(baseQuantity) || 1;
 	const numericPrice = parseFloat(unitPrice) || 0;
 	const effectivePricePerBase = numericQty > 0 ? numericPrice / numericQty : 0;
-	const baseUnitPrice =
-		parseFloat(
+	const baseUnitPrice = useMemo(() => {
+		const directPrice = parseFloat(
 			String(
-				selectedBaseUnit?.unitPrice ??
+				selectedBaseUnit?.basePrice ??
+					selectedBaseUnit?.unitPrice ??
 					selectedBaseUnit?.finalPrice ??
 					selectedBaseUnit?.sellPrice ??
 					selectedBaseUnit?.price ??
-					primaryBaseUnit?.unitPrice ??
-					primaryBaseUnit?.finalPrice ??
-					primaryBaseUnit?.sellPrice ??
-					primaryBaseUnit?.price ??
-					product?.sellPrice ??
-					product?.price ??
+					"",
+			),
+		);
+		if (!isNaN(directPrice) && directPrice > 0) {
+			return directPrice;
+		}
+
+		// If selectedBaseUnit has variantPrices
+		if (
+			selectedBaseUnit?.variantPrices &&
+			Array.isArray(selectedBaseUnit.variantPrices) &&
+			selectedBaseUnit.variantPrices.length > 0
+		) {
+			const firstVpPrice = parseFloat(
+				String(
+					selectedBaseUnit.variantPrices[0]?.basePrice ??
+						selectedBaseUnit.variantPrices[0]?.finalPrice ??
+						selectedBaseUnit.variantPrices[0]?.unitPrice ??
+						selectedBaseUnit.variantPrices[0]?.sellPrice ??
+						selectedBaseUnit.variantPrices[0]?.price ??
+						"",
+				),
+			);
+			if (!isNaN(firstVpPrice) && firstVpPrice > 0) {
+				return firstVpPrice;
+			}
+		}
+
+		// Fallback to primary base unit or product price
+		const primaryPrice =
+			parseFloat(
+				String(
+					primaryBaseUnit?.basePrice ??
+						primaryBaseUnit?.unitPrice ??
+						primaryBaseUnit?.finalPrice ??
+						primaryBaseUnit?.sellPrice ??
+						primaryBaseUnit?.price ??
+						product?.sellPrice ??
+						product?.price ??
+						0,
+				),
+			) || 0;
+
+		const factor = parseFloat(
+			String(
+				selectedBaseUnit?.baseQuantity ??
+					selectedBaseUnit?.conversionFactor ??
+					selectedBaseUnit?.conversionRate ??
+					selectedBaseUnit?.multiplier ??
+					selectedBaseUnit?.factor ??
 					0,
 			),
-		) || 0;
+		);
+
+		if (primaryPrice > 0 && factor > 0 && !selectedBaseUnit?.isBase) {
+			return primaryPrice * factor;
+		}
+
+		return primaryPrice;
+	}, [selectedBaseUnit, primaryBaseUnit, product]);
+
 	const unitListPrice = calculateUnitListPrice(baseUnitPrice, numericQty);
 
-	// Helper to resolve a variant's base price
-	const getVariantBasePrice = (v: any): number => {
-		const val =
-			v.finalPrice ??
-			v.sellPrice ??
-			v.price ??
-			v.unitPrice ??
-			v.basePrice ??
-			v.retailPrice ??
-			baseUnitPrice;
-		return Math.max(0, parseFloat(String(val)) || 0);
+	// Helper to resolve a variant's base price in the selected baseUnit (field 'baseUnit' selected above)
+	const getVariantBasePrice = (v: any, baseUnitOverride?: any): number => {
+		if (!v) return baseUnitPrice;
+
+		const targetBase =
+			baseUnitOverride ||
+			selectedBaseUnit ||
+			existingProductUnits.find(
+				(u: any) =>
+					String(u.unitId || u.id) === String(baseUnitId) ||
+					(!isNaN(Number(u.unitId || u.id)) &&
+						!isNaN(Number(baseUnitId)) &&
+						Number(u.unitId || u.id) === Number(baseUnitId)),
+			) ||
+			primaryBaseUnit;
+
+		const targetBaseId = String(
+			targetBase?.unitId ?? targetBase?.id ?? baseUnitId ?? "",
+		);
+		const vId = String(v.id ?? v.variantId ?? "");
+
+		// Priority 1: Check if variant v has explicit unit entry for targetBaseId (e.g. in v.units, v.unitPrices, etc.)
+		const vUnits =
+			v?.units || v?.unitPrices || v?.unit_prices || v?.variantUnits;
+		if (Array.isArray(vUnits) && vUnits.length > 0 && targetBaseId) {
+			const matchedVUnit = vUnits.find((vu: any) => {
+				const uId = String(vu.unitId ?? vu.unit_id ?? vu.id ?? "");
+				return (
+					uId === targetBaseId ||
+					(!isNaN(Number(uId)) &&
+						!isNaN(Number(targetBaseId)) &&
+						Number(uId) === Number(targetBaseId))
+				);
+			});
+			if (matchedVUnit) {
+				const p = parseFloat(
+					String(
+						matchedVUnit.basePrice ??
+							matchedVUnit.finalPrice ??
+							matchedVUnit.unitPrice ??
+							matchedVUnit.sellPrice ??
+							matchedVUnit.price ??
+							matchedVUnit.retailPrice ??
+							"",
+					),
+				);
+				if (!isNaN(p) && p > 0) return p;
+			}
+		}
+
+		// Priority 2: Check if targetBase unit has variantPrices for this variant v
+		const vpSources = [
+			targetBase?.variantPrices,
+			existingMappedUnits.find((u: any) => {
+				const id = String(u.unitId ?? u.id ?? "");
+				return (
+					id === targetBaseId ||
+					(!isNaN(Number(id)) &&
+						!isNaN(Number(targetBaseId)) &&
+						Number(id) === Number(targetBaseId))
+				);
+			})?.variantPrices,
+			product?.units?.find((u: any) => {
+				const id = String(u.unitId ?? u.id ?? "");
+				return (
+					id === targetBaseId ||
+					(!isNaN(Number(id)) &&
+						!isNaN(Number(targetBaseId)) &&
+						Number(id) === Number(targetBaseId))
+				);
+			})?.variantPrices,
+			product?.productUnits?.find((u: any) => {
+				const id = String(u.unitId ?? u.id ?? "");
+				return (
+					id === targetBaseId ||
+					(!isNaN(Number(id)) &&
+						!isNaN(Number(targetBaseId)) &&
+						Number(id) === Number(targetBaseId))
+				);
+			})?.variantPrices,
+		];
+
+		for (const vpList of vpSources) {
+			if (Array.isArray(vpList) && vpList.length > 0) {
+				const vp = vpList.find((item: any) => {
+					const itemId = String(
+						item.variantId ?? item.variant_id ?? item.id ?? "",
+					);
+					return (
+						itemId === vId ||
+						(!isNaN(Number(itemId)) &&
+							!isNaN(Number(vId)) &&
+							Number(itemId) === Number(vId))
+					);
+				});
+				if (vp) {
+					const p = parseFloat(
+						String(
+							vp.basePrice ??
+								vp.finalPrice ??
+								vp.unitPrice ??
+								vp.sellPrice ??
+								vp.price ??
+								vp.retailPrice ??
+								"",
+						),
+					);
+					if (!isNaN(p) && p > 0) return p;
+				}
+			}
+		}
+
+		// Check if targetBase is the primary inventory base unit
+		const isTargetPrimaryBase = Boolean(
+			targetBase?.isBase ||
+				targetBase?.is_base ||
+				(primaryBaseUnit &&
+					String(primaryBaseUnit.unitId || primaryBaseUnit.id) ===
+						targetBaseId),
+		);
+
+		// Variant's root primary base price (for 1 product base unit)
+		const vRootBasePrice = Math.max(
+			0,
+			parseFloat(
+				String(
+					v.basePrice ??
+						v.finalPrice ??
+						v.sellPrice ??
+						v.price ??
+						v.unitPrice ??
+						v.retailPrice ??
+						0,
+				),
+			) || 0,
+		);
+
+		// Priority 3: If targetBase is the primary base unit, return variant's root base price
+		if (isTargetPrimaryBase) {
+			if (vRootBasePrice > 0) return vRootBasePrice;
+			return baseUnitPrice;
+		}
+
+		// Priority 4: If targetBase is a secondary packaging unit, compute from its conversion multiplier
+		const unitMultiplier = parseFloat(
+			String(
+				targetBase?.baseQuantity ??
+					targetBase?.conversionFactor ??
+					targetBase?.conversionRate ??
+					targetBase?.multiplier ??
+					targetBase?.factor ??
+					0,
+			),
+		);
+
+		if (unitMultiplier > 0 && vRootBasePrice > 0) {
+			return vRootBasePrice * unitMultiplier;
+		}
+
+		// Priority 5: Fallback to targetBase's own basePrice / unitPrice (if unit has uniform price across variants)
+		const targetUnitPrice = parseFloat(
+			String(
+				targetBase?.basePrice ??
+					targetBase?.finalPrice ??
+					targetBase?.unitPrice ??
+					targetBase?.sellPrice ??
+					targetBase?.price ??
+					0,
+			),
+		);
+		if (targetUnitPrice > 0) {
+			return targetUnitPrice;
+		}
+
+		// Final fallback: variant root price or baseUnitPrice
+		return vRootBasePrice > 0 ? vRootBasePrice : baseUnitPrice;
 	};
 
-	// Helper to resolve a variant's list price (base price * conversion multiplier)
-	const getVariantListPrice = (v: any): number => {
-		const vBase = getVariantBasePrice(v);
+	// Helper to resolve a variant's list price (base unit price * conversion multiplier)
+	const getVariantListPrice = (v: any, baseUnitOverride?: any): number => {
+		const vBase = getVariantBasePrice(v, baseUnitOverride);
 		return calculateUnitListPrice(vBase, numericQty);
 	};
 
@@ -523,18 +750,51 @@ export function MapProductUnitModal({
 	const handleBaseQuantityChange = (newQtyStr: string) => {
 		setBaseQuantity(newQtyStr);
 		const newQty = parseFloat(newQtyStr);
-		if (!isNaN(newQty) && newQty > 0 && baseUnitPrice > 0) {
-			const newListPrice = calculateUnitListPrice(baseUnitPrice, newQty);
-			const numericD = parseFloat(discount) || 0;
-			if (numericD > 0) {
-				const finalP = calculateUnitFinalPrice(
-					newListPrice,
-					numericD,
-					discountType,
-				);
-				setUnitPrice(finalP.toFixed(2));
-			} else {
-				setUnitPrice(newListPrice.toFixed(2));
+		if (!isNaN(newQty) && newQty > 0) {
+			if (baseUnitPrice > 0) {
+				const newListPrice = calculateUnitListPrice(baseUnitPrice, newQty);
+				const numericD = parseFloat(discount) || 0;
+				if (numericD > 0) {
+					const finalP = calculateUnitFinalPrice(
+						newListPrice,
+						numericD,
+						discountType,
+					);
+					setUnitPrice(finalP.toFixed(2));
+				} else {
+					setUnitPrice(newListPrice.toFixed(2));
+				}
+			}
+
+			// Update variant prices for variants whose discount is 0 or uncustomized
+			if (productVariants.length > 0) {
+				setVariantPrices((prev) => {
+					const updated = { ...prev };
+					productVariants.forEach((v: any) => {
+						const vBase = getVariantBasePrice(v);
+						const vList = calculateUnitListPrice(vBase, newQty);
+						const current = prev[v.id];
+						const currentDiscount = parseFloat(current?.discount || "0") || 0;
+						if (!current || currentDiscount === 0) {
+							updated[v.id] = {
+								unitPrice: vList > 0 ? vList.toFixed(2) : "0",
+								discount: "0",
+								discountType: current?.discountType || "PERCENTAGE",
+							};
+						} else {
+							const finalP = calculateUnitFinalPrice(
+								vList,
+								currentDiscount,
+								current.discountType,
+							);
+							updated[v.id] = {
+								...current,
+								unitPrice: finalP > 0 ? finalP.toFixed(2) : "0",
+							};
+						}
+					});
+					return updated;
+				});
 			}
 		}
 	};
@@ -548,7 +808,8 @@ export function MapProductUnitModal({
 		const newBasePrice =
 			parseFloat(
 				String(
-					newBaseObj?.unitPrice ??
+					newBaseObj?.basePrice ??
+						newBaseObj?.unitPrice ??
 						newBaseObj?.finalPrice ??
 						newBaseObj?.sellPrice ??
 						newBaseObj?.price ??
@@ -569,6 +830,37 @@ export function MapProductUnitModal({
 			} else {
 				setUnitPrice(newListPrice.toFixed(2));
 			}
+		}
+
+		// Update variant prices when baseUnit changes
+		if (productVariants.length > 0) {
+			setVariantPrices((prev) => {
+				const updated = { ...prev };
+				productVariants.forEach((v: any) => {
+					const vBase = getVariantBasePrice(v, newBaseObj);
+					const vList = calculateUnitListPrice(vBase, numericQty);
+					const current = prev[v.id];
+					const currentDiscount = parseFloat(current?.discount || "0") || 0;
+					if (!current || currentDiscount === 0) {
+						updated[v.id] = {
+							unitPrice: vList > 0 ? vList.toFixed(2) : "0",
+							discount: "0",
+							discountType: current?.discountType || "PERCENTAGE",
+						};
+					} else {
+						const finalP = calculateUnitFinalPrice(
+							vList,
+							currentDiscount,
+							current.discountType,
+						);
+						updated[v.id] = {
+							...current,
+							unitPrice: finalP > 0 ? finalP.toFixed(2) : "0",
+						};
+					}
+				});
+				return updated;
+			});
 		}
 	};
 
@@ -886,9 +1178,9 @@ export function MapProductUnitModal({
 			unitId: Number(unitId),
 			baseUnitId: baseUnitId ? Number(baseUnitId) : null,
 			baseQuantity: numericQty,
-			unitPrice: mainNormalized.unitPrice,
-			discount: mainNormalized.discount,
-			discountType: mainNormalized.discountType,
+			unitPrice: isSamePrice ? mainNormalized.unitPrice : null,
+			discount: isSamePrice ? mainNormalized.discount : null,
+			discountType: isSamePrice ? mainNormalized.discountType : undefined,
 			sellable: sellable,
 			isBase: isBase,
 			variantPrices: formattedVariantPrices,
@@ -1099,10 +1391,10 @@ export function MapProductUnitModal({
 								size="sm"
 								onClick={handleAutoMultiplyBasePrice}
 								className="h-6 text-[10px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-bold gap-1 px-1.5 cursor-pointer"
-								title={`Multiply base price ($${baseUnitPrice.toFixed(2)}) by conversion multiplier (${numericQty})`}
+								title={`Multiply ${baseUnitObj?.symbol || baseUnitObj?.name || "base"} price ($${baseUnitPrice.toFixed(2)}) by conversion multiplier (${numericQty})`}
 							>
 								<Calculator className="h-3 w-3" />
-								Auto × Base (${baseUnitPrice.toFixed(2)})
+								Auto × {baseUnitObj?.symbol || baseUnitObj?.name || "Base"} (${baseUnitPrice.toFixed(2)})
 							</Button>
 						)}
 					</div>
@@ -1166,7 +1458,7 @@ export function MapProductUnitModal({
 							prefixAddon="$"
 							suffixAddon={targetUnitObj?.symbol ? `/${targetUnitObj.symbol}` : undefined}
 							className="bg-slate-100 dark:bg-slate-800/80 font-mono font-bold text-slate-700 dark:text-slate-300 cursor-not-allowed select-none"
-							helperText={`Base $${baseUnitPrice.toFixed(2)} × ${numericQty}`}
+							helperText={`${baseUnitObj?.symbol || baseUnitObj?.name || "Base"} $${baseUnitPrice.toFixed(2)} × ${numericQty}`}
 						/>
 
 						{/* 3. Discount field with compact Discount Type (% / $) at the end */}
@@ -1332,7 +1624,7 @@ export function MapProductUnitModal({
 											size="sm"
 											onClick={() => handleAutoCalculateAllVariants(true)}
 											className="h-7 text-[10px] gap-1 bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 font-bold hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer"
-											title={`Auto-calculate all variant prices from base price × ${numericQty}`}
+											title={`Auto-calculate all variant prices from ${baseUnitObj?.symbol || baseUnitObj?.name || "base"} price × ${numericQty}`}
 										>
 											<Calculator className="h-3 w-3 text-purple-600 dark:text-purple-400" />
 											Auto-calculate All ({numericQty}x)
@@ -1432,7 +1724,7 @@ export function MapProductUnitModal({
 																	variant="outline"
 																	className="text-[9px] py-0 px-1 text-slate-500 font-mono"
 																>
-																	Base: ${vBasePrice.toFixed(2)}
+																	{baseUnitObj?.symbol || baseUnitObj?.name ? `${baseUnitObj.symbol || baseUnitObj.name}: ` : "Base: "}${vBasePrice.toFixed(2)}
 																</Badge>
 															)}
 															{vListPrice > 0 && numericQty > 1 && (
@@ -1452,7 +1744,7 @@ export function MapProductUnitModal({
 														size="sm"
 														onClick={() => handleResetVariant(v)}
 														className="h-6 text-[10px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 px-1.5 gap-1 shrink-0 cursor-pointer font-semibold"
-														title={`Auto-calculate ${v.name} (Base $${vBasePrice.toFixed(2)} × ${numericQty})`}
+														title={`Auto-calculate ${v.name} (${baseUnitObj?.symbol || baseUnitObj?.name || "Base"} $${vBasePrice.toFixed(2)} × ${numericQty})`}
 													>
 														<Calculator className="h-2.5 w-2.5" />
 														Auto-calc
@@ -1472,13 +1764,13 @@ export function MapProductUnitModal({
 															<span className="text-slate-400 text-xs mr-1 font-mono font-semibold">$</span>
 															<input
 																type="text"
-																value={vListPrice.toFixed(2)}
+																value={vListPrice > 0 ? vListPrice.toFixed(2) : "0.00"}
 																readOnly
 																className="w-full bg-transparent border-0 outline-none text-xs font-mono font-bold text-slate-700 dark:text-slate-300 cursor-not-allowed select-none"
 															/>
 														</div>
 														<span className="text-[10px] text-slate-400 font-medium block mt-0.5 font-mono">
-															Base ${vBasePrice.toFixed(2)} × {numericQty}
+															{baseUnitObj?.symbol || baseUnitObj?.name || "Base"} ${vBasePrice.toFixed(2)} × {numericQty}
 														</span>
 													</div>
 

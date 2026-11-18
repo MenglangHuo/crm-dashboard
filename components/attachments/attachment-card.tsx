@@ -200,7 +200,7 @@ export function AttachmentCard({
 					if (res?.downloadUrl) {
 						downloadLink = res.downloadUrl;
 					}
-				} catch (ignored) {}
+				} catch (_ignored) {}
 			}
 
 			if (downloadLink) {
@@ -354,7 +354,7 @@ export function AttachmentCard({
 			<div className="relative flex aspect-[4/3] w-full items-center justify-center p-4">
 				{isImage && previewUrl ? (
 					<div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800/80">
-						{/* eslint-disable-next-line @next/next/no-img-element */}
+						{ }
 						<img
 							src={previewUrl}
 							alt={attachment.fileName}

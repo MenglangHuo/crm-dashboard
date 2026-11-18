@@ -20,19 +20,11 @@ import {
 	ModernSearchSelect,
 	SearchSelectOption,
 } from "@/components/ui-custom/form-controls/modern-search-select";
-import { ModernButton } from "@/components/ui-custom/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import {
 	Send,
-	Star,
-	CheckCircle2,
 	CheckSquare,
-	AlignLeft,
 	User,
-	Building2,
-	HelpCircle,
-	Sparkles,
 	Loader2,
 } from "lucide-react";
 
@@ -194,7 +186,7 @@ export function SubmitSurveyModal({
 			if (!tplId) throw new Error("No template selected");
 			return feedbackApi.createSubmission(tplId, payload);
 		},
-		onSuccess: (data) => {
+		onSuccess: (_data) => {
 			toast.success(
 				"Feedback survey response submitted to CRM API successfully!",
 			);

@@ -17,9 +17,6 @@ import {
 	Plus,
 	Trash2,
 	Sliders,
-	Sparkles,
-	GripVertical,
-	CheckCircle2,
 } from "lucide-react";
 
 export interface SortRule {

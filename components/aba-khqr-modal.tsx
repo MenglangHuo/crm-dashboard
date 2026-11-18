@@ -1,14 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
-	QrCode,
 	Copy,
 	CheckCircle2,
 	RefreshCw,
 	ShieldCheck,
-	Download,
-	Smartphone,
 } from "lucide-react";
 import { useQuickActions } from "@/components/quick-action-modal-context";
 import { toast } from "sonner";

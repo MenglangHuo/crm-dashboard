@@ -21,12 +21,8 @@ import {
 	ChevronDown,
 	Sparkles,
 	Layers,
-	Trash2,
-	MoreVertical,
-	Loader2,
 	Filter,
 	Maximize2,
-	Minimize2,
 	AlertCircle,
 } from "lucide-react";
 
@@ -34,7 +30,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import {
 	Table,
 	TableBody,
@@ -45,12 +40,9 @@ import {
 } from "@/components/ui/table";
 import {
 	DropdownMenu,
-	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuLabel,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -61,9 +53,7 @@ import {
 	ColumnDef,
 	DataTableProps,
 	FilterState,
-	PresetView,
 	RowAction,
-	SortDirection,
 	SortState,
 } from "./types";
 import { RowActionsCell } from "./cell-renderers";
@@ -273,7 +263,7 @@ export function DataTable<T extends Record<string, any>>({
 	headerActions,
 	primaryAction,
 	toolbarActions,
-	extraHeaderContent,
+	extraHeaderContent: _extraHeaderContent,
 	onImport,
 	onExport,
 	exportFilename = "data-table",
@@ -295,7 +285,7 @@ export function DataTable<T extends Record<string, any>>({
 
 	renderSubComponent,
 	expandedRowIds,
-	onToggleExpandRow,
+	onToggleExpandRow: _onToggleExpandRow,
 
 	manualPagination = false,
 	totalCount,
@@ -354,7 +344,7 @@ export function DataTable<T extends Record<string, any>>({
 		searchPlaceholder !== "Search..."
 			? searchPlaceholder
 			: t("common.search", "Search...");
-	const effectiveCreateButtonLabel =
+	const _effectiveCreateButtonLabel =
 		createButtonLabel !== "Add Record"
 			? createButtonLabel
 			: t("common.create", "Add New");
@@ -632,7 +622,7 @@ export function DataTable<T extends Record<string, any>>({
 		else setUncontrolledSort(nextSort);
 	};
 
-	const handleFilterChange = (colId: string, val: any) => {
+	const _handleFilterChange = (colId: string, val: any) => {
 		const nextFilters = { ...filterState };
 		if (
 			val === "" ||

@@ -12,34 +12,25 @@ import {
 	Receipt,
 	User,
 	Zap,
-	QrCode,
-	DollarSign,
 	Copy,
 	Check,
-	ShieldCheck,
 	Package,
-	Building2,
 	History,
 	CheckCircle2,
 	Ban,
 	RotateCcw,
-	FileText,
 	Percent,
 	TrendingUp,
-	AlertTriangle,
 	Clock,
 	Truck,
-	Phone,
 	ChevronDown,
 	SlidersHorizontal,
-	MoreHorizontal,
 } from "lucide-react";
 import {
 	DropdownMenu,
 	DropdownMenuTrigger,
 	DropdownMenuContent,
 	DropdownMenuItem,
-	DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
 	ModernModal,
@@ -89,7 +80,7 @@ function SafeItemImage({ src, alt }: { src?: string; alt: string }) {
 export function InvoiceDetailsModal({
 	invoiceId,
 	onClose,
-	onSelectLoanId,
+	onSelectLoanId: _onSelectLoanId,
 	onOpenPayments,
 }: InvoiceDetailsModalProps) {
 	const { t } = useTranslation();
@@ -110,9 +101,9 @@ export function InvoiceDetailsModal({
 	const [paymentMethod, setPaymentMethod] =
 		useState<PaymentMethod>("MOBILE_PAYMENT");
 	const [referenceNumber, setReferenceNumber] = useState("");
-	const [bankAccount, setBankAccount] = useState("");
+	const [bankAccount, _setBankAccount] = useState("");
 	const [paymentNotes, setPaymentNotes] = useState("");
-	const [idempotencyKey, setIdempotencyKey] = useState<string>("");
+	const [idempotencyKey, _setIdempotencyKey] = useState<string>("");
 
 	// Fetch Invoice Details
 	const { data: details, isLoading: isDetailsLoading } = useQuery({

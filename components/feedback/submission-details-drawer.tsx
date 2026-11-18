@@ -8,15 +8,11 @@ import {
 	ModernModalCancelButton,
 } from "@/components/ui-custom/modal";
 import { Badge } from "@/components/ui/badge";
-import { ModernButton } from "@/components/ui-custom/button";
 import {
 	MessageSquare,
 	Star,
 	CheckCircle2,
-	Calendar,
 	User,
-	Building2,
-	FileText,
 	Quote,
 	Check,
 	Award,

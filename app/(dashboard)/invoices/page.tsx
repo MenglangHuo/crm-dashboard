@@ -29,7 +29,6 @@ import { PermissionGate } from "@/components/auth/permission-gate";
 import { customersApi, financeApi, invoicesApi, paymentsApi } from "@/lib/api/endpoints";
 import { useTranslation } from "@/lib/i18n/context";
 import { Invoice } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	AlertTriangle,
@@ -42,7 +41,6 @@ import {
 	History,
 	Layers,
 	Printer,
-	RefreshCw,
 	RotateCcw,
 	TrendingUp,
 	Truck,
@@ -51,7 +49,6 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { useCompanyContext } from "@/components/providers/company-context";
 
 function InvoicesPageContent() {
@@ -149,7 +146,7 @@ function InvoicesPageContent() {
 	const {
 		data: searchResponse,
 		isLoading,
-		isFetching,
+		isFetching: _isFetching,
 		isError,
 		error,
 		refetch,

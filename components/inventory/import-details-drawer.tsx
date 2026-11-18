@@ -22,16 +22,10 @@ import {
 	Printer,
 	Copy,
 	CheckCheck,
-	TrendingUp,
 	Boxes,
-	Layers,
-	DollarSign,
-	Phone,
-	Tag,
 	CheckCircle2,
 	Loader2,
 	ShieldCheck,
-	CircleDot,
 	RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";

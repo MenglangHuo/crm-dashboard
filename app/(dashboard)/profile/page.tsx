@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	profileApi,
-	usersApi,
 	uploadService,
 	fileUrl,
 } from "@/lib/api/endpoints";
@@ -25,12 +24,10 @@ import {
 	Briefcase,
 	MapPin,
 	Phone,
-	Clock,
 	Lock,
 	Eye,
 	EyeOff,
 	Sparkles,
-	BadgeCheck,
 	ShieldAlert,
 	CheckCircle2,
 	Camera,
@@ -38,13 +35,9 @@ import {
 	Shield,
 	Activity,
 	FileText,
-	RotateCcw,
 	Save,
 	Layers,
-	Search,
 	Users,
-	Filter,
-	Laptop,
 	Copy,
 	Check,
 	PhoneCall,
@@ -53,28 +46,19 @@ import {
 	Trash2,
 	AlertCircle,
 	Globe,
-	RefreshCw,
 	Calendar,
 	Smile,
 	Edit3,
 	ZoomIn,
 	ScrollText,
 	ExternalLink,
-	ChevronDown,
-	ChevronUp,
-	ChevronRight,
 	Sliders,
-	X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
@@ -763,7 +747,7 @@ function aggregateAndDeduplicatePermissions(
 
 	const directGrantsCount = distinctPermissions.filter((p) => p.isDirect).length;
 
-	let rolesSummary: RoleCardInfo[] = Array.from(roleCountMap.entries()).map(
+	const rolesSummary: RoleCardInfo[] = Array.from(roleCountMap.entries()).map(
 		([name, count]) => {
 			const meta = roleMetaMap.get(name);
 			return {
@@ -827,9 +811,9 @@ export default function ProfilePage() {
 	const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 	const [showNewPassword, setShowNewPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-	const [permissionSearch, setPermissionSearch] = useState("");
-	const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>("ALL");
-	const [selectedActionFilter, setSelectedActionFilter] = useState<string>("ALL");
+	const [permissionSearch, _setPermissionSearch] = useState("");
+	const [selectedRoleFilter, _setSelectedRoleFilter] = useState<string>("ALL");
+	const [selectedActionFilter, _setSelectedActionFilter] = useState<string>("ALL");
 	const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
 	const [isEditingImageUrl, setIsEditingImageUrl] = useState(false);
 	const [imageUrlInput, setImageUrlInput] = useState("");
@@ -974,7 +958,7 @@ export default function ProfilePage() {
 				profileForm.setValue("imageUrl", finalUrl, { shouldDirty: true });
 				toast.success("Avatar image uploaded");
 			}
-		} catch (err) {
+		} catch (_err) {
 			toast.dismiss(toastId);
 			toast.error("Failed to upload avatar image");
 		}
@@ -1104,12 +1088,12 @@ export default function ProfilePage() {
 
 	const {
 		permissions: allPermissions,
-		totalRawGrants,
+		totalRawGrants: _totalRawGrants,
 		distinctCount,
-		duplicateCount,
-		rolesSummary,
-		modulesList,
-		directGrantsCount,
+		duplicateCount: _duplicateCount,
+		rolesSummary: _rolesSummary,
+		modulesList: _modulesList,
+		directGrantsCount: _directGrantsCount,
 	} = aggregatedPermissions;
 
 	// ---- Filter Permissions ------------------------------------
@@ -1146,7 +1130,7 @@ export default function ProfilePage() {
 	}, [allPermissions, selectedRoleFilter, selectedActionFilter, permissionSearch]);
 
 	// Capability counts based on active role and search
-	const capabilityCounts = useMemo(() => {
+	const _capabilityCounts = useMemo(() => {
 		let baseList = allPermissions;
 		if (selectedRoleFilter !== "ALL") {
 			if (selectedRoleFilter === "DIRECT") {
@@ -1198,7 +1182,7 @@ export default function ProfilePage() {
 	}, [filteredPermissions]);
 
 	// Distinct capabilities per module
-	const moduleCapabilities = useMemo(() => {
+	const _moduleCapabilities = useMemo(() => {
 		const caps: Record<string, Set<CapabilityType>> = {};
 		Object.entries(permissionsByModule).forEach(([modName, perms]) => {
 			const set = new Set<CapabilityType>();
@@ -1210,14 +1194,14 @@ export default function ProfilePage() {
 		return caps;
 	}, [permissionsByModule]);
 
-	const toggleModule = (modName: string) => {
+	const _toggleModule = (modName: string) => {
 		setExpandedModules((prev) => ({
 			...prev,
 			[modName]: prev[modName] !== undefined ? !prev[modName] : false,
 		}));
 	};
 
-	const expandAllModules = (mods: string[]) => {
+	const _expandAllModules = (mods: string[]) => {
 		const next: Record<string, boolean> = {};
 		mods.forEach((m) => {
 			next[m] = true;
@@ -1225,7 +1209,7 @@ export default function ProfilePage() {
 		setExpandedModules(next);
 	};
 
-	const collapseAllModules = (mods: string[]) => {
+	const _collapseAllModules = (mods: string[]) => {
 		const next: Record<string, boolean> = {};
 		mods.forEach((m) => {
 			next[m] = false;
@@ -1233,7 +1217,7 @@ export default function ProfilePage() {
 		setExpandedModules(next);
 	};
 
-	const isModuleExpanded = (modName: string) => {
+	const _isModuleExpanded = (modName: string) => {
 		if (permissionSearch.trim().length > 0 || selectedActionFilter !== "ALL") {
 			return true;
 		}

@@ -11,7 +11,6 @@ import {
 	Key,
 	Lock,
 	Layers,
-	Filter,
 	CheckCircle2,
 } from "lucide-react";
 
@@ -35,7 +34,7 @@ import { PermissionGuard } from "@/components/auth/permission-guard";
 export default function PermissionsPage() {
 	const { t } = useTranslation();
 	const [search, setSearch] = useState("");
-	const [selectedModule, setSelectedModule] = useState<string>("ALL");
+	const [selectedModule, _setSelectedModule] = useState<string>("ALL");
 
 	const { data: permissionsData = [], isLoading } = useQuery({
 		queryKey: ["permissions"],

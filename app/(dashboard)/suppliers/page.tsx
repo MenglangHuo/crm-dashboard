@@ -23,7 +23,7 @@ import {
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Truck, Phone, Building2, RotateCcw, Ban, Edit2, Plus } from "lucide-react";
+import { Truck, Phone, Building2, Edit2, Plus } from "lucide-react";
 import type { Supplier } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
 import { PermissionGuard } from "@/components/auth/permission-guard";
@@ -34,11 +34,11 @@ export default function SuppliersPage() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { can } = usePermissions();
-	const canCreateSupplier = can("SUPPLIER", "CREATE");
+	const _canCreateSupplier = can("SUPPLIER", "CREATE");
 	const canUpdateSupplier = can("SUPPLIER", "UPDATE");
 	const canDeleteSupplier = can("SUPPLIER", "DELETE");
 	const [search, setSearch] = useState("");
-	const [statusFilter, setStatusFilter] = useState<string | undefined>(
+	const [statusFilter, _setStatusFilter] = useState<string | undefined>(
 		undefined,
 	);
 	const [page, setPage] = useState(1);

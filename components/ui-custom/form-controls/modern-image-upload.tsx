@@ -1,22 +1,19 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import {
-	UploadCloud,
-	Plus,
-	X,
-	Image as ImageIcon,
-	Loader2,
-	Eye,
-	Link as LinkIcon,
-	Sparkles,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { uploadService } from "@/lib/services/file-uploader";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+	Eye,
+	Link as LinkIcon,
+	Loader2,
+	UploadCloud,
+	X
+} from "lucide-react";
+import React, { useRef, useState } from "react";
+import { toast } from "sonner";
 
 export interface ModernImageUploadProps {
 	label?: string;
@@ -89,7 +86,7 @@ export function ModernImageUpload({
 				onChange?.(updated);
 				toast.success("Image uploaded successfully");
 			}
-		} catch (err: any) {
+		} catch (_err: any) {
 			// Fallback to local Data URL preview if server upload fails in offline/demo mode
 			toast.warning("Server upload error, using instant preview");
 			const localDataUrls: string[] = [];

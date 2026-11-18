@@ -298,7 +298,7 @@ export function ModernSearchSelect({
 			: "h-12 min-h-12 text-base px-4 rounded-xl",
 	};
 
-	const iconSizeStyles = {
+	const _iconSizeStyles = {
 		sm: "size-3.5",
 		md: "size-4",
 		lg: "size-5",

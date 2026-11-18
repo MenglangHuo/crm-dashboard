@@ -13,7 +13,6 @@ import { getErrorMessage } from "@/lib/api/client";
 import {
 	ConfigurationDomainGroup,
 	ConfigurationItem,
-	ConfigCategory,
 } from "@/types/configuration";
 import { ConfigControlRenderer } from "./config-control-renderer";
 import { FloatingSaveBar } from "./floating-save-bar";
@@ -23,13 +22,11 @@ import { useTranslation } from "@/lib/i18n/context";
 
 import {
 	SlidersHorizontal,
-	Building2,
 	Search,
 	RotateCcw,
 	Lock,
 	Settings,
 	ShieldAlert,
-	Boxes,
 	FileText,
 	Users,
 	Layers,
@@ -38,20 +35,20 @@ import {
 	ShoppingBag,
 	Package,
 	ShieldCheck,
-	Check,
-	CheckCircle2,
 	AlertCircle,
 	X,
 	ChevronLeft,
 	ChevronRight,
-	Info,
 	Sliders,
-	HelpCircle,
 	RefreshCw,
-	Eye,
 	Building,
 	Hash,
 	ArrowUpDown,
+	Database,
+	Bell,
+	Globe,
+	Percent,
+	MapPin,
 } from "lucide-react";
 
 import { ModernButton } from "@/components/ui-custom/button";
@@ -65,12 +62,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-	Tooltip,
-	TooltipContent,
 	TooltipProvider,
-	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Database, Bell, Tag, Globe, Percent, MapPin } from "lucide-react";
 
 // Domain Icon mapping supporting both category keys and icon strings
 const DOMAIN_ICONS: Record<string, React.ElementType> = {
@@ -167,7 +160,7 @@ export function SystemConfigurationsView() {
 	const [activeDomain, setActiveDomain] = useState<string>("GENERAL");
 	const [searchQuery, setSearchQuery] = useState<string>("");
 	const [sortOrder, setSortOrder] = useState<"default" | "az" | "za">("default");
-	const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
+	const [selectedCompanyId, _setSelectedCompanyId] = useState<string>("all");
 	const [dirtyMap, setDirtyMap] = useState<Record<string, any>>({});
 	const [resettingKeys, setResettingKeys] = useState<Record<string, boolean>>(
 		{},
@@ -264,7 +257,7 @@ export function SystemConfigurationsView() {
 	);
 
 	// Fetch Companies for Admin Switcher
-	const { data: companiesData } = useQuery({
+	const { data: _companiesData } = useQuery({
 		queryKey: ["companies-list-for-config"],
 		queryFn: () =>
 			companiesApi.list({ limit: 50 }).catch(() => ({ items: [], total: 0 })),
@@ -435,7 +428,7 @@ export function SystemConfigurationsView() {
 				),
 			);
 			queryClient.invalidateQueries({ queryKey: ["configurations"] });
-		} catch (err) {
+		} catch (_err) {
 			toast.success(
 				t(
 					"configurations.resetSuccess",
@@ -488,7 +481,7 @@ export function SystemConfigurationsView() {
 	}, [resolvedGroups, searchQuery]);
 
 	// Total matching configurations across all domains
-	const totalMatchingResults = useMemo(() => {
+	const _totalMatchingResults = useMemo(() => {
 		return filteredDomainGroups.reduce(
 			(sum, d) => sum + d.totalConfigurations,
 			0,

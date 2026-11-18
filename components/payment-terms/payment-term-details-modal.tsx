@@ -14,16 +14,11 @@ import {
 	Calendar,
 	Zap,
 	TrendingDown,
-	CheckCircle2,
-	AlertCircle,
 	Edit2,
 	Receipt,
 	Info,
 	Layers,
-	ArrowRight,
-	Calculator,
 	ShieldCheck,
-	Building2,
 	Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";

@@ -49,7 +49,7 @@ function getPrefixFromKey(configKey: string): string {
  * Tokens supported: {prefix} {YYYY} {YY} {MM} {DD} {seq}
  * Pass configKey so the correct domain prefix (INV, ORD, …) is substituted.
  */
-function resolvePatternPreview(
+function _resolvePatternPreview(
 	pattern: string,
 	zeroPadding: number = 5,
 	configKey: string = "",
@@ -79,7 +79,7 @@ function NumberPatternControl({
 	value,
 	onChange,
 	disabled,
-	zeroPadding,
+	zeroPadding: _zeroPadding,
 	configKey = "",
 }: {
 	value: string;

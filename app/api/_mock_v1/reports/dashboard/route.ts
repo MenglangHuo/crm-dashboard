@@ -2,10 +2,10 @@ import { NextRequest } from "next/server";
 import { ok } from "@/lib/server/api";
 
 function getMockDashboardData(
-	startDate?: string,
-	endDate?: string,
-	companyId?: string | number,
-	userId?: string | number,
+	_startDate?: string,
+	_endDate?: string,
+	_companyId?: string | number,
+	_userId?: string | number,
 ) {
 	return {
 		totalProducts: 10,

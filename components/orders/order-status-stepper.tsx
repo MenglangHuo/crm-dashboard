@@ -19,15 +19,11 @@ import {
 	Receipt,
 	XCircle,
 	ShieldCheck,
-	PackageCheck,
 	UserCheck,
-	DollarSign,
 	Clock,
 	Check,
 	AlertCircle,
-	ArrowRight,
 	History,
-	ChevronRight,
 } from "lucide-react";
 import { OrderHistoryDetailModal } from "@/components/orders/order-history-detail-modal";
 
@@ -48,7 +44,7 @@ export function OrderStatusStepper({
 	const paymentStatus = (
 		order.paymentStatus || "PENDING"
 	).toUpperCase() as OrderPaymentStatus;
-	const stockVerificationStatus = (
+	const _stockVerificationStatus = (
 		order.stockVerificationStatus || "NOT_YET"
 	).toUpperCase() as StockVerificationStatus;
 
@@ -77,7 +73,7 @@ export function OrderStatusStepper({
 	// Status flags
 	const isVoid = status === "VOID" || status === "CANCELLED";
 	const isRefunded = status === "REFUNDED" || paymentStatus === "REFUNDED";
-	const isDualApproved = Boolean(
+	const _isDualApproved = Boolean(
 		status === "APPROVED" ||
 			status === "COMPLETED" ||
 			(order.stockkeeperApproved && order.saleManagerApproved),
@@ -130,7 +126,7 @@ export function OrderStatusStepper({
 	];
 
 	// Filter histories for selected step
-	const getStepHistories = (stepId: string) => {
+	const _getStepHistories = (stepId: string) => {
 		return allHistories.filter((t: any) => {
 			const historyStatus = (t.toStatus || t.fromStatus || "").toUpperCase();
 			const historyType = (t.actionType || t.title || "").toUpperCase();

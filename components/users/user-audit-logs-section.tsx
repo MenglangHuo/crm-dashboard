@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
 import {
 	Activity,
 	AlertCircle,
 	Building2,
 	Calendar,
 	Check,
-	CheckCircle2,
 	ChevronRight,
 	Clock,
 	Copy,
@@ -23,7 +20,6 @@ import {
 	FolderTree,
 	GitCommit,
 	Globe,
-	Info,
 	Layers,
 	List,
 	MapPin,
@@ -39,23 +35,25 @@ import {
 	Tag,
 	Trash2,
 	Truck,
-	User as UserIcon,
 	UserCog,
+	User as UserIcon,
 	Users,
 	Warehouse,
 	X,
-	Zap,
+	Zap
 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 
+import { DataTable, type ColumnDef } from "@/components/ui-custom/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DataTable, type ColumnDef } from "@/components/ui-custom/data-table";
 import {
 	Sheet,
 	SheetContent,
+	SheetDescription,
 	SheetHeader,
 	SheetTitle,
-	SheetDescription,
 } from "@/components/ui/sheet";
 import { auditLogsApi, profileApi } from "@/lib/api/endpoints";
 import type { AuditLog } from "@/lib/types";

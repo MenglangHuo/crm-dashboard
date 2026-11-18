@@ -2454,8 +2454,8 @@ export interface ProductUnitItemInput {
 	unitId: number | string;
 	baseUnitId?: number | string | null;
 	baseQuantity?: number;
-	unitPrice: number;
-	discount?: number;
+	unitPrice?: number | null;
+	discount?: number | null;
 	discountType?: DiscountType;
 	sellable?: boolean;
 	isBase?: boolean;
@@ -2660,6 +2660,10 @@ export interface StockProductItem {
 	imageUrl?: string | null;
 	thumbnail?: string | null;
 	image?: string | null;
+	sku?: string;
+	barcode?: string;
+	baseSku?: string;
+	baseBarcode?: string;
 	variants: StockVariantItem[];
 }
 

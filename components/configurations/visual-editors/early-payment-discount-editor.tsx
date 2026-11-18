@@ -3,16 +3,12 @@
 import React, { useState } from "react";
 import { ModernButton } from "@/components/ui-custom/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-	Percent,
 	Plus,
 	Trash2,
 	ChevronUp,
 	ChevronDown,
-	Clock,
 	Zap,
-	Tag,
 	RotateCcw,
 	Sparkles,
 	ArrowRight,

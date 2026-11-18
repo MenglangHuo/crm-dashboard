@@ -1,6 +1,5 @@
 import { db } from "@/lib/server/db";
 import { ok, requireAuth } from "@/lib/server/api";
-import type { Delivery } from "@/lib/types";
 
 export async function POST(request: Request) {
 	const { error } = await requireAuth();

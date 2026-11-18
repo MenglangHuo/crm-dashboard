@@ -22,7 +22,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/permission-guard";
-import { PermissionGate } from "@/components/auth/permission-gate";
 import { paymentsApi } from "@/lib/api/endpoints";
 import { useTranslation } from "@/lib/i18n/context";
 import { Payment } from "@/lib/types";
@@ -46,7 +45,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 function PaymentsPageContent() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
-	const { openQuickPay, openReceipt } = useQuickActionDispatch();
+	const { openQuickPay: _openQuickPay, openReceipt: _openReceipt } = useQuickActionDispatch();
 	const { selectedCompanyId } = useCompanyContext();
 
 	// State
@@ -135,7 +134,7 @@ function PaymentsPageContent() {
 	const {
 		data: searchResponse,
 		isLoading,
-		isFetching,
+		isFetching: _isFetching,
 		isError,
 		error,
 		refetch,

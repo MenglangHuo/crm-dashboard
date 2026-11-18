@@ -20,18 +20,12 @@ import {
 	SearchSelectOption,
 } from "@/components/ui-custom/form-controls";
 import { ModernButton } from "@/components/ui-custom/button";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { LeafletMap } from "./leaflet-map";
 import {
 	MapPin,
 	Users,
 	Truck,
-	Building,
 	Navigation,
-	Loader2,
-	Phone,
-	Sparkles,
 } from "lucide-react";
 
 interface Props {
@@ -68,7 +62,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: Props) {
 	const [isGettingLocation, setIsGettingLocation] = useState(false);
 
 	// Fetch Users / Staff with search capability
-	const { data: usersData, isLoading: isLoadingUsers } = useQuery({
+	const { data: usersData, isLoading: _isLoadingUsers } = useQuery({
 		queryKey: ["all-users-selection"],
 		queryFn: () => usersApi.list({ limit: 100 }),
 		enabled: isOpen,
@@ -76,7 +70,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: Props) {
 	const availableUsers = usersData?.items || [];
 
 	// Fetch Deliveries with search capability
-	const { data: deliveriesData, isLoading: isLoadingDeliveries } = useQuery({
+	const { data: deliveriesData, isLoading: _isLoadingDeliveries } = useQuery({
 		queryKey: ["all-deliveries-selection"],
 		queryFn: () => deliveriesApi.list({ limit: 100 }),
 		enabled: isOpen,

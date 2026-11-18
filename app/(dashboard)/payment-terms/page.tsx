@@ -9,15 +9,9 @@ import { toast } from "sonner";
 import {
 	Clock,
 	Plus,
-	Percent,
-	Calendar,
-	Sparkles,
 	Edit2,
 	Trash2,
-	CheckCircle2,
-	ShieldCheck,
 	Zap,
-	SlidersHorizontal,
 	Eye,
 } from "lucide-react";
 
@@ -28,7 +22,6 @@ import {
 } from "@/components/ui-custom/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ModernButton } from "@/components/ui-custom/modern-button";
 import { PaymentTermModal } from "@/components/payment-terms/payment-term-modal";
 import { PaymentTermDetailsModal } from "@/components/payment-terms/payment-term-details-modal";
 import { useTranslation } from "@/lib/i18n/context";

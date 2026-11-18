@@ -142,11 +142,11 @@ export default function SystemAdminsPage() {
 
 	// Table & Filter State
 	const [search, setSearch] = useState("");
-	const [levelFilter, setLevelFilter] = useState("ALL");
+	const [levelFilter, _setLevelFilter] = useState("ALL");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
-	const [sortBy, setSortBy] = useState("createdAt");
-	const [orderBy, setOrderBy] = useState<"ASC" | "DESC">("DESC");
+	const [sortBy, _setSortBy] = useState("createdAt");
+	const [orderBy, _setOrderBy] = useState<"ASC" | "DESC">("DESC");
 
 	// Modals & Action State
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -383,7 +383,7 @@ export default function SystemAdminsPage() {
 	const adminList = data?.items || [];
 	const totalAdmins = data?.total || 0;
 	const activeAdminsCount = adminList.filter((a) => a.isActive).length;
-	const fullAdminsCount = adminList.filter(
+	const _fullAdminsCount = adminList.filter(
 		(a) => (a.adminLevel || "").toUpperCase() === "FULL",
 	).length;
 	const supportAdminsCount = adminList.filter(

@@ -9,14 +9,8 @@ import {
 	BarChart3,
 	CircleDollarSign,
 	CreditCard,
-	FileCheck,
-	LineChart,
-	Percent,
 	ShoppingCart,
-	TrendingDown,
-	TrendingUp,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TimeSeriesMetricItem } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";

@@ -9,7 +9,6 @@ import {
 	ModernModalCancelButton,
 } from "@/components/ui-custom/modal";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
 	Crown,
 	Sparkles,
@@ -19,7 +18,6 @@ import {
 	XCircle,
 	Zap,
 	ArrowRight,
-	CheckCircle2,
 	AlertCircle,
 	Users,
 	ShieldCheck,
@@ -584,7 +582,7 @@ export function SubscriptionAuditDetailModal({
 						<div className="rounded-2xl border border-slate-200/90 bg-white overflow-hidden dark:border-slate-800 dark:bg-slate-900 shadow-2xs">
 							<div className="divide-y divide-slate-100 dark:divide-slate-800">
 								{featureComparisonList.map(
-									({ feature, changeType, inOld, inNew }) => {
+									({ feature, changeType, inOld: _inOld, inNew: _inNew }) => {
 										return (
 											<div
 												key={feature.id || feature.code}

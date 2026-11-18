@@ -18,7 +18,6 @@ import {
 } from "@/components/ui-custom/modal";
 import {
 	ModernSelect,
-	ModernInput,
 	ModernSwitch,
 	ModernDatePicker,
 	SelectOption,
@@ -27,14 +26,9 @@ import { Badge } from "@/components/ui/badge";
 import {
 	Clock,
 	Calendar,
-	Zap,
 	CheckCircle2,
 	AlertTriangle,
-	ArrowRight,
-	TrendingDown,
-	Building2,
 	Receipt,
-	Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/context";
@@ -52,7 +46,7 @@ export function ChangePaymentTermModal({
 	onOpenChange,
 	onSuccess,
 }: ChangePaymentTermModalProps) {
-	const { t } = useTranslation();
+	const { t: _t } = useTranslation();
 	const queryClient = useQueryClient();
 
 	// Fetch available Payment Terms
@@ -191,7 +185,7 @@ export function ChangePaymentTermModal({
 
 			return await invoicesApi.changePaymentTerm(invoice.id, payload);
 		},
-		onSuccess: (updatedInvoice) => {
+		onSuccess: (_updatedInvoice) => {
 			const termTitle = selectedTerm?.name || "Payment Term";
 			toast.success(`បានផ្លាស់ប្តូរលក្ខខណ្ឌទូទាត់សម្រាប់វិក្កយបត្រ ${invoiceNo} ជោគជ័យ`, {
 				description: `លក្ខខណ្ឌថ្មី: '${termTitle}' ត្រូវបានអនុវត្ត។`,

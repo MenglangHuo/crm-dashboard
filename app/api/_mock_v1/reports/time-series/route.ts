@@ -3,9 +3,9 @@ import { ok } from "@/lib/server/api";
 
 function getMockTimeSeriesData(
 	startDate?: string,
-	endDate?: string,
-	companyId?: string | number,
-	userId?: string | number,
+	_endDate?: string,
+	_companyId?: string | number,
+	_userId?: string | number,
 ) {
 	const dateKey =
 		(startDate ? String(startDate).slice(0, 7) : "2026-08") || "2026-08";

@@ -2,11 +2,11 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ordersApi, safeImageUrl, fileUrl } from "@/lib/api/endpoints";
+import { ordersApi, safeImageUrl } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";
 import { usePermissions } from "@/hooks/use-permissions";
 import { toast } from "sonner";
-import { Order, OrderItem } from "@/lib/types";
+import { OrderItem } from "@/lib/types";
 import {
 	ModernModal,
 	ModernModalFooter,
@@ -37,7 +37,6 @@ import {
 	Loader2,
 	Send,
 	Boxes,
-	AlertCircle,
 	ShieldCheck,
 	Receipt,
 	RotateCcw,
@@ -46,17 +45,11 @@ import {
 	CheckCircle2,
 	Building2,
 	User,
-	PackageCheck,
 	Eye,
 	ShoppingCart,
-	DollarSign,
-	Tag,
 	Package,
-	Check,
 	Save,
 	Gift,
-	Truck,
-	MapPin,
 	UserCheck,
 	Ban,
 	ChevronDown,
@@ -119,7 +112,7 @@ export function OrderDetailsDrawer({
 }: OrderDetailsDrawerProps) {
 	const queryClient = useQueryClient();
 	const {
-		isAdmin,
+		isAdmin: _isAdmin,
 		isSale,
 		canCreateOrder,
 		canPostOrder,

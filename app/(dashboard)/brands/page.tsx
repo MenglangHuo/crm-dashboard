@@ -6,12 +6,13 @@ import { brandsApi } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Tag } from "lucide-react";
+import { Tag, Trash2 } from "lucide-react";
 import {
 	DataTable,
 	ColumnDef,
 	BRAND_DOMAIN_FILTERS,
 } from "@/components/ui-custom/data-table";
+import { DeleteFromDbDialog } from "@/components/ui-custom/delete-from-db-dialog";
 import {
 	ModernModal,
 	ModernModalFooter,
@@ -64,6 +65,18 @@ export default function BrandsPage() {
 		onSuccess: () => {
 			toast.success("Brand deactivated successfully");
 			queryClient.invalidateQueries({ queryKey: ["brands"] });
+		},
+		onError: (error) => toast.error(getErrorMessage(error)),
+	});
+
+	const [deleteTarget, setDeleteTarget] = useState<Brand | null>(null);
+
+	const deleteFromDbMutation = useMutation({
+		mutationFn: (id: string | number) => brandsApi.deleteFromDb(String(id)),
+		onSuccess: () => {
+			toast.success("Brand permanently deleted from database");
+			queryClient.invalidateQueries({ queryKey: ["brands"] });
+			setDeleteTarget(null);
 		},
 		onError: (error) => toast.error(getErrorMessage(error)),
 	});
@@ -177,7 +190,40 @@ export default function BrandsPage() {
 				onPageSizeChange={setPageSize}
 				isLoading={isLoading}
 				onEditRow={openEditDialog}
-				onDeleteRow={(item) => deleteMutation.mutate(item.id)}
+				onDeleteRow={(item) => setDeleteTarget(item)}
+				customRowActions={[
+					{
+						id: "delete-from-db",
+						label: "Delete from Database",
+						icon: <Trash2 className="h-3.5 w-3.5 text-rose-600" />,
+						variant: "destructive",
+						onClick: (brand) => setDeleteTarget(brand),
+					},
+				]}
+			/>
+
+			<DeleteFromDbDialog
+				open={Boolean(deleteTarget)}
+				onOpenChange={(open) => {
+					if (!open) setDeleteTarget(null);
+				}}
+				itemName={deleteTarget?.name || ""}
+				itemType="brand"
+				itemIdentifier={deleteTarget?.id}
+				isLoading={deleteFromDbMutation.isPending}
+				isDeactivating={deleteMutation.isPending}
+				onConfirm={() => {
+					if (deleteTarget) {
+						deleteFromDbMutation.mutate(deleteTarget.id);
+					}
+				}}
+				onDeactivate={() => {
+					if (deleteTarget) {
+						deleteMutation.mutate(deleteTarget.id, {
+							onSettled: () => setDeleteTarget(null),
+						});
+					}
+				}}
 			/>
 
 			<ModernModal

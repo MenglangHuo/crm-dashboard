@@ -16,13 +16,7 @@ import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
 import {
 	Product,
-	Supplier,
-	Warehouse,
-	Category,
-	Unit,
 	VariantUnit,
-	DynamicInventorySubmitPayload,
-	DynamicInventoryItemPayload,
 	StockAdjustmentPayload,
 } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
@@ -41,7 +35,6 @@ import { ModernDatePicker } from "@/components/ui-custom/form-controls/modern-da
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
 	Package,
 	Search,
@@ -50,11 +43,8 @@ import {
 	Trash2,
 	Building2,
 	Truck,
-	Sparkles,
-	DollarSign,
 	Tag,
 	Boxes,
-	Calendar,
 	Clock,
 	FileText,
 	RefreshCw,
@@ -66,19 +56,11 @@ import {
 	ChevronUp,
 	TrendingUp,
 	Layers,
-	ArrowRightLeft,
-	AlertCircle,
 	AlertTriangle,
 	CheckCircle2,
 	X,
-	Store,
-	Phone,
-	BarChart3,
 	SlidersHorizontal,
 	Scale,
-	ArrowDownRight,
-	ArrowUpRight,
-	HelpCircle,
 } from "lucide-react";
 
 // Types

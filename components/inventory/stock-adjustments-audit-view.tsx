@@ -17,7 +17,6 @@ import { DynamicFilterModal } from "@/components/ui-custom/data-table/dynamic-fi
 import { STOCK_ADJUSTMENT_DOMAIN_FILTERS } from "@/components/ui-custom/data-table/domain-filter-configs";
 import { FilterCriterion } from "@/components/ui-custom/data-table/search-filter-types";
 import {
-	History,
 	Search,
 	RefreshCw,
 	SlidersHorizontal,
@@ -38,7 +37,6 @@ import {
 	Check,
 	Eye,
 	Clock,
-	RotateCcw,
 	Layers,
 	Tag,
 	Filter,
@@ -48,7 +46,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/context";
 
 export function StockAdjustmentsAuditView() {
-	const { t } = useTranslation();
+	const { t: _t } = useTranslation();
 
 	// Search & Pagination
 	const [search, setSearch] = useState("");

@@ -5,7 +5,7 @@ export async function GET(
 	_request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
-	const { profile, error } = await requireAuth();
+	const { profile: _profile, error } = await requireAuth();
 	if (error) return error;
 
 	const { id } = await params;
@@ -53,7 +53,7 @@ export async function updateRoleHandler(
 	request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
-	const { profile, error } = await requireAuth();
+	const { profile: _profile, error } = await requireAuth();
 	if (error) return error;
 	const { id } = await params;
 	const role = db.roles.find((r) => r.id === id || String(r.id) === String(id));

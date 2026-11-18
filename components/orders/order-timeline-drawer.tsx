@@ -23,7 +23,6 @@ import {
 	ArrowRight,
 	UserCheck,
 	FileDiff,
-	Tag,
 	Clock,
 	Layers,
 	Edit3,
@@ -34,9 +33,7 @@ import {
 	Package,
 	DollarSign,
 	Search,
-	Hash,
 	Shield,
-	Calendar,
 } from "lucide-react";
 
 interface OrderTimelineDrawerProps {

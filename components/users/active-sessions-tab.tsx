@@ -1,41 +1,34 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { sessionsApi, authApi } from "@/lib/api/endpoints";
 import { clearClientSession, getErrorMessage } from "@/lib/api/client";
+import { authApi, sessionsApi } from "@/lib/api/endpoints";
 import { useTranslation } from "@/lib/i18n/context";
-import { toast } from "sonner";
 import type { ActiveSessionResponse, DeviceType } from "@/lib/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { toast } from "sonner";
 
 import {
+	AlertTriangle,
+	Check,
+	CheckCircle2,
+	Edit3,
+	Globe,
 	Laptop,
+	Lock,
+	LogOut,
+	RefreshCw,
+	ShieldAlert,
 	Smartphone,
 	Tablet,
-	Monitor,
-	Globe,
-	ShieldCheck,
-	ShieldAlert,
-	CheckCircle2,
-	Clock,
-	Activity,
-	LogOut,
 	Trash2,
-	Edit3,
-	Check,
-	X,
-	RefreshCw,
-	AlertTriangle,
-	Info,
-	Radio,
-	Sparkles,
-	Lock,
+	X
 } from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ModernButton } from "@/components/ui-custom/modern-button";
 import { ModernModal } from "@/components/ui-custom/modal/modern-modal";
+import { ModernButton } from "@/components/ui-custom/modern-button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface ActiveSessionsTabProps {
 	onSessionCountChange?: (count: number) => void;

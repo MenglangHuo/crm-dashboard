@@ -3,22 +3,16 @@
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { customersApi } from "@/lib/api/endpoints";
-import { Customer, CustomerNearbyResult } from "@/lib/types";
+import { Customer } from "@/lib/types";
 import { VisitStatusBadge } from "./visit-status-badge";
 import { LeafletMap } from "./leaflet-map";
 import {
-	MapPin,
-	Navigation,
-	Compass,
 	Phone,
 	ExternalLink,
 	Loader2,
-	Users,
-	Building2,
 	Zap,
 	Map as MapIcon,
 	LayoutGrid,
-	Image as ImageIcon,
 	LocateFixed,
 } from "lucide-react";
 import { ModernButton } from "@/components/ui-custom/button";
@@ -70,7 +64,7 @@ export function NearbyMapView({ onLogVisit }: Props) {
 				setIsDetecting(false);
 				toast.success("GPS Location updated successfully");
 			},
-			(err) => {
+			(_err) => {
 				setIsDetecting(false);
 				setCoords(DEFAULT_CENTER);
 				toast.info("Using center coordinates fallback");

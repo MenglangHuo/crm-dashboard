@@ -4,22 +4,16 @@ import * as React from "react";
 import Link from "next/link";
 import {
 	AlertTriangle,
-	ArrowDownRight,
 	ArrowUpRight,
 	BadgePercent,
 	Boxes,
 	CircleDollarSign,
 	CreditCard,
-	FileCheck,
-	FileText,
-	Package,
 	Percent,
 	Receipt,
-	ShieldAlert,
 	ShoppingCart,
 	TrendingDown,
 	TrendingUp,
-	Truck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -102,9 +96,9 @@ export function FinancialKpiGrid({
 	const lowStockCount = data?.lowStockCount ?? 0;
 	const outOfStockCount = data?.outOfStockCount ?? 0;
 	const totalUnpaid = data?.totalUnpaid ?? 0;
-	const totalTaxAmount = data?.totalTaxAmount ?? 0;
-	const totalShippingAmount = data?.totalShippingAmount ?? 0;
-	const totalProducts = data?.totalProducts ?? 0;
+	const _totalTaxAmount = data?.totalTaxAmount ?? 0;
+	const _totalShippingAmount = data?.totalShippingAmount ?? 0;
+	const _totalProducts = data?.totalProducts ?? 0;
 
 	const isProfitPositive = grossProfit >= 0;
 	const profitMarginPercent =

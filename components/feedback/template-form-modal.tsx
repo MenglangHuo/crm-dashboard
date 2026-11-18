@@ -9,7 +9,6 @@ import type {
 	FeedbackTemplate,
 	FeedbackQuestion,
 	CreateFeedbackTemplateInput,
-	TemplateQuestionAssignment,
 } from "@/lib/types";
 import {
 	ModernModal,
@@ -19,7 +18,6 @@ import {
 } from "@/components/ui-custom/modal";
 import {
 	ModernInput,
-	ModernTextarea,
 } from "@/components/ui-custom/form-controls";
 import { ModernButton } from "@/components/ui-custom/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,9 +30,7 @@ import {
 	HelpCircle,
 	ArrowUp,
 	ArrowDown,
-	CheckCircle2,
 	Search,
-	Sparkles,
 	Layers,
 	Check,
 	GripVertical,
@@ -80,7 +76,7 @@ export function TemplateFormModal({
 	const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
 	// Fetch Question Bank
-	const { data: questionsData, isLoading: isLoadingQuestions } = useQuery({
+	const { data: questionsData, isLoading: _isLoadingQuestions } = useQuery({
 		queryKey: ["feedback-questions-for-template"],
 		queryFn: () => feedbackApi.searchQuestions({ size: 100 }),
 		enabled: open,

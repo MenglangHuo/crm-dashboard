@@ -9,13 +9,9 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, MapPin, Phone, RefreshCw } from "lucide-react";
+import { MapPin, Phone, RefreshCw } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import {
 	DataTable,
 	ColumnDef,
@@ -45,7 +41,7 @@ export default function BranchesPage() {
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
 
-	const { data, isLoading, isFetching, refetch } = useQuery({
+	const { data, isLoading, isFetching: _isFetching, refetch } = useQuery({
 		queryKey: ["branches", { page, pageSize, search }],
 		queryFn: () =>
 			branchesApi.list({ page, limit: pageSize, search, includeDeleted: true }),

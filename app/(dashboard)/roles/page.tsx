@@ -27,10 +27,6 @@ import {
 	Eye,
 	Plus,
 	Search,
-	Sparkles,
-	Calendar,
-	MoreVertical,
-	CheckCircle2,
 	Trash2,
 	Edit,
 	ArrowUpDown,
@@ -375,7 +371,7 @@ export default function RolesPage() {
 	};
 
 	// Summary Metrics calculations
-	const stats = useMemo(() => {
+	const _stats = useMemo(() => {
 		const totalRoles = data?.total || rolesList.length;
 		const topTierCount = rolesList.filter(
 			(r) => r.priority === 0 || r.name === "VILLA_ADMIN",

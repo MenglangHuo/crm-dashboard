@@ -34,13 +34,9 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import {
-	ArrowUpRight,
-	CheckCircle2,
 	Download,
 	Inbox,
-	Loader2,
 	MessageSquare,
-	Sparkles,
 	Star,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -50,8 +46,6 @@ import { PermissionGuard } from "@/components/auth/permission-guard";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import type {
 	DashboardReportData,
-	TimeSeriesMetricItem,
-	IncomeComparisonData,
 } from "@/lib/types";
 
 // Empty fallback structure for initial unpopulated state
@@ -73,7 +67,7 @@ const EMPTY_DASHBOARD_DATA: DashboardReportData = {
 	topProductsByQuantity: [],
 };
 
-const cardClass =
+const _cardClass =
 	"rounded-2xl border border-slate-200/80 bg-white/90 shadow-xs backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/85";
 
 export default function DashboardPage() {
@@ -132,7 +126,7 @@ export default function DashboardPage() {
 		data: dashboardData,
 		isLoading: isLoadingDashboard,
 		isFetching: isFetchingDashboard,
-		refetch: refetchDashboard,
+		refetch: _refetchDashboard,
 	} = useQuery({
 		queryKey: [
 			"dashboard-report",
@@ -154,7 +148,7 @@ export default function DashboardPage() {
 	const {
 		data: timeSeriesData,
 		isLoading: isLoadingTimeSeries,
-		refetch: refetchTimeSeries,
+		refetch: _refetchTimeSeries,
 	} = useQuery({
 		queryKey: [
 			"time-series-report",
@@ -176,7 +170,7 @@ export default function DashboardPage() {
 	const {
 		data: incomeData,
 		isLoading: isLoadingIncome,
-		refetch: refetchIncome,
+		refetch: _refetchIncome,
 	} = useQuery({
 		queryKey: ["income-comparison-report"],
 		queryFn: () => reportsApi.getIncomeComparison(),
@@ -196,7 +190,7 @@ export default function DashboardPage() {
 	const {
 		data: submissionsData,
 		isLoading: isLoadingSubmissions,
-		refetch: refetchSubmissions,
+		refetch: _refetchSubmissions,
 	} = useQuery({
 		queryKey: [
 			"feedback-submissions-summary",

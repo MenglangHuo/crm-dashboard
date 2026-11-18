@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	inventoryImportsApi,
 	supplierReturnsApi,
-	suppliersApi,
 } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
@@ -39,26 +38,19 @@ import {
 	Truck,
 	Plus,
 	Boxes,
-	Building2,
 	Calendar,
-	DollarSign,
-	TrendingUp,
 	RefreshCw,
 	Eye,
 	Pencil,
 	Copy,
 	CheckCheck,
 	Trash2,
-	Tag,
 	CheckCircle2,
 	Clock,
-	Package,
-	Layers,
 	SlidersHorizontal,
 	ShieldCheck,
 	RotateCcw,
 	AlertTriangle,
-	ExternalLink,
 } from "lucide-react";
 
 export default function InventoryImportsPage() {

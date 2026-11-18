@@ -9,12 +9,10 @@ import {
 	CheckCircle2,
 	Phone,
 	Mail,
-	MessageSquare,
 	AlertCircle,
 	X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { OtpPinInput } from "@/components/auth/otp-pin-input";
 import { authApi } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";

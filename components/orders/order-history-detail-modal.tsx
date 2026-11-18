@@ -27,7 +27,6 @@ import {
 	UserCheck,
 	Boxes,
 	Receipt,
-	CheckCircle2,
 	ShieldCheck,
 	Plus,
 	Gift,

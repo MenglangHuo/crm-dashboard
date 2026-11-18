@@ -355,7 +355,7 @@ export function normalizeRole(raw: any): Role {
 	);
 	const isSystem = isSystemDefault;
 
-	let permissionsMap: RolePermissionsMap = {};
+	const permissionsMap: RolePermissionsMap = {};
 	const derivedPermissionIds = extractRolePermissionIds(raw);
 
 	if (Array.isArray(raw.permissions)) {
@@ -654,7 +654,7 @@ export function formatRolePermissionsPayload(
 	if (Array.isArray(permissionsData) && permissionsData.length > 0) {
 		permissionsData.forEach((p) => {
 			let rawMod = String(p.module || "").trim();
-			let rawName = String(p.name || "").trim();
+			const rawName = String(p.name || "").trim();
 			let actionName = "";
 
 			if (rawName.includes(".")) {
