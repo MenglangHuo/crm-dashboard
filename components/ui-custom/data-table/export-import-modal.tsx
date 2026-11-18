@@ -6,9 +6,7 @@ import {
 	Upload,
 	FileSpreadsheet,
 	FileJson,
-	Check,
 	Loader2,
-	AlertCircle,
 } from "lucide-react";
 import {
 	Dialog,
@@ -224,7 +222,7 @@ export function ImportModal({
 	onOpenChange,
 	onImportData,
 }: ImportModalProps) {
-	const { t } = useTranslation();
+	const { t: _t } = useTranslation();
 	const [file, setFile] = useState<File | null>(null);
 	const [isProcessing, setIsProcessing] = useState(false);
 

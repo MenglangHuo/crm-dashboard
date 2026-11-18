@@ -23,13 +23,9 @@ import { Button } from "@/components/ui/button";
 import {
 	CreditCard,
 	AlertTriangle,
-	CheckCircle2,
-	DollarSign,
-	Calendar,
 	Layers,
 	FileText,
 	UserCheck,
-	Tag,
 	Hash,
 	Link as LinkIcon,
 	Sparkles,
@@ -61,7 +57,7 @@ export function MultiInvoicePaymentModal({
 	selectedInvoices,
 	onSuccess,
 }: MultiInvoicePaymentModalProps) {
-	const { t } = useTranslation();
+	const { t: _t } = useTranslation();
 	const queryClient = useQueryClient();
 
 	// Detect and group customers from selected invoices

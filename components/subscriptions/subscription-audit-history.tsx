@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { subscriptionsApi } from "@/lib/api/endpoints";
-import { SubscriptionAuditLog, SubscriptionStatus } from "@/types/subscription";
+import { SubscriptionAuditLog } from "@/types/subscription";
 import { SubscriptionAuditDetailModal } from "./subscription-audit-detail-modal";
 import { DataTable, ColumnDef } from "@/components/ui-custom/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,6 @@ import { useTranslation } from "@/lib/i18n/context";
 import {
 	Clock,
 	Search,
-	Filter,
 	Eye,
 	TrendingUp,
 	TrendingDown,
@@ -24,9 +23,6 @@ import {
 	Zap,
 	ArrowRight,
 	UserCheck,
-	Building2,
-	Calendar,
-	Layers,
 	FileText,
 } from "lucide-react";
 
@@ -107,7 +103,7 @@ interface SubscriptionAuditHistorySectionProps {
 
 export function SubscriptionAuditHistorySection({
 	effectiveCompanyId,
-	isSystemAdmin,
+	isSystemAdmin: _isSystemAdmin,
 }: SubscriptionAuditHistorySectionProps) {
 	const { t } = useTranslation();
 	const [searchTerm, setSearchTerm] = useState("");
@@ -119,7 +115,7 @@ export function SubscriptionAuditHistorySection({
 	// Fetch subscription history audit log from API
 	const {
 		data: pagedResult,
-		isLoading,
+		isLoading: _isLoading,
 		refetch,
 	} = useQuery({
 		queryKey: ["subscription-history-audit", effectiveCompanyId],

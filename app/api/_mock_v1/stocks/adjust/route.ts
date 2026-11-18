@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mockDb } from "@/lib/server/db";
 
 export async function POST(req: NextRequest) {
 	try {

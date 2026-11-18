@@ -18,7 +18,7 @@ import { toast } from "sonner";
 export function LanguageSwitcher() {
 	const { locale, setLocale, t } = useTranslation();
 
-	const currentOption =
+	const _currentOption =
 		SUPPORTED_LOCALES.find((item) => item.code === locale) ||
 		SUPPORTED_LOCALES[0];
 

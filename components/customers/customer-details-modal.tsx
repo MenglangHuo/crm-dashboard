@@ -12,19 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { ModernButton } from "@/components/ui-custom/button";
 import Link from "next/link";
 import {
-	User,
 	Phone,
-	Building2,
 	MapPin,
 	Users,
 	Truck,
 	Zap,
 	ExternalLink,
-	Calendar,
 	Image as ImageIcon,
 	Edit3,
-	Star,
-	FileText,
 } from "lucide-react";
 
 interface Props {

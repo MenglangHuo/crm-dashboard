@@ -1,28 +1,25 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { usePathname } from "next/navigation";
 import { profileApi } from "@/lib/api/endpoints";
 import {
+	checkCan,
+	checkCanAll,
+	checkCanAny,
 	extractAllAuthorities,
+	getClientAccessToken,
 	isUserAdmin,
 	isUserSale,
-	checkHasPermission,
-	checkCan,
-	checkCanAny,
-	checkCanAll,
 	normalizePermissionKey,
-	getClientAccessToken,
-	PermissionResource,
 	PermissionAction,
-	type PermissionCheckItem,
+	PermissionResource,
+	type PermissionCheckItem
 } from "@/lib/auth-permissions";
+import { useQuery } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
+import { useMemo, useSyncExternalStore } from "react";
 
 export {
-	PermissionResource,
-	PermissionAction,
-	type PermissionCheckItem,
+	PermissionAction, PermissionResource, type PermissionCheckItem
 };
 
 const emptySubscribe = () => () => {};

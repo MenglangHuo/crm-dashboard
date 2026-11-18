@@ -15,7 +15,7 @@ import {
 } from "@/lib/api/endpoints";
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
-import { Product, Customer, Order, VariantUnit, PaymentTerm } from "@/lib/types";
+import { Product, Order, VariantUnit, PaymentTerm } from "@/lib/types";
 import {
 	ModernModal,
 	ModernModalFooter,
@@ -46,7 +46,6 @@ import {
 	ChevronRight,
 	Sparkles,
 	DollarSign,
-	Lock,
 	Gift,
 	Truck,
 	MapPin,
@@ -58,7 +57,6 @@ import {
 	Layers,
 	Edit3,
 	Check,
-	Percent,
 	Copy,
 	Clock,
 } from "lucide-react";

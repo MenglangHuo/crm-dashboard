@@ -7,9 +7,7 @@ import {
 	Boxes,
 	CircleDollarSign,
 	Crown,
-	Medal,
 	Package,
-	Sparkles,
 	Trophy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

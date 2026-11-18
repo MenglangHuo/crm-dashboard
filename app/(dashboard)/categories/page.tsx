@@ -27,6 +27,7 @@ import {
 import { ModernInput } from "@/components/ui-custom/form-controls";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { DeleteFromDbDialog } from "@/components/ui-custom/delete-from-db-dialog";
 import { useTranslation } from "@/lib/i18n/context";
 import type { Category } from "@/lib/types";
 
@@ -71,12 +72,25 @@ export default function CategoriesPage() {
 		onError: (error) => toast.error(getErrorMessage(error)),
 	});
 
+	const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+
 	const deleteMutation = useMutation({
 		mutationFn: (id: string | number) => categoriesApi.remove(String(id)),
 		onSuccess: () => {
 			toast.success("Category deactivated successfully");
 			queryClient.invalidateQueries({ queryKey: ["categories"] });
 			queryClient.invalidateQueries({ queryKey: ["categories-all"] });
+		},
+		onError: (error) => toast.error(getErrorMessage(error)),
+	});
+
+	const deleteFromDbMutation = useMutation({
+		mutationFn: (id: string | number) => categoriesApi.deleteFromDb(String(id)),
+		onSuccess: () => {
+			toast.success("Category permanently deleted from database");
+			queryClient.invalidateQueries({ queryKey: ["categories"] });
+			queryClient.invalidateQueries({ queryKey: ["categories-all"] });
+			setDeleteTarget(null);
 		},
 		onError: (error) => toast.error(getErrorMessage(error)),
 	});
@@ -233,7 +247,40 @@ export default function CategoriesPage() {
 				onPageSizeChange={setPageSize}
 				isLoading={isLoading}
 				onEditRow={openEditDialog}
-				onDeleteRow={(item) => deleteMutation.mutate(item.id)}
+				onDeleteRow={(item) => setDeleteTarget(item)}
+				customRowActions={[
+					{
+						id: "delete-from-db",
+						label: "Delete from Database",
+						icon: <Trash2 className="h-3.5 w-3.5 text-rose-600" />,
+						variant: "destructive",
+						onClick: (cat) => setDeleteTarget(cat),
+					},
+				]}
+			/>
+
+			<DeleteFromDbDialog
+				open={Boolean(deleteTarget)}
+				onOpenChange={(open) => {
+					if (!open) setDeleteTarget(null);
+				}}
+				itemName={deleteTarget?.name || ""}
+				itemType="category"
+				itemIdentifier={deleteTarget?.id}
+				isLoading={deleteFromDbMutation.isPending}
+				isDeactivating={deleteMutation.isPending}
+				onConfirm={() => {
+					if (deleteTarget) {
+						deleteFromDbMutation.mutate(deleteTarget.id);
+					}
+				}}
+				onDeactivate={() => {
+					if (deleteTarget) {
+						deleteMutation.mutate(deleteTarget.id, {
+							onSettled: () => setDeleteTarget(null),
+						});
+					}
+				}}
 			/>
 
 			<ModernModal

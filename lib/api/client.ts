@@ -7,11 +7,10 @@
 // clears session and redirects to the login/sign-in page.
 // ============================================================
 
-import axios, { AxiosError } from "axios";
-import type { InternalAxiosRequestConfig } from "axios";
 import { refreshAuthCookies } from "@/app/actions/auth";
-import type { ApiResponse } from "@/lib/types";
 import { env } from "@/lib/config/env";
+import type { ApiResponse } from "@/lib/types";
+import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 
 export class ApiError extends Error {
 	code: string;
@@ -208,15 +207,19 @@ api.interceptors.request.use((config) => {
 		if (token) {
 			config.headers.Authorization = `Bearer ${token}`;
 		}
-		config.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
-		config.headers["Pragma"] = "no-cache";
+		const locale =
+			readCookie("crm_locale") ||
+			localStorage.getItem("crm_locale") ||
+			"en";
+		config.headers["Accept-Language"] = locale === "km" ? "km" : "en";
+		config.headers["X-Language"] = locale === "km" ? "km" : "en";
 
 		const companyId =
 			readCookie("crm_company_id") ||
 			localStorage.getItem("crm_company_id");
-		const isSystemAdmin =
-			readCookie("crm_is_system_admin") === "true" ||
-			localStorage.getItem("crm_is_system_admin") === "true";
+		// const isSystemAdmin =
+		// 	readCookie("crm_is_system_admin") === "true" ||
+		// 	localStorage.getItem("crm_is_system_admin") === "true";
 
 		if (companyId) {
 			config.headers["X-Company-Id"] = companyId;
@@ -320,7 +323,7 @@ api.interceptors.response.use(
 			if (msg) {
 				throw new ApiError(
 					msg,
-					body.error || body.code || "REQUEST_FAILED",
+					body.code || body.error || "REQUEST_FAILED",
 					error.response?.status ?? 500,
 				);
 			}
@@ -333,13 +336,30 @@ api.interceptors.response.use(
 	},
 );
 
-export function getErrorMessage(error: unknown) {
-	if (error instanceof ApiError) return error.message;
+export function getErrorMessage(
+	error: unknown,
+	t?: (path: string, defaultText?: string) => string,
+): string {
+	if (error instanceof ApiError) {
+		if (t && error.code) {
+			const translated = t(`apiErrors.${error.code}`, "");
+			if (translated && translated !== `apiErrors.${error.code}`) {
+				return translated;
+			}
+		}
+		return error.message;
+	}
 	if (error instanceof Error) {
 		const axErr = error as AxiosError<any>;
 		if (axErr.response?.data) {
 			const data = axErr.response.data;
 			if (typeof data === "string") return data;
+			if (t && data.code) {
+				const translated = t(`apiErrors.${data.code}`, "");
+				if (translated && translated !== `apiErrors.${data.code}`) {
+					return translated;
+				}
+			}
 			if (data.message) return data.message;
 			if (data.error) return data.error;
 		}

@@ -10,7 +10,6 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-	Loader2,
 	Briefcase,
 	FileIcon,
 	Mail,
@@ -19,8 +18,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
 	DataTable,
 	ColumnDef,
@@ -36,7 +33,6 @@ import {
 } from "@/components/ui-custom/modal";
 import { ModernInput } from "@/components/ui-custom/form-controls";
 import { FileUpload } from "@/components/ui-custom/file-upload";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 const formSchema = z.object({
 	firstName: z.string().min(1, "First name is required"),

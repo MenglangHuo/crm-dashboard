@@ -5,7 +5,7 @@ export async function POST(
 	request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
-	const { profile, error } = await requireAuth("users.update");
+	const { profile: _profile, error } = await requireAuth("users.update");
 	if (error) return error;
 	const { id } = await params;
 	const user = db.users.find((u) => String(u.id) === String(id));

@@ -19,7 +19,6 @@ import {
 	Search,
 	RefreshCw,
 	X,
-	ShieldAlert,
 	Calendar,
 	User as UserIcon,
 } from "lucide-react";

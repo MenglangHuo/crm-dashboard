@@ -13,13 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	RotateCcw,
-	Truck,
-	Building2,
-	Calendar,
-	DollarSign,
 	Boxes,
-	Package,
-	Layers,
 	CheckCircle2,
 	ShieldCheck,
 	Clock,
@@ -28,8 +22,6 @@ import {
 	CheckCheck,
 	Printer,
 	Loader2,
-	FileText,
-	UserCheck,
 	ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,7 +45,7 @@ export function SupplierReturnDetailsDrawer({
 	onViewOriginImport,
 }: SupplierReturnDetailsDrawerProps) {
 	const [copiedReturnNum, setCopiedReturnNum] = useState(false);
-	const [copiedImportNum, setCopiedImportNum] = useState(false);
+	const [_copiedImportNum, setCopiedImportNum] = useState(false);
 
 	const effectiveId = returnId ?? initialData?.id;
 

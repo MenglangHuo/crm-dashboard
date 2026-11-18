@@ -1,27 +1,21 @@
 "use client";
 
 import React, { useState, useMemo, Suspense } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	stocksApi,
 	warehousesApi,
-	inventoryImportsApi,
 	stockMovementsApi,
 	productsApi,
 	categoriesApi,
 	brandsApi,
-	unitsApi,
 	safeImageUrl,
 	DEFAULT_IMAGE_URL,
 } from "@/lib/api/endpoints";
 import {
 	StockProductItem,
 	StockVariantItem,
-	StockAdjustmentPayload,
-	StockAdjustmentItemInput,
 	StockMovementVariantItem,
-	StockMovement,
-	InventoryImport,
 } from "@/lib/types";
 import {
 	DynamicInventoryStudioModal,
@@ -48,48 +42,34 @@ import {
 	Boxes,
 	Warehouse as WarehouseIcon,
 	AlertTriangle,
-	ArrowDownLeft,
-	ArrowUpRight,
-	Plus,
 	Loader2,
 	Truck,
 	History,
-	TrendingUp,
 	SlidersHorizontal,
-	CheckCircle2,
 	Search,
 	X,
 	RefreshCw,
 	Layers,
 	ChevronDown,
 	ChevronRight,
-	PackageCheck,
+	ChevronLeft,
 	Scale,
-	Minus,
-	FileText,
-	BarChart3,
-	Building2,
 	Tag,
-	DollarSign,
-	Info,
-	Coins,
-	CircleDollarSign,
-	Receipt,
-	ArrowRight,
-	GitFork,
 	LayoutGrid,
 	LayoutList,
-	List,
 	Package,
-	Percent,
-	Sparkles,
 	Eye,
+	CornerDownRight,
+	ChevronsUpDown,
+	ChevronsDownUp,
 } from "lucide-react";
 import {
-	DataTable,
-	ColumnDef,
-	StatusBadgeCell,
-} from "@/components/ui-custom/data-table";
+	DropdownMenu,
+	DropdownMenuTrigger,
+	DropdownMenuContent,
+} from "@/components/ui/dropdown-menu";
+
+
 import {
 	ModernTabs,
 	ModernTabsList,
@@ -98,7 +78,6 @@ import {
 } from "@/components/ui-custom/modern-tabs";
 import { DynamicFilterModal } from "@/components/ui-custom/data-table/dynamic-filter-modal";
 import {
-	DomainFilterField,
 	FilterCriterion,
 	buildSearchFilterPayload,
 } from "@/components/ui-custom/data-table/search-filter-types";
@@ -110,19 +89,17 @@ import {
 	ModernModal,
 	ModernModalFooter,
 	ModernModalCancelButton,
-	ModernModalSubmitButton,
 } from "@/components/ui-custom/modal";
 import {
-	ModernInput,
 	ModernSelect,
-	ModernTextarea,
 } from "@/components/ui-custom/form-controls";
-import { getErrorMessage } from "@/lib/api/client";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/context";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import { PermissionGate } from "@/components/auth/permission-gate";
+
+const STOCK_VARIANT_VIEW_PREFERENCE_KEY = "crm.stock.variant-view-mode";
 
 // Reusable Safe Product/Variant Image with Automatic Fallback Handling
 function StockProductImage({
@@ -614,6 +591,478 @@ function getNormalizedVariantStockData(
 	};
 }
 
+/**
+ * Cascading / Hierarchical multi-unit stock decomposition.
+ * Breaks down total quantity into discrete whole units from largest packaging tier down to smallest base tier.
+ * e.g., 2,369 Pcs with (Pcs: 1, Box: 24, Set: 240) => Set: 9, Box: 8, Pcs: 17
+ * e.g., 31 Pcs with (Pcs: 1, Box: 24, Set: 240) => Set: 0, Box: 1, Pcs: 7
+ */
+function decomposeQuantityByUnits(
+	totalQty: number,
+	allUnits: NormalizedStockUnit[],
+): Map<string | number, number> {
+	const result = new Map<string | number, number>();
+	if (!allUnits || allUnits.length === 0) return result;
+
+	// Sort descending by baseQuantity so largest packaging tier takes first quotient
+	const sortedDesc = [...allUnits].sort(
+		(a, b) => (b.baseQuantity || 1) - (a.baseQuantity || 1),
+	);
+
+	let remaining = Math.max(0, totalQty);
+	for (let i = 0; i < sortedDesc.length; i++) {
+		const unit = sortedDesc[i];
+		const bQty = unit.baseQuantity || 1;
+		if (i === sortedDesc.length - 1 || bQty <= 1) {
+			// Smallest / base unit absorbs remaining quotient
+			result.set(unit.unitId, remaining);
+			remaining = 0;
+		} else {
+			const count = Math.floor(remaining / bQty);
+			result.set(unit.unitId, count);
+			remaining = remaining % bQty;
+		}
+	}
+
+	return result;
+}
+
+function UnitPricingPopover({
+	stockData,
+	children,
+}: {
+	stockData: NormalizedVariantStockData;
+	children?: React.ReactNode;
+}) {
+	const { baseUnit, packageUnits, allUnits, basePrice, cost } = stockData;
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					(children as React.ReactElement) || (
+						<button
+							type="button"
+							className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80 transition-colors cursor-pointer"
+						>
+							<Package className="size-3 text-purple-500 shrink-0" />
+							<span className="truncate max-w-[130px]">
+								1 {baseUnit.unitName}
+								{packageUnits.length > 0
+									? ` · +${packageUnits.length} pkg`
+									: ""}
+							</span>
+							<ChevronDown className="size-2.5 opacity-60 shrink-0" />
+						</button>
+					)
+				}
+			/>
+			<DropdownMenuContent
+				align="start"
+				className="w-84 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl space-y-2.5 z-50"
+			>
+				<div className="flex items-center justify-between border-b pb-2 border-slate-100 dark:border-slate-800">
+					<div className="flex items-center gap-1.5">
+						<Tag className="size-3.5 text-purple-600 dark:text-purple-400" />
+						<span className="font-bold text-xs text-foreground uppercase tracking-wider">
+							Packaging & Price Schedule
+						</span>
+					</div>
+					<span className="text-[10px] font-mono text-muted-foreground bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded font-semibold">
+						{allUnits.length} {allUnits.length === 1 ? "Unit" : "Tiers"}
+					</span>
+				</div>
+
+				<div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
+					{allUnits.map((u) => (
+						<div
+							key={u.unitId}
+							className={cn(
+								"p-2 rounded-lg border text-xs flex items-center justify-between gap-2",
+								u.isBase
+									? "bg-purple-50/70 dark:bg-purple-950/40 border-purple-200/80 dark:border-purple-800/80"
+									: "bg-slate-50/60 dark:bg-slate-800/50 border-slate-200/70 dark:border-slate-700/70",
+							)}
+						>
+							<div className="space-y-0.5 min-w-0">
+								<div className="flex items-center gap-1.5">
+									<span className="font-bold text-xs text-foreground truncate">
+										{u.unitName}
+									</span>
+									{u.isBase ? (
+										<span className="text-[9px] font-bold px-1 py-0 rounded bg-purple-200 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+											Base
+										</span>
+									) : (
+										<span className="text-[10px] font-mono text-muted-foreground truncate">
+											{u.formulaText}
+										</span>
+									)}
+								</div>
+								<span className="text-[10px] font-mono text-muted-foreground block truncate">
+									Stock: {u.availableEquivalentStr}
+								</span>
+							</div>
+
+							<div className="text-right shrink-0">
+								<div className="flex items-baseline justify-end gap-1 font-mono">
+									<span className="font-black text-xs text-emerald-600 dark:text-emerald-400">
+										${u.sellingPrice.toFixed(2)}
+									</span>
+								</div>
+								{!u.isBase && (
+									<div className="flex items-center justify-end gap-1">
+										<span className="text-[9px] font-mono text-muted-foreground">
+											(${u.pricePerBaseUnit.toFixed(2)}/{baseUnit.unitName})
+										</span>
+										{u.savingsPercent && u.savingsPercent > 0 ? (
+											<span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1 rounded border border-emerald-200">
+												-{u.savingsPercent}%
+											</span>
+										) : null}
+									</div>
+								)}
+							</div>
+						</div>
+					))}
+				</div>
+
+				{cost > 0 && (
+					<div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+						<span>
+							Base Cost: ${cost.toFixed(2)}/{baseUnit.unitName}
+						</span>
+						{basePrice > 0 && (
+							<span className="text-emerald-600 font-semibold">
+								Margin: {(((basePrice - cost) / basePrice) * 100).toFixed(0)}%
+							</span>
+						)}
+					</div>
+				)}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function InteractiveVariantCard({
+	v,
+	product,
+	stockData,
+	productImagesMap,
+	openAdjustModalForVariant,
+	openVariantMovementsModal,
+	t,
+}: {
+	v: StockVariantItem;
+	product: StockProductItem;
+	stockData: NormalizedVariantStockData;
+	productImagesMap?: Map<string | number, any>;
+	openAdjustModalForVariant: any;
+	openVariantMovementsModal: any;
+	t: any;
+}) {
+	const {
+		baseUnit,
+		packageUnits: _packageUnits,
+		allUnits,
+		basePrice: _basePrice,
+		cost,
+		physicalStock,
+		availableStock,
+		reservedStock,
+		soldStock,
+		isOutOfStock,
+		isLowStock,
+		smartStockDecomposition: _smartStockDecomposition,
+	} = stockData;
+
+	const [activeUnitId, setActiveUnitId] = useState<string | number>(
+		baseUnit.unitId,
+	);
+	const activeUnit =
+		allUnits.find((u) => String(u.unitId) === String(activeUnitId)) || baseUnit;
+
+	const activePrice = activeUnit.sellingPrice;
+	const _activeSavings = activeUnit.savingsPercent;
+	const _isBase = activeUnit.isBase;
+	// Cascading decomposition for card metrics across all packaging units
+	const onHandDecomp = decomposeQuantityByUnits(physicalStock, allUnits);
+	const reservedDecomp = decomposeQuantityByUnits(reservedStock, allUnits);
+	const soldDecomp = decomposeQuantityByUnits(soldStock, allUnits);
+
+	const activeOnHand = onHandDecomp.get(activeUnit.unitId) ?? 0;
+	const activeReserved = reservedDecomp.get(activeUnit.unitId) ?? 0;
+	const activeSold = soldDecomp.get(activeUnit.unitId) ?? 0;
+
+	// Cost of variant for active unit (cost per base unit * activeUnit.baseQuantity)
+	const activeCost = cost > 0 ? cost * (activeUnit.baseQuantity || 1) : 0;
+
+	const marginPercent =
+		activeCost > 0 && activePrice > 0
+			? Math.round(((activePrice - activeCost) / activePrice) * 100)
+			: null;
+
+	return (
+		<div className="rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs hover:shadow-sm hover:border-purple-300 dark:hover:border-purple-800/60 transition-all flex flex-col justify-between overflow-hidden group">
+			{/* Body Section */}
+			<div className="p-3 sm:p-3.5 space-y-2.5">
+				{/* 1. Header: Image + Variant Name + SKU + Status */}
+				<div className="flex items-start gap-2.5">
+					<StockProductImage
+						src={extractVariantImageUrl(v, product, productImagesMap)}
+						alt={v.variantName}
+						className="size-10 rounded-lg border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center transition-transform group-hover:scale-105"
+					/>
+					<div className="min-w-0 flex-1 space-y-0.5">
+						<div className="flex items-center justify-between gap-1.5">
+							<h4
+								className="font-bold text-xs sm:text-sm text-foreground leading-tight truncate"
+								title={v.variantName}
+							>
+								{v.variantName}
+							</h4>
+							{/* Stock Status Pill */}
+							<div className="shrink-0">
+								{isOutOfStock ? (
+									<span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 whitespace-nowrap">
+										<span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
+										{t("stocks.outOfStock")}
+									</span>
+								) : isLowStock ? (
+									<span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60 whitespace-nowrap">
+										<span className="size-1.5 rounded-full bg-amber-500" />
+										{t("stocks.lowStockAlert")}
+									</span>
+								) : (
+									<span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60 whitespace-nowrap">
+										<span className="size-1.5 rounded-full bg-emerald-500" />
+										{t("stocks.inStock")}
+									</span>
+								)}
+							</div>
+						</div>
+
+						{/* SKU & Barcode */}
+						<div className="flex items-center gap-1 font-mono text-[9px] text-muted-foreground flex-wrap">
+							<span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded border border-slate-200/80 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-300">
+								SKU: {v.sku}
+							</span>
+							{v.barcode && (
+								<span className="text-slate-400 truncate max-w-[90px]">
+									· {v.barcode}
+								</span>
+							)}
+						</div>
+					</div>
+				</div>
+
+				{/* 2. Unit of Measure (UoM) - Compact row */}
+				{allUnits.length > 1 ? (
+					<div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 overflow-x-auto [scrollbar-width:none]">
+						{allUnits.map((u) => {
+							const isSelected = String(u.unitId) === String(activeUnitId);
+							return (
+								<button
+									key={u.unitId}
+									type="button"
+									onClick={() => setActiveUnitId(u.unitId)}
+									className={cn(
+										"h-6 px-2 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap",
+										isSelected
+											? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-2xs border border-slate-200/60 dark:border-slate-700"
+											: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+									)}
+								>
+									<span>{u.unitName}</span>
+									{u.isBase ? (
+										<span className="text-[8px] px-1 py-0 rounded font-semibold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+											Base
+										</span>
+									) : (
+										<span className="text-[9px] font-mono text-muted-foreground font-normal">
+											×{u.baseQuantity}
+										</span>
+									)}
+								</button>
+							);
+						})}
+					</div>
+				) : (
+					<div className="flex items-center justify-between text-[10px] px-2 py-0.5 rounded-md bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 text-muted-foreground">
+						<span className="font-semibold uppercase tracking-wider flex items-center gap-1 text-slate-500">
+							<Tag className="size-2.5 text-purple-500" /> UoM
+						</span>
+						<span className="font-mono text-[11px] font-semibold text-foreground flex items-center gap-1">
+							<span>{baseUnit.unitName}</span>
+							<span className="text-[8px] px-1 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-bold">
+								Base
+							</span>
+						</span>
+					</div>
+				)}
+
+				{/* 3. Side-by-Side Compact Operational Metrics (On Hand Stock & Selling Price/Cost) */}
+				<div className="grid grid-cols-2 gap-2">
+					{/* Left: On Hand Stock, Reserved & Sold */}
+					<div className="rounded-lg p-2.5 bg-slate-50/80 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 flex flex-col justify-between space-y-1">
+						<div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+							<span>On Hand</span>
+						</div>
+
+						{/* Primary On Hand Stock Number */}
+						<div className="flex items-baseline gap-0.5">
+							<span
+								className={cn(
+									"font-mono text-lg sm:text-xl font-bold tracking-tight leading-tight",
+									physicalStock <= 0
+										? "text-rose-600 dark:text-rose-400"
+										: isLowStock
+										? "text-amber-600 dark:text-amber-400"
+										: "text-blue-600 dark:text-blue-400",
+								)}
+							>
+								{activeOnHand.toLocaleString()}
+							</span>
+							<span className="text-[10px] font-medium text-muted-foreground font-mono ml-1">
+								{activeUnit.unitName}
+							</span>
+						</div>
+
+						{/* Secondary Micro-Metrics: Reserved (Amber) & Sold (Purple) */}
+						<div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-1 text-xs font-mono h-[34px]">
+							<div
+								className="flex flex-col justify-center"
+								title={`Reserved: ${activeReserved} ${activeUnit.unitName}`}
+							>
+								<span className="text-[8px] uppercase font-bold text-slate-500 leading-none">
+									Reserved
+								</span>
+								<span
+									className={cn(
+										"text-xs font-bold mt-0.5",
+										activeReserved > 0
+											? "text-amber-600 dark:text-amber-400"
+											: "text-slate-400 dark:text-slate-500",
+									)}
+								>
+									{activeReserved.toLocaleString()}
+								</span>
+							</div>
+							<div
+								className="flex flex-col items-end justify-center"
+								title={`Sold: ${activeSold} ${activeUnit.unitName}`}
+							>
+								<span className="text-[8px] uppercase font-bold text-slate-500 leading-none">
+									Sold
+								</span>
+								<span className="text-xs font-bold text-purple-600 dark:text-purple-400 mt-0.5">
+									{activeSold.toLocaleString()}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Right: Selling Price & Unit Cost */}
+					<div className="rounded-lg p-2.5 bg-slate-50/80 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 flex flex-col justify-between space-y-1">
+						<div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+							<span>Price</span>
+						</div>
+
+						{/* Primary Price Number (Clean & Proportional font size) */}
+						<div className="flex items-baseline gap-0.5">
+							<span className="font-mono text-lg sm:text-xl font-bold tracking-tight leading-tight text-emerald-700 dark:text-emerald-400">
+								${activePrice.toFixed(2)}
+							</span>
+							<span className="text-[10px] font-medium text-muted-foreground font-mono ml-0.5">
+								/{activeUnit.unitName}
+							</span>
+						</div>
+
+						{/* Secondary Micro-Metrics: Cost of Variant & Margin */}
+						<div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-1 text-xs font-mono h-[34px]">
+							<div
+								className="flex flex-col justify-center"
+								title={`Unit Cost: $${activeCost.toFixed(2)}/${activeUnit.unitName}`}
+							>
+								<span className="text-[8px] uppercase font-bold text-slate-500 leading-none">
+									Cost
+								</span>
+								<span className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-0.5">
+									{activeCost > 0 ? `$${activeCost.toFixed(2)}` : "—"}
+								</span>
+							</div>
+							{marginPercent !== null && (
+								<div className="flex flex-col items-end justify-center">
+									<span className="text-[8px] uppercase font-bold text-slate-500 leading-none">
+										Margin
+									</span>
+									<span
+										className={cn(
+											"font-bold text-xs mt-0.5",
+											marginPercent >= 0
+												? "text-emerald-600 dark:text-emerald-400"
+												: "text-rose-600 dark:text-rose-400",
+										)}
+										title={`Profit Margin: ${marginPercent}%`}
+									>
+										{marginPercent}%
+									</span>
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{/* 4. Footer Actions (Compact, responsive button bar) */}
+			<div className="p-2.5 px-3 bg-slate-50/90 dark:bg-slate-900/90 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2">
+				<Button
+					size="sm"
+					variant="outline"
+					onClick={() =>
+						openVariantMovementsModal(
+							v.variantId,
+							v.variantName,
+							v.sku,
+						)
+					}
+					className="h-7.5 text-xs font-semibold gap-1 text-slate-700 dark:text-slate-300 hover:text-purple-600 hover:border-purple-300 dark:hover:border-purple-800 rounded-lg"
+				>
+					<History className="size-3" />
+					<span>Movements</span>
+				</Button>
+
+				<Button
+					size="sm"
+					onClick={() =>
+						openAdjustModalForVariant(
+							v.variantId,
+							v.variantName,
+							v.sku,
+							{
+								productName:
+									product.productName ||
+									product.name ||
+									v.variantName,
+								unitId: baseUnit.unitId,
+								unitName: baseUnit.unitName,
+								availableStock: availableStock,
+								imageUrl:
+									(v.imageUrl || product.imageUrl) ??
+									undefined,
+							},
+						)
+					}
+					className="h-7.5 text-xs font-semibold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-2xs"
+				>
+					<Scale className="size-3" />
+					<span>Adjust</span>
+				</Button>
+			</div>
+		</div>
+	);
+}
+
 function StockPageContent() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
@@ -650,11 +1099,11 @@ function StockPageContent() {
 	const [activeFilters, setActiveFilters] = useState<FilterCriterion[]>([]);
 	const [isFilterStudioOpen, setIsFilterStudioOpen] = useState(false);
 	const [searchPage, setSearchPage] = useState(0); // 0-indexed for backend API
-	const [searchSize, setSearchSize] = useState(10);
+	const [searchSize, _setSearchSize] = useState(10);
 
 	// Low Stock & Out of Stock Pagination
-	const [lowStockPage, setLowStockPage] = useState(0);
-	const [outStockPage, setOutStockPage] = useState(0);
+	const [lowStockPage, _setLowStockPage] = useState(0);
+	const [outStockPage, _setOutStockPage] = useState(0);
 
 	// Expanded Product Table Rows state
 	const [expandedProducts, setExpandedProducts] = useState<
@@ -665,8 +1114,35 @@ function StockPageContent() {
 	const [globalVariantViewMode, setGlobalVariantViewMode] = useState<
 		"card" | "list"
 	>("list");
-	const [productViewModes, setProductViewModes] = useState<
-		Record<string | number, "card" | "list">
+	const [hasLoadedStockViewPreference, setHasLoadedStockViewPreference] =
+		useState(false);
+
+	React.useEffect(() => {
+		const savedViewMode = window.localStorage.getItem(
+			STOCK_VARIANT_VIEW_PREFERENCE_KEY,
+		);
+		if (savedViewMode === "card" || savedViewMode === "list") {
+			setGlobalVariantViewMode(savedViewMode);
+		}
+		setHasLoadedStockViewPreference(true);
+	}, []);
+
+	React.useEffect(() => {
+		if (!hasLoadedStockViewPreference) return;
+		window.localStorage.setItem(
+			STOCK_VARIANT_VIEW_PREFERENCE_KEY,
+			globalVariantViewMode,
+		);
+	}, [globalVariantViewMode, hasLoadedStockViewPreference]);
+
+	// Scrollable height expansion state (toggle between compact scrollable max-h-[380px] vs full max-h-none)
+	const [productScrollExpanded, setProductScrollExpanded] = useState<
+		Record<string | number, boolean>
+	>({});
+
+	// In-product variant filter/search query per product
+	const [variantSearches, setVariantSearches] = useState<
+		Record<string | number, string>
 	>({});
 
 	// Variant Movement History Modal State (Supports Warehouse Filtering)
@@ -706,13 +1182,13 @@ function StockPageContent() {
 		!!selectedVariantForMovements ||
 		!!selectedProductForModal;
 
-	const { data: categoriesData } = useQuery({
+	const { data: _categoriesData } = useQuery({
 		queryKey: ["categories-all"],
 		queryFn: () => categoriesApi.list({ limit: 100 }),
 		enabled: isFilterOrModalActive,
 	});
 
-	const { data: brandsData } = useQuery({
+	const { data: _brandsData } = useQuery({
 		queryKey: ["brands-all"],
 		queryFn: () => brandsApi.list({ limit: 100 }),
 		enabled: isFilterOrModalActive,
@@ -793,7 +1269,7 @@ function StockPageContent() {
 	}, [productsData]);
 
 	// Extract all variants from products list for dropdowns
-	const allVariants = useMemo(() => {
+	const _allVariants = useMemo(() => {
 		const items = productsData?.items || [];
 		const variantsList: Array<{
 			variantId: number;
@@ -1154,7 +1630,7 @@ function StockPageContent() {
 							</PermissionGate>
 
 							{/* Global Sub-row View Mode Toggle */}
-							<div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700 h-10">
+							<div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700 h-10">
 								<button
 									type="button"
 									onClick={() => setGlobalVariantViewMode("list")}
@@ -1257,31 +1733,144 @@ function StockPageContent() {
 							</p>
 						</div>
 					) : (
-						<div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-card overflow-hidden shadow-xs">
-							<Table>
-								<TableHeader className="bg-slate-50/80 dark:bg-slate-900/80">
+						<>
+							{/* Compact product-first layout for phones; variant details scroll vertically. */}
+							<div className="md:hidden space-y-2.5">
+								{searchStockData.map((product, idx) => {
+									const prodId = product.productId || product.productUuid || idx;
+									const variants = product.variants || [];
+									const isExpanded = expandedProducts[prodId] ?? false;
+									const totalOnHand = variants.reduce(
+										(sum, variant) => sum + (variant.inventorySummary?.totalPhysicalQty ?? variant.stockQty ?? 0),
+										0,
+									);
+									const totalAvailable = variants.reduce(
+										(sum, variant) => sum + (variant.inventorySummary?.availableQty ?? variant.stockQty ?? 0),
+										0,
+									);
+									const hasOutOfStock = totalAvailable <= 0;
+									const hasLowStock = variants.some((variant) => variant.inventorySummary?.isLowStock || ((variant.inventorySummary?.availableQty ?? variant.stockQty ?? 0) > 0 && (variant.inventorySummary?.availableQty ?? variant.stockQty ?? 0) <= (variant.inventorySummary?.lowStockThreshold ?? 5)));
+									const query = (variantSearches[prodId] || "").toLowerCase().trim();
+									const visibleVariants = query
+										? variants.filter((variant) => [variant.variantName, variant.sku, variant.barcode].some((value) => (value || "").toLowerCase().includes(query)))
+										: variants;
+
+									return (
+										<section key={prodId} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
+											<div className="flex items-center gap-3 p-3.5">
+												<button
+													type="button"
+													aria-expanded={isExpanded}
+													onClick={() => toggleProductExpand(prodId)}
+													className="flex min-w-0 flex-1 items-center gap-3 text-left"
+												>
+													<StockProductImage src={extractStockImageUrl(product, productImagesMap)} alt={product.productName || "Product"} className="size-11 rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800" />
+													<span className="min-w-0 flex-1">
+														<span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{product.productName || product.name || t("stocks.productName", "Product")}</span>
+														<span className="mt-0.5 block text-xs text-muted-foreground">{variants.length} {variants.length === 1 ? "variant" : "variants"} · On hand {totalOnHand.toLocaleString()}</span>
+													</span>
+													<ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", !isExpanded && "-rotate-90")} />
+												</button>
+												<div className="shrink-0 text-right">
+													<div className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{totalAvailable.toLocaleString()}</div>
+													<div className="text-[10px] text-muted-foreground">available</div>
+												</div>
+											</div>
+											<div className="flex items-center justify-between border-t border-slate-100 px-3.5 py-2 dark:border-slate-800">
+												<span className={cn("inline-flex items-center gap-1.5 text-xs font-medium", hasOutOfStock ? "text-rose-600 dark:text-rose-400" : hasLowStock ? "text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400")}>
+													<span className={cn("size-1.5 rounded-full", hasOutOfStock ? "bg-rose-500" : hasLowStock ? "bg-amber-500" : "bg-emerald-500")} />
+													{hasOutOfStock ? t("stocks.outOfStock") : hasLowStock ? t("stocks.lowStockAlert") : t("stocks.inStock")}
+												</span>
+												<Button type="button" variant="ghost" size="sm" onClick={() => setSelectedProductForModal(product)} className="h-7 px-2 text-xs text-purple-700 dark:text-purple-300">
+													<Eye className="mr-1 size-3.5" />Details
+												</Button>
+											</div>
+
+											{isExpanded && (
+												<div className="border-t border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/40">
+													<div className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-200 bg-slate-50/95 p-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+														<div className="relative min-w-0 flex-1">
+															<Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+															<Input value={variantSearches[prodId] || ""} onChange={(event) => setVariantSearches((prev) => ({ ...prev, [prodId]: event.target.value }))} placeholder="Find variant or SKU" className="h-9 rounded-lg bg-white pl-8 text-xs dark:bg-slate-950" />
+														</div>
+														<Button type="button" variant="outline" size="sm" onClick={() => setSelectedProductForModal(product)} className="h-9 shrink-0 px-2.5 text-xs">Details</Button>
+													</div>
+													<div className="max-h-[55vh] divide-y divide-slate-200 overflow-y-auto overscroll-contain dark:divide-slate-800">
+														{visibleVariants.length === 0 ? (
+															<div className="p-6 text-center text-xs text-muted-foreground">No variants match this search.</div>
+														) : visibleVariants.map((variant) => {
+															const stockData = getNormalizedVariantStockData(variant, product, variantDetailsMap);
+															const { baseUnit, availableStock, physicalStock, reservedStock, soldStock, isOutOfStock, isLowStock } = stockData;
+															return (
+																<article key={variant.variantId} className="bg-white p-3 dark:bg-slate-900">
+																	<div className="flex items-start gap-2.5">
+																		<StockProductImage src={extractVariantImageUrl(variant, product, productImagesMap)} alt={variant.variantName} className="size-9 rounded-md border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800" />
+																		<div className="min-w-0 flex-1">
+																			<div className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{variant.variantName}</div>
+																			<div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">{variant.sku || "No SKU"}{variant.barcode ? ` · ${variant.barcode}` : ""}</div>
+																		</div>
+																		<span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", isOutOfStock ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300" : isLowStock ? "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300")}>{isOutOfStock ? t("stocks.outOfStock") : isLowStock ? t("stocks.lowStockAlert") : t("stocks.inStock")}</span>
+																	</div>
+																	<div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-slate-50 px-2.5 py-2 dark:bg-slate-950/60">
+																		<div><div className="text-[10px] text-muted-foreground">On hand</div><div className="mt-0.5 text-xs font-semibold tabular-nums">{physicalStock.toLocaleString()} <span className="font-normal text-muted-foreground">{baseUnit.unitName}</span></div></div>
+																		<div><div className="text-[10px] text-muted-foreground">Reserved</div><div className="mt-0.5 text-xs font-semibold tabular-nums text-amber-700 dark:text-amber-400">{reservedStock.toLocaleString()}</div></div>
+																		<div><div className="text-[10px] text-muted-foreground">Sold</div><div className="mt-0.5 text-xs font-semibold tabular-nums text-purple-700 dark:text-purple-400">{soldStock.toLocaleString()}</div></div>
+																	</div>
+																	<div className="mt-2 flex items-center justify-between gap-2">
+																		<UnitPricingPopover stockData={stockData} />
+																		<div className="flex shrink-0 items-center gap-1">
+																			<Button type="button" variant="ghost" size="icon" onClick={() => openVariantMovementsModal(variant.variantId, variant.variantName, variant.sku)} className="size-8 text-slate-500" title={t("stocks.allMovements")}><History className="size-4" /></Button>
+																			<Button type="button" size="sm" onClick={() => openAdjustModalForVariant(variant.variantId, variant.variantName, variant.sku, { productName: product.productName || product.name || variant.variantName, unitId: baseUnit.unitId, unitName: baseUnit.unitName, availableStock, imageUrl: (variant.imageUrl || product.imageUrl) ?? undefined })} className="h-8 bg-emerald-600 px-2.5 text-xs text-white hover:bg-emerald-700"><Scale className="mr-1 size-3.5" />Adjust</Button>
+																		</div>
+																	</div>
+																</article>
+															);
+														})}
+								</div>
+							</div>
+							)}
+						</section>
+						);
+					})}
+								<div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+									<span className="text-xs text-muted-foreground">Page {searchPage + 1} of {searchTotalPages} · {searchTotalElements} products</span>
+									<div className="flex gap-1.5">
+										<Button size="sm" variant="outline" disabled={searchPage === 0} onClick={() => setSearchPage((prev) => Math.max(0, prev - 1))} className="h-8 px-2.5 text-xs">Previous</Button>
+										<Button size="sm" variant="outline" disabled={searchPage >= searchTotalPages - 1} onClick={() => setSearchPage((prev) => prev + 1)} className="h-8 px-2.5 text-xs">Next</Button>
+									</div>
+								</div>
+							</div>
+							<div className="hidden md:block rounded-xl border border-slate-200 dark:border-slate-800 bg-card overflow-hidden shadow-xs">
+							<Table className="w-full min-w-[1020px]">
+								<TableHeader className="bg-slate-50/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800">
 									<TableRow className="hover:bg-transparent">
-										<TableHead className="w-10 text-center"></TableHead>
-										<TableHead className="font-bold text-xs text-foreground">
-											{t("stocks.productName")}
+										<TableHead className="w-9 min-w-9 p-1 text-center sticky left-0 z-20 bg-slate-50 dark:bg-slate-900"></TableHead>
+										<TableHead className="font-bold text-xs text-foreground min-w-[170px] max-w-[220px] sticky left-9 z-20 bg-slate-50 dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)]">
+											{t("stocks.productName", "Product / Variant")}
 										</TableHead>
-										<TableHead className="font-bold text-xs text-center">
-											{t("products.unitHierarchy")}
+										<TableHead className="font-bold text-xs text-left min-w-[110px]">
+											{t("products.barcode", "Barcode")}
 										</TableHead>
-										<TableHead className="font-bold text-xs text-right">
-											{t("stocks.quantityOnHand")}
+										<TableHead className="font-bold text-xs text-left min-w-[100px]">
+											{t("products.sku", "SKU")}
 										</TableHead>
-										<TableHead className="font-bold text-xs text-right">
-											{t("stocks.availableQuantity")}
+										<TableHead className="font-bold text-xs text-right min-w-[75px]">
+											{t("stocks.quantityOnHand", "On Hand")}
 										</TableHead>
-										<TableHead className="font-bold text-xs text-right">
-											{t("stocks.reservedQuantity")}
+										<TableHead className="font-bold text-xs text-right min-w-[65px]">
+											{t("stocks.reservedQuantity", "Reserved")}
 										</TableHead>
-										<TableHead className="font-bold text-xs text-right">
-											{t("stocks.soldQuantity")}
+										<TableHead className="font-bold text-xs text-right min-w-[85px]">
+											{t("stocks.availableQuantity", "Available")}
 										</TableHead>
-										<TableHead className="font-bold text-xs text-center">
-											{t("stocks.stockStatus")}
+										<TableHead className="font-bold text-xs text-right min-w-[60px]">
+											{t("stocks.soldQuantity", "Sold")}
+										</TableHead>
+										<TableHead className="font-bold text-xs text-center min-w-[95px]">
+											{t("stocks.stockStatus", "Status")}
+										</TableHead>
+										<TableHead className="sticky right-0 z-20 bg-slate-50 dark:bg-slate-900 border-l border-slate-200/80 dark:border-slate-800 font-bold text-xs text-center min-w-[105px] shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)]">
+											{t("common.actions", "Actions")}
 										</TableHead>
 									</TableRow>
 								</TableHeader>
@@ -1322,22 +1911,94 @@ function StockPageContent() {
 													(v.stockQty !== undefined && v.stockQty <= 5),
 											);
 
+											const _productUnitsList = Array.from(
+												new Set(
+													variants.flatMap((v) => {
+														const summary = v.inventorySummary;
+														const names: string[] = [];
+														if (summary?.baseUnit) names.push(summary.baseUnit);
+														if (Array.isArray(v.unitBreakdown)) {
+															v.unitBreakdown.forEach((ub: any) => {
+																if (ub.unitName) names.push(ub.unitName);
+															});
+														}
+														return names;
+													}),
+												),
+											);
+
+											const productBarcode =
+												product.barcode ||
+												(product as any).baseBarcode ||
+												(variants.length === 1 ? variants[0]?.barcode : null);
+											const productSku =
+												product.sku ||
+												(product as any).baseSku ||
+												(variants.length === 1 ? variants[0]?.sku : null);
+
+											// Calculate aggregated cost and price ranges for parent row
+											const variantStockDataList = variants.map((v) =>
+												getNormalizedVariantStockData(
+													v,
+													product,
+													variantDetailsMap,
+												),
+											);
+											const allCosts = variantStockDataList
+												.map((s) => s.cost)
+												.filter((c) => c > 0);
+											const minCost =
+												allCosts.length > 0 ? Math.min(...allCosts) : 0;
+											const maxCost =
+												allCosts.length > 0 ? Math.max(...allCosts) : 0;
+											const _costDisplay =
+												allCosts.length === 0
+													? "—"
+													: minCost === maxCost
+														? `$${minCost.toFixed(2)}`
+														: `$${minCost.toFixed(2)}–$${maxCost.toFixed(2)}`;
+
+											const allBasePrices = variantStockDataList
+												.map((s) => s.basePrice)
+												.filter((p) => p > 0);
+											const allMaxPrices = variantStockDataList.map((s) => {
+												const pkgMax = s.packageUnits.reduce(
+													(m, pu) => Math.max(m, pu.sellingPrice),
+													0,
+												);
+												return Math.max(s.basePrice, pkgMax);
+											});
+											const minPrice =
+												allBasePrices.length > 0
+													? Math.min(...allBasePrices)
+													: 0;
+											const maxPrice =
+												allMaxPrices.length > 0
+													? Math.max(...allMaxPrices)
+													: 0;
+											const _priceDisplay =
+												minPrice === 0 && maxPrice === 0
+													? "—"
+													: minPrice === maxPrice
+														? `$${minPrice.toFixed(2)}`
+														: `$${minPrice.toFixed(2)}–$${maxPrice.toFixed(2)}`;
+
 											return (
 												<React.Fragment key={prodId}>
-													{/* Main Product Table Row */}
+													{/* Main Product Table Row (Odoo 17 / Shopify Polaris Tree Row) */}
 													<TableRow
 														onClick={() => setSelectedProductForModal(product)}
 														className={cn(
-															"cursor-pointer transition-colors hover:bg-purple-50/40 dark:hover:bg-purple-950/20 group",
+															"cursor-pointer transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40 group",
 															isExpanded &&
-																"bg-purple-50/20 dark:bg-purple-950/10 font-medium",
+																"bg-purple-50/20 dark:bg-purple-950/15 font-medium border-b-0",
 														)}
 													>
-														<TableCell className="text-center p-2">
+														<TableCell className="w-9 min-w-9 text-center p-1 sticky left-0 z-10 bg-white dark:bg-slate-950 group-hover:bg-slate-50 dark:group-hover:bg-slate-800/40">
 															<Button
 																variant="ghost"
 																size="icon"
-																className="size-7 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-950/50"
+																className="size-7 text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50 rounded-lg transition-colors"
 																onClick={(e) => {
 																	e.stopPropagation();
 																	toggleProductExpand(prodId);
@@ -1349,31 +2010,31 @@ function StockPageContent() {
 																}
 															>
 																{isExpanded ? (
-																	<ChevronDown className="size-4" />
+																	<ChevronDown className="size-4 text-purple-600 dark:text-purple-400" />
 																) : (
 																	<ChevronRight className="size-4" />
 																)}
 															</Button>
 														</TableCell>
 
-														<TableCell>
-															<div className="flex items-center justify-between gap-3">
-																<div className="flex items-center gap-3 min-w-0">
+														<TableCell className="min-w-[170px] max-w-[220px] p-2 sticky left-9 z-10 bg-white dark:bg-slate-950 border-r border-slate-200/80 dark:border-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] group-hover:bg-slate-50 dark:group-hover:bg-slate-800/40">
+															<div className="flex items-center justify-between gap-2">
+																<div className="flex items-center gap-2.5 min-w-0">
 																	<StockProductImage
 																		src={extractStockImageUrl(
 																			product,
 																			productImagesMap,
 																		)}
 																		alt={product.productName || "Product"}
-																		className="size-9 rounded-lg border border-border/80 shadow-2xs shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center transition-transform group-hover:scale-105"
+																		className="size-8 rounded-lg border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center transition-transform group-hover:scale-105"
 																	/>
 
 																	<div className="min-w-0">
 																		<p className="font-bold text-xs text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors flex items-center gap-2 truncate">
 																			<span>{product.productName}</span>
 																		</p>
-																		<span className="text-[10px] text-muted-foreground block font-mono">
-																			Click to view product details
+																		<span className="text-[10px] text-muted-foreground block font-mono truncate">
+																			Click to view details
 																		</span>
 																	</div>
 																</div>
@@ -1386,886 +2047,774 @@ function StockPageContent() {
 																		e.stopPropagation();
 																		setSelectedProductForModal(product);
 																	}}
-																	className="opacity-0 group-hover:opacity-100 transition-opacity h-7 px-2 text-[11px] font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/50 rounded-lg gap-1 shrink-0"
+																	className="opacity-0 group-hover:opacity-100 transition-opacity h-6 px-1.5 text-[10px] font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/50 rounded-md gap-0.5 shrink-0"
 																>
-																	<Eye className="size-3.5" />
+																	<Eye className="size-3" />
 																	<span>Details</span>
 																</Button>
 															</div>
 														</TableCell>
 
-														<TableCell className="text-center">
-															<Badge
-																variant="secondary"
-																className="text-[10px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
-															>
-																{variants.length}{" "}
-																{variants.length === 1 ? "Variant" : "Variants"}
-															</Badge>
-														</TableCell>
-
-														<TableCell className="text-right font-bold text-xs text-foreground">
-															{totalPhysical}
-														</TableCell>
-
-														<TableCell className="text-right font-bold text-xs text-emerald-600 dark:text-emerald-400">
-															{totalAvailable}
-														</TableCell>
-
-														<TableCell className="text-right text-xs text-amber-600 font-semibold">
-															{totalReserved}
-														</TableCell>
-
-														<TableCell className="text-right text-xs text-muted-foreground">
-															{totalSold}
-														</TableCell>
-
-														<TableCell className="text-center">
-															{totalAvailable === 0 ? (
-																<Badge
-																	variant="destructive"
-																	className="text-[9px] px-1.5 py-0"
-																>
-																	{t("stocks.outOfStock")}
-																</Badge>
-															) : hasLowStock ? (
-																<Badge
-																	variant="outline"
-																	className="text-[9px] px-1.5 py-0 border-amber-400 text-amber-700 bg-amber-50"
-																>
-																	{t("stocks.lowStockAlert")}
-																</Badge>
+														{/* Barcode */}
+														<TableCell className="min-w-[110px] p-2">
+															{productBarcode ? (
+																<span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-medium">
+																	{productBarcode}
+																</span>
 															) : (
-																<Badge
-																	variant="outline"
-																	className="text-[9px] px-1.5 py-0 border-emerald-400 text-emerald-700 bg-emerald-50"
-																>
-																	{t("stocks.inStock")}
-																</Badge>
+																<span className="text-xs text-muted-foreground font-mono">—</span>
 															)}
+														</TableCell>
+
+														{/* SKU */}
+														<TableCell className="min-w-[100px] p-2">
+															{productSku ? (
+																<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+																	{productSku}
+																</span>
+															) : (
+																<span className="text-xs text-muted-foreground font-mono">—</span>
+															)}
+														</TableCell>
+
+														{/* On Hand */}
+														<TableCell className="min-w-[75px] p-2 text-right font-bold text-xs text-foreground font-mono">
+															{totalPhysical.toLocaleString()}
+														</TableCell>
+
+														{/* Reserved */}
+														<TableCell className="min-w-[65px] p-2 text-right text-xs font-mono">
+															<span
+																className={
+																	totalReserved > 0
+																		? "text-amber-600 font-bold"
+																		: "text-muted-foreground"
+																}
+															>
+																{totalReserved.toLocaleString()}
+															</span>
+														</TableCell>
+
+														{/* Available */}
+														<TableCell className="min-w-[85px] p-2 text-right font-bold text-xs text-emerald-600 dark:text-emerald-400 font-mono">
+															{totalAvailable.toLocaleString()}
+														</TableCell>
+
+														{/* Sold */}
+														<TableCell className="min-w-[60px] p-2 text-right text-xs text-muted-foreground font-mono">
+															{totalSold.toLocaleString()}
+														</TableCell>
+
+														<TableCell className="min-w-[95px] p-2 text-center">
+															{totalAvailable === 0 ? (
+																<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60">
+																	<span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
+																	{t("stocks.outOfStock")}
+																</span>
+															) : hasLowStock ? (
+																<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60">
+																	<span className="size-1.5 rounded-full bg-amber-500" />
+																	{t("stocks.lowStockAlert")}
+																</span>
+															) : (
+																<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60">
+																	<span className="size-1.5 rounded-full bg-emerald-500" />
+																	{t("stocks.inStock")}
+																</span>
+															)}
+														</TableCell>
+
+														<TableCell className="sticky right-0 z-10 bg-white dark:bg-slate-950 border-l border-slate-200/80 dark:border-slate-800 p-2 text-center min-w-[105px] shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] group-hover:bg-slate-50 dark:group-hover:bg-slate-800/40">
+															<Button
+																type="button"
+																variant="ghost"
+																size="sm"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	setSelectedProductForModal(product);
+																}}
+																className="h-7 px-2 text-[11px] font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/50 rounded-lg gap-1"
+															>
+																<Eye className="size-3.5" />
+																<span>Details</span>
+															</Button>
 														</TableCell>
 													</TableRow>
 
-													{/* Collapsible Variants Sub-Table */}
-													{isExpanded && (
-														<TableRow className="bg-slate-50/60 dark:bg-slate-900/60 hover:bg-slate-50/60 border-b">
-															<TableCell colSpan={9} className="p-4">
-																<div className="rounded-2xl border border-purple-200/70 dark:border-purple-900/40 bg-card p-5 space-y-4 shadow-sm">
-																	{/* Header with View Mode Tabs (Table vs Cards) */}
-																	<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3.5 border-slate-100 dark:border-slate-800">
-																		<div className="flex items-center gap-2.5">
-																			<div className="flex size-8 items-center justify-center rounded-xl bg-purple-100 dark:bg-purple-950/70 text-purple-600 dark:text-purple-400">
-																				<Layers className="size-4.5" />
+													{/* Collapsible Variants Section - Dedicated Scrollable Sub-Table with Sticky Headers */}
+													{isExpanded && (() => {
+														const variantQuery = (variantSearches[prodId] || "").toLowerCase().trim();
+														const displayedVariants = variantQuery
+															? variants.filter((v: StockVariantItem) => {
+																	const nameMatch = (v.variantName || "").toLowerCase().includes(variantQuery);
+																	const skuMatch = (v.sku || "").toLowerCase().includes(variantQuery);
+																	const barcodeMatch = (v.barcode || "").toLowerCase().includes(variantQuery);
+																	return nameMatch || skuMatch || barcodeMatch;
+															  })
+															: variants;
+														const isScrollExpanded = productScrollExpanded[prodId] ?? false;
+
+														return (
+															<TableRow className="bg-slate-50/30 dark:bg-slate-950/30 hover:bg-slate-50/30 dark:hover:bg-slate-950/30 border-b border-purple-100/80 dark:border-purple-900/40">
+																<TableCell colSpan={10} className="p-0 max-w-0">
+																	<div className="w-full max-w-full flex flex-col border-y border-purple-100/80 dark:border-purple-900/50 bg-white/70 dark:bg-slate-950/70">
+																		{/* Section Header / Toolbar */}
+																		<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 py-2 px-4 bg-purple-50/40 dark:bg-purple-950/30 border-b border-purple-100/70 dark:border-purple-900/40">
+																			<div className="flex items-center gap-2 flex-wrap">
+																				<div className="flex size-6 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/60 text-purple-600 dark:text-purple-300">
+																					<Layers className="size-3.5" />
+																				</div>
+																				<span className="text-xs font-bold text-foreground">
+																					{variants.length}{" "}
+																					{variants.length === 1
+																						? "Variant"
+																						: "Variants"}
+																				</span>
+																				<span className="text-[11px] text-muted-foreground hidden sm:inline">
+																					— Multi-unit pricing & inventory schedule for {product.productName}
+																				</span>
+
+																				{variants.length > 2 && (
+																					<Badge
+																						variant="outline"
+																						className="text-[10px] h-5 px-1.5 font-normal border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 bg-purple-50/50 dark:bg-purple-950/50 gap-1 hidden md:inline-flex"
+																					>
+																						<span>Scrollable</span>
+																					</Badge>
+																				)}
 																			</div>
-																			<div>
-																				<h5 className="font-extrabold text-xs text-foreground uppercase tracking-wider flex items-center gap-2">
-																					{t("products.productVariants")} (
-																					{variants.length})
-																				</h5>
-																				<p className="text-[11px] text-muted-foreground">
-																					{t("products.unitHierarchy")} &{" "}
-																					{t("stocks.subtitle")}
-																				</p>
+
+																			<div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+																				{/* Local View Mode Toggle: Table vs Cards */}
+																				<div className="flex items-center bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-2xs">
+																					<button
+																						type="button"
+																						onClick={() => setGlobalVariantViewMode("list")}
+																						className={cn(
+																							"h-6 px-2 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer",
+																							globalVariantViewMode === "list"
+																								? "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300"
+																								: "text-slate-600 dark:text-slate-400 hover:text-foreground",
+																						)}
+																						title="View variants as Table"
+																					>
+																						<LayoutList className="size-3" />
+																						<span>Table</span>
+																					</button>
+																					<button
+																						type="button"
+																						onClick={() => setGlobalVariantViewMode("card")}
+																						className={cn(
+																							"h-6 px-2 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer",
+																							globalVariantViewMode === "card"
+																								? "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300"
+																								: "text-slate-600 dark:text-slate-400 hover:text-foreground",
+																						)}
+																						title="View variants as Cards"
+																					>
+																						<LayoutGrid className="size-3" />
+																						<span>Cards</span>
+																					</button>
+																				</div>
+
+																				{/* In-product quick variant search if variants > 3 */}
+																				{variants.length > 3 && (
+																					<div className="relative">
+																						<Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+																						<input
+																							type="text"
+																							value={variantSearches[prodId] || ""}
+																							onChange={(e) =>
+																								setVariantSearches((prev) => ({
+																									...prev,
+																									[prodId]: e.target.value,
+																								}))
+																							}
+																							placeholder="Filter variants..."
+																							className="h-6.5 w-28 sm:w-36 pl-6 pr-5 text-[11px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-500"
+																						/>
+																						{variantSearches[prodId] && (
+																							<button
+																								type="button"
+																								onClick={() =>
+																									setVariantSearches((prev) => ({
+																										...prev,
+																										[prodId]: "",
+																									}))
+																								}
+																								className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-[10px]"
+																							>
+																								×
+																							</button>
+																						)}
+																					</div>
+																				)}
+
+																				{/* Quick Horizontal Scroll Buttons */}
+																				<div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200/80 dark:border-slate-700">
+																					<button
+																						type="button"
+																						onClick={() => {
+																							const scroller = document.getElementById(`variant-scroller-${prodId}`);
+																							const outer = scroller?.closest('[data-slot="table-container"]') as HTMLElement | null;
+																							const target = (scroller && scroller.scrollWidth > scroller.clientWidth) ? scroller : (outer || scroller);
+																							target?.scrollBy({ left: -260, behavior: "smooth" });
+																						}}
+																						className="h-6 w-6 rounded flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-foreground hover:bg-white dark:hover:bg-slate-900 transition-colors cursor-pointer"
+																						title="Scroll table left"
+																					>
+																						<ChevronLeft className="size-3.5" />
+																					</button>
+																					<button
+																						type="button"
+																						onClick={() => {
+																							const scroller = document.getElementById(`variant-scroller-${prodId}`);
+																							const outer = scroller?.closest('[data-slot="table-container"]') as HTMLElement | null;
+																							const target = (scroller && scroller.scrollWidth > scroller.clientWidth) ? scroller : (outer || scroller);
+																							target?.scrollBy({ left: 260, behavior: "smooth" });
+																						}}
+																						className="h-6 w-6 rounded flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-foreground hover:bg-white dark:hover:bg-slate-900 transition-colors cursor-pointer"
+																						title="Scroll table right to view Status & Actions"
+																					>
+																						<ChevronRight className="size-3.5" />
+																					</button>
+																				</div>
+
+																				<Button
+																					type="button"
+																					variant="ghost"
+																					size="sm"
+																					onClick={() => setSelectedProductForModal(product)}
+																					className="h-7 text-xs font-semibold gap-1 text-purple-600 hover:text-purple-700 hover:bg-purple-100/50 dark:hover:bg-purple-950/50 rounded-lg px-2.5"
+																				>
+																					<Eye className="size-3" />
+																					<span>Product Info</span>
+																				</Button>
+
+																				{/* Expand height / Compact height toggle */}
+																				{variants.length > 3 && (
+																					<Button
+																						type="button"
+																						variant="ghost"
+																						size="sm"
+																						onClick={() =>
+																							setProductScrollExpanded((prev) => ({
+																								...prev,
+																								[prodId]: !prev[prodId],
+																							}))
+																						}
+																						className="h-7 text-xs font-medium gap-1 text-slate-600 dark:text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-lg px-2"
+																						title={
+																							isScrollExpanded
+																								? "Compact scrollable container"
+																								: "Expand all rows without scroll"
+																						}
+																					>
+																						{isScrollExpanded ? (
+																							<>
+																								<ChevronsDownUp className="size-3" />
+																								<span className="hidden lg:inline text-[11px]">Compact</span>
+																							</>
+																						) : (
+																							<>
+																								<ChevronsUpDown className="size-3" />
+																								<span className="hidden lg:inline text-[11px]">Expand</span>
+																							</>
+																						)}
+																					</Button>
+																				)}
+
+
 																			</div>
 																		</div>
 
-																		<div className="flex items-center gap-2 shrink-0 self-start sm:self-auto flex-wrap">
-																			<Button
-																				type="button"
-																				variant="outline"
-																				size="sm"
-																				onClick={() => setSelectedProductForModal(product)}
-																				className="h-8 text-xs font-semibold gap-1.5 text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-950/40 rounded-xl px-3"
-																			>
-																				<Eye className="size-3.5" />
-																				<span>Product Details</span>
-																			</Button>
-
-																			{/* View Mode Switcher Tabs */}
-																			<div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700">
-																			<button
-																				type="button"
-																				onClick={() =>
-																					setProductViewModes((prev) => ({
-																						...prev,
-																						[prodId]: "list" as const,
-																					}))
-																				}
-																				className={cn(
-																					"h-7 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer",
-																					(productViewModes[prodId] ??
-																						globalVariantViewMode) === "list"
-																						? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-2xs border border-slate-200/60 dark:border-slate-700"
-																						: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
-																				)}
-																			>
-																				<LayoutList className="size-3.5" />
-																				<span>
-																					{t("common.table", "Table")}
-																				</span>
-																			</button>
-																			<button
-																				type="button"
-																				onClick={() =>
-																					setProductViewModes((prev) => ({
-																						...prev,
-																						[prodId]: "card" as const,
-																					}))
-																				}
-																				className={cn(
-																					"h-7 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer",
-																					(productViewModes[prodId] ??
-																						globalVariantViewMode) === "card"
-																						? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-2xs border border-slate-200/60 dark:border-slate-700"
-																						: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
-																				)}
-																			>
-																				<LayoutGrid className="size-3.5" />
-																				<span>
-																					{t("common.cards", "Cards")}
-																				</span>
-																			</button>
-																		</div>
-																	</div>
-																</div>
-
-																	{/* Content Switcher based on viewMode */}
-																	{(productViewModes[prodId] ??
-																		globalVariantViewMode) === "list" ? (
-																		/* TABULAR VIEW OF VARIANTS */
-																		<div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-2xs">
-																			<table className="w-full text-left text-xs border-collapse min-w-[900px]">
-																				<thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
-																					<tr>
-																						<th className="p-3 text-left">
-																							{t(
-																								"stocks.productName",
-																								"Variant / Item",
-																							)}
-																						</th>
-																						<th className="p-3 text-left">
-																							{t(
-																								"products.unitHierarchy",
-																								"Unit & Conversions",
-																							)}
-																						</th>
-																						<th className="p-3 text-right">
-																							{t(
-																								"stocks.unitCost",
-																								"Unit Cost",
-																							)}
-																						</th>
-																						<th className="p-3 text-right">
-																							{t(
-																								"stocks.retailPrice",
-																								"Retail Price",
-																							)}
-																						</th>
-																						<th className="p-3 text-right">
-																							{t(
-																								"stocks.quantityOnHand",
-																								"On Hand",
-																							)}
-																						</th>
-																						<th className="p-3 text-right">
-																							{t(
-																								"stocks.availableQuantity",
-																								"Available (Remain)",
-																							)}
-																						</th>
-																						<th className="p-3 text-right">
-																							{t(
-																								"stocks.reservedQuantity",
-																								"Reserved",
-																							)}
-																						</th>
-																						<th className="p-3 text-right">
-																							{t("stocks.soldQuantity", "Sold")}
-																						</th>
-																						<th className="p-3 text-center">
-																							{t(
-																								"stocks.stockStatus",
-																								"Stock Status",
-																							)}
-																						</th>
-																						<th className="p-3 text-center">
-																							{t("common.actions", "Actions")}
-																						</th>
-																					</tr>
-																				</thead>
-																				<tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-																					{variants.map(
-																						(v: StockVariantItem) => {
-																							const stockData =
-																								getNormalizedVariantStockData(
+																		{/* Scrollable Container with max-height, horizontal scroll, and custom scrollbars */}
+																		<div
+																			id={`variant-scroller-${prodId}`}
+																			className={cn(
+																				"w-full max-w-full overflow-x-auto overflow-y-auto transition-all",
+																				variants.length <= 3 || isScrollExpanded
+																					? "max-h-none"
+																					: "max-h-[380px]",
+																				// Enhanced scrollbar styling for both horizontal and vertical scrolling:
+																				"[scrollbar-width:thin] [scrollbar-color:theme(colors.purple.400)_theme(colors.slate.100)] dark:[scrollbar-color:theme(colors.purple.600)_theme(colors.slate.900)]",
+																				"[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2",
+																				"[&::-webkit-scrollbar-track]:bg-slate-100/90 dark:[&::-webkit-scrollbar-track]:bg-slate-900/90",
+																				"[&::-webkit-scrollbar-thumb]:bg-purple-300 dark:[&::-webkit-scrollbar-thumb]:bg-purple-700 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-purple-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-purple-600",
+																			)}
+																		>
+													{globalVariantViewMode === "list" ? (
+																				<table className="w-full min-w-[1020px] text-xs border-collapse">
+																					<thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-2xs">
+																						<tr className="hover:bg-transparent bg-slate-100 dark:bg-slate-900">
+																							<th className="w-9 min-w-9 text-center py-2 text-[10px] text-muted-foreground bg-inherit sticky left-0 z-20"></th>
+																							<th className="font-bold text-[11px] text-foreground min-w-[170px] max-w-[220px] py-2 text-left bg-inherit sticky left-9 z-20 border-r border-slate-200/80 dark:border-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)]">
+																								{t("stocks.variantName", "Variant / Identity")}
+																							</th>
+																							<th className="font-bold text-[11px] text-left min-w-[70px] py-2 bg-inherit">
+																								{t("products.units", "Units")}
+																							</th>
+																							<th className="font-bold text-[11px] text-right min-w-[95px] py-2 bg-inherit">
+																								{t("stocks.unitCost", "Unit Cost")}
+																							</th>
+																							<th className="font-bold text-[11px] text-right min-w-[100px] py-2 bg-inherit">
+																								{t("stocks.retailPrice", "Retail Price ($)")}
+																							</th>
+																							<th className="font-bold text-[11px] text-right min-w-[85px] py-2 bg-inherit">
+																								{t("stocks.quantityOnHand", "On Hand")}
+																							</th>
+																							<th className="font-bold text-[11px] text-right min-w-[75px] py-2 bg-inherit">
+																								{t("stocks.reservedQuantity", "Reserved")}
+																							</th>
+																							<th className="font-bold text-[11px] text-right min-w-[85px] py-2 bg-inherit">
+																								{t("stocks.availableQuantity", "Available")}
+																							</th>
+																							<th className="font-bold text-[11px] text-right min-w-[75px] py-2 bg-inherit">
+																								{t("stocks.soldQuantity", "Sold")}
+																							</th>
+																							<th className="font-bold text-[11px] text-center min-w-[95px] py-2 bg-inherit">
+																								{t("stocks.stockStatus", "Status")}
+																							</th>
+																							<th className="sticky right-0 z-20 bg-slate-100 dark:bg-slate-900 border-l border-slate-200/80 dark:border-slate-800 font-bold text-[11px] text-center min-w-[185px] py-2 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)]">
+																								{t("common.actions", "Actions")}
+																							</th>
+																						</tr>
+																					</thead>
+																					<tbody>
+																						{displayedVariants.length === 0 ? (
+																							<tr>
+																								<td colSpan={11} className="py-8 text-center text-xs text-muted-foreground">
+																									No variants matching "{variantSearches[prodId]}"
+																								</td>
+																							</tr>
+																						) : (
+																							displayedVariants.map((v: StockVariantItem) => {
+																								const stockData = getNormalizedVariantStockData(
 																									v,
 																									product,
 																									variantDetailsMap,
 																								);
-																							const {
-																								baseUnit,
-																								packageUnits,
-																								basePrice,
-																								cost,
-																								physicalStock,
-																								availableStock,
-																								reservedStock,
-																								soldStock,
-																								isOutOfStock,
-																								isLowStock,
-																								smartStockDecomposition,
-																							} = stockData;
+																								const {
+																									baseUnit,
+																									packageUnits: _packageUnits,
+																									allUnits,
+																									basePrice: _basePrice,
+																									cost,
+																									physicalStock,
+																									availableStock,
+																									reservedStock,
+																									soldStock,
+																									isOutOfStock,
+																									isLowStock,
+																									smartStockDecomposition: _smartStockDecomposition,
+																								} = stockData;
 
-																							return (
-																								<tr
-																									key={v.variantId}
-																									className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group"
-																								>
-																									{/* 1. Variant Item */}
-																									<td className="p-3">
-																										<div className="flex items-center gap-3">
-																											<StockProductImage
-																												src={extractVariantImageUrl(
-																													v,
-																													product,
-																													productImagesMap,
-																												)}
-																												alt={v.variantName}
-																												className="size-9 rounded-lg border border-border/80 shadow-2xs shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center transition-transform group-hover:scale-105"
-																											/>
+																								// Cascading multi-unit decomposition for inventory metrics
+																								const onHandDecomp = decomposeQuantityByUnits(physicalStock, allUnits);
+																								const reservedDecomp = decomposeQuantityByUnits(reservedStock, allUnits);
+																								const availableDecomp = decomposeQuantityByUnits(availableStock, allUnits);
+																								const soldDecomp = decomposeQuantityByUnits(soldStock, allUnits);
 
-																											<div className="space-y-0.5 min-w-0">
-																												<span className="font-bold text-xs text-slate-900 dark:text-slate-100 block">
-																													{v.variantName}
-																												</span>
-																												<div className="flex items-center gap-1.5 flex-wrap">
-																													<span className="font-mono text-[10px] text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded border border-slate-200 dark:border-slate-700 font-semibold">
-																														SKU: {v.sku}
-																													</span>
-																													{v.barcode && (
-																														<span className="font-mono text-[10px] text-slate-500">
-																															BAR: {v.barcode}
-																														</span>
-																													)}
-																												</div>
-																											</div>
-																										</div>
-																									</td>
-
-																									{/* 2. Packaging Units & Hierarchy */}
-																									<td className="p-3">
-																										<div className="space-y-1.5 max-w-[280px]">
-																											<div className="flex items-center gap-1.5 flex-wrap">
-																												<Badge
-																													variant="outline"
-																													className="text-[10px] font-bold px-1.5 py-0 bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800 flex items-center gap-1"
-																												>
-																													<Package className="size-3 text-purple-500" />
-																													{baseUnit.unitName} (Base)
-																												</Badge>
-																												{packageUnits.length > 0 && (
-																													<span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 font-mono">
-																														+{packageUnits.length}{" "}
-																														{packageUnits.length === 1
-																															? "unit"
-																															: "units"}
-																													</span>
-																												)}
-																											</div>
-																											{packageUnits.length > 0 && (
-																												<div className="flex flex-col gap-1">
-																													{packageUnits.map((pu) => (
-																														<div
-																															key={pu.unitId}
-																															className="inline-flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/80 text-slate-700 dark:text-slate-300"
-																														>
-																															<span className="font-medium truncate">
-																																{pu.formulaText}
-																															</span>
-																															{pu.savingsPercent &&
-																															pu.savingsPercent > 0 ? (
-																																<span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/80 shrink-0">
-																																	Save {pu.savingsPercent}%
-																																</span>
-																															) : null}
-																														</div>
-																													))}
-																												</div>
-																											)}
-																										</div>
-																									</td>
-
-																									{/* 3. Unit Cost */}
-																									<td className="p-3 text-right">
-																										<div className="inline-flex flex-col items-end">
-																											<span className="font-mono font-bold text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-900/50">
-																												${cost.toFixed(2)}
-																											</span>
-																											<span className="text-[9px] font-medium text-muted-foreground mt-0.5">
-																												/{baseUnit.unitName}
-																											</span>
-																										</div>
-																									</td>
-
-																									{/* 4. Retail Price */}
-																									<td className="p-3 text-right">
-																										<div className="flex flex-col items-end gap-1">
-																											<div className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-900/50">
-																												<span className="font-mono font-black text-xs text-emerald-700 dark:text-emerald-300">
-																													${basePrice.toFixed(2)}
-																												</span>
-																												<span className="text-[10px] text-muted-foreground font-medium">
-																													/{baseUnit.unitName}
-																												</span>
-																											</div>
-																											{packageUnits.length > 0 && (
-																												<div className="flex flex-col items-end gap-0.5 font-mono text-[10px]">
-																													{packageUnits.map((pu) => (
-																														<div
-																															key={pu.unitId}
-																															className="flex items-center gap-1 text-slate-600 dark:text-slate-400"
-																														>
-																															<span className="font-semibold text-slate-700 dark:text-slate-300">
-																																{pu.unitName}:
-																															</span>
-																															<span className="font-bold text-emerald-600 dark:text-emerald-400">
-																																${pu.sellingPrice.toFixed(2)}
-																															</span>
-																															<span className="text-[9px] text-muted-foreground">
-																																($
-																																{pu.pricePerBaseUnit.toFixed(
-																																	2,
-																																)}
-																																/{baseUnit.unitName})
-																															</span>
-																														</div>
-																													))}
-																												</div>
-																											)}
-																										</div>
-																									</td>
-
-																									{/* 5. Physical Stock (On Hand) */}
-																									<td className="p-3 text-right">
-																										<div className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
-																											{physicalStock}{" "}
-																											<span className="text-[10px] font-normal text-muted-foreground">
-																												{baseUnit.unitName}
-																											</span>
-																										</div>
-																									</td>
-
-																									{/* 6. Available Stock (Remain) */}
-																									<td className="p-3 text-right">
-																										<div
-																											className={cn(
-																												"font-mono font-black text-sm",
-																												isOutOfStock
-																													? "text-rose-600 dark:text-rose-400"
-																													: "text-emerald-600 dark:text-emerald-400",
-																											)}
-																										>
-																											{availableStock}{" "}
-																											<span className="text-[10px] font-semibold">
-																												{baseUnit.unitName}
-																											</span>
-																										</div>
-																										{/* Smart decomposition across packaging units */}
-																										{packageUnits.length > 0 &&
-																											availableStock > 0 && (
-																												<div
-																													className="inline-flex items-center gap-1 text-[10px] text-purple-700 dark:text-purple-300 font-mono mt-0.5 bg-purple-50/70 dark:bg-purple-950/40 px-1.5 py-0.2 rounded border border-purple-200/60 dark:border-purple-800/60"
-																													title={smartStockDecomposition}
-																												>
-																													<span className="text-purple-500 font-sans font-bold">
-																														≈
-																													</span>
-																													<span className="truncate max-w-[140px]">
-																														{smartStockDecomposition}
-																													</span>
-																												</div>
-																											)}
-																									</td>
-
-																									{/* 7. Reserved */}
-																									<td className="p-3 text-right font-mono font-semibold text-amber-600 dark:text-amber-400">
-																										{reservedStock}
-																									</td>
-
-																									{/* 8. Sold */}
-																									<td className="p-3 text-right font-mono text-muted-foreground">
-																										{soldStock}
-																									</td>
-
-																									{/* 9. Stock Status */}
-																									<td className="p-3 text-center">
-																										{isOutOfStock ? (
-																											<Badge
-																												variant="destructive"
-																												className="text-[9px] px-2 py-0.5 font-bold shadow-2xs"
-																											>
-																												{t("stocks.outOfStock")}
-																											</Badge>
-																										) : isLowStock ? (
-																											<Badge
-																												variant="outline"
-																												className="text-[9px] px-2 py-0.5 border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs"
-																											>
-																												{t("stocks.lowStockAlert")}
-																											</Badge>
-																										) : (
-																											<Badge
-																												variant="outline"
-																												className="text-[9px] px-2 py-0.5 border-emerald-400 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300 font-bold shadow-2xs"
-																											>
-																												{t("stocks.inStock")}
-																											</Badge>
-																										)}
-																									</td>
-
-																									{/* 10. Actions */}
-																									<td className="p-3 text-center">
-																										<div className="flex items-center justify-center gap-1.5">
-																											<Button
-																												size="sm"
-																												variant="outline"
-																												onClick={() =>
-																													openVariantMovementsModal(
-																														v.variantId,
-																														v.variantName,
-																														v.sku,
-																													)
-																												}
-																												className="h-7 text-[11px] font-semibold gap-1 text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-950/40 rounded-lg px-2"
-																												title={t(
-																													"stocks.allMovements",
-																												)}
-																											>
-																												<History className="h-3 w-3" />
-																												<span className="hidden lg:inline">
-																													{t(
-																														"stocks.allMovements",
-																													)}
-																												</span>
-																											</Button>
-																											<Button
-																												size="sm"
-																												onClick={() =>
-																													openAdjustModalForVariant(
-																														v.variantId,
-																														v.variantName,
-																														v.sku,
-																														{
-																															productName:
-																																product.productName ||
-																																product.name ||
-																																v.variantName,
-																															unitId:
-																																baseUnit.unitId,
-																															unitName:
-																																baseUnit.unitName,
-																															availableStock:
-																																availableStock,
-																															imageUrl:
-																																(v.imageUrl ||
-																																	product.imageUrl) ??
-																																undefined,
-																														},
-																													)
-																												}
-																												className="h-7 text-[11px] font-semibold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-2 shadow-2xs"
-																												title={t(
-																													"stocks.adjustStock",
-																												)}
-																											>
-																												<Scale className="h-3 w-3" />
-																												<span className="hidden lg:inline">
-																													{t(
-																														"stocks.adjustStock",
-																													)}
-																												</span>
-																											</Button>
-																										</div>
-																									</td>
-																								</tr>
-																							);
-																						},
-																					)}
-																				</tbody>
-																			</table>
-																		</div>
-																	) : (
-																		/* Variant Cards List */
-																		<div className="space-y-3.5">
-																			{variants.map((v: StockVariantItem) => {
-																				const stockData =
-																					getNormalizedVariantStockData(
-																						v,
-																						product,
-																						variantDetailsMap,
-																					);
-																				const {
-																					baseUnit,
-																					packageUnits,
-																					allUnits,
-																					basePrice,
-																					cost,
-																					physicalStock,
-																					availableStock,
-																					reservedStock,
-																					soldStock,
-																					isOutOfStock,
-																					isLowStock,
-																					smartStockDecomposition,
-																				} = stockData;
-
-																				return (
-																					<div
-																						key={v.variantId}
-																						className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 shadow-xs space-y-3 hover:border-purple-300 dark:hover:border-purple-800/60 transition-all"
-																					>
-																						{/* Row 1: Header (Variant Image, Variant Name, SKUs, Stock Metrics & Main Actions) */}
-																						<div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-																							<div className="flex items-start sm:items-center gap-3">
-																								<StockProductImage
-																									src={extractVariantImageUrl(
-																										v,
-																										product,
-																										productImagesMap,
-																									)}
-																									alt={v.variantName}
-																									className="size-11 rounded-xl border border-border/80 shadow-2xs shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
-																								/>
-																								<div className="space-y-1.5">
-																									<div className="flex items-center gap-2 flex-wrap">
-																										<span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
-																											{v.variantName}
-																										</span>
-																										<Badge
-																											variant="outline"
-																											className="font-mono text-[10px] px-2 py-0.5 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
-																										>
-																											SKU: {v.sku}
-																										</Badge>
-																										{v.barcode && (
-																											<Badge
-																												variant="outline"
-																												className="font-mono text-[10px] px-2 py-0.5 text-muted-foreground border-slate-200 dark:border-slate-800"
-																											>
-																												BAR: {v.barcode}
-																											</Badge>
-																										)}
-																										{isOutOfStock ? (
-																											<Badge
-																												variant="destructive"
-																												className="text-[10px] font-bold px-2 py-0.5 shadow-2xs"
-																											>
-																												{t("stocks.outOfStock")}
-																											</Badge>
-																										) : isLowStock ? (
-																											<Badge className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-																												{t(
-																													"stocks.lowStockAlert",
-																												)}
-																											</Badge>
-																										) : (
-																											<Badge
-																												variant="outline"
-																												className="text-[10px] font-bold px-2 py-0.5 border-emerald-400 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300 shadow-2xs"
-																											>
-																												{t("stocks.inStock")}
-																											</Badge>
-																										)}
-																									</div>
-
-																									{/* Key Stock Metrics Ribbon */}
-																									<div className="flex items-center gap-2 text-xs flex-wrap pt-0.5">
-																										{/* Unit Cost */}
-																										<div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 shadow-2xs">
-																											<Coins className="size-3.5 text-amber-600 dark:text-amber-400" />
-																											<span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-400">
-																												{t("stocks.unitCost")}:
-																											</span>
-																											<span className="font-mono font-black text-xs text-amber-900 dark:text-amber-100">
-																												${cost.toFixed(2)}
-																											</span>
-																											<span className="text-[9px] text-muted-foreground">
-																												/{baseUnit.unitName}
-																											</span>
-																										</div>
-
-																										{/* Physical Stock */}
-																										<div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300">
-																											<Boxes className="size-3.5 text-blue-600 dark:text-blue-400" />
-																											<span className="text-[10px] font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300">
-																												{t("stocks.physical")}:
-																											</span>
-																											<span className="font-mono font-black text-xs text-blue-900 dark:text-blue-100">
-																												{physicalStock}
-																											</span>
-																											<span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300">
-																												{baseUnit.unitName}
-																											</span>
-																										</div>
-
-																										{/* Available Stock */}
-																										<div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-2xs">
-																											<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-																											<span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
-																												{t(
-																													"stocks.availableQuantity",
-																												)}
-																												:
-																											</span>
-																											<span className="font-mono font-black text-xs text-emerald-800 dark:text-emerald-200">
-																												{availableStock}{" "}
-																												{baseUnit.unitName}
-																											</span>
-																										</div>
-
-																										{/* Reserved */}
-																										<div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-700 dark:text-orange-300">
-																											<Receipt className="size-3.5 text-orange-600 dark:text-orange-400" />
-																											<span className="text-[10px] font-bold uppercase tracking-wider text-orange-800 dark:text-orange-400">
-																												{t(
-																													"stocks.reservedQuantity",
-																												)}
-																												:
-																											</span>
-																											<span className="font-mono font-black text-xs text-orange-900 dark:text-orange-200">
-																												{reservedStock}
-																											</span>
-																										</div>
-
-																										{/* Sold */}
-																										<div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-500/10 border border-slate-500/20 text-slate-700 dark:text-slate-300">
-																											<TrendingUp className="size-3.5 text-slate-600 dark:text-slate-400" />
-																											<span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-400">
-																												{t(
-																													"stocks.soldQuantity",
-																												)}
-																												:
-																											</span>
-																											<span className="font-mono font-black text-xs text-slate-800 dark:text-slate-200">
-																												{soldStock}
-																											</span>
-																										</div>
-																									</div>
-																								</div>
-																							</div>
-
-																							{/* Action Buttons */}
-																							<div className="flex items-center gap-2 shrink-0">
-																								<Button
-																									size="sm"
-																									variant="outline"
-																									onClick={() =>
-																										openVariantMovementsModal(
-																											v.variantId,
-																											v.variantName,
-																											v.sku,
-																										)
-																									}
-																									className="h-9 text-xs font-semibold gap-1.5 text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-950/40 rounded-xl px-3.5"
-																								>
-																									<History className="h-3.5 w-3.5" />{" "}
-																									{t("stocks.allMovements")}
-																								</Button>
-
-																								<Button
-																									size="sm"
-																									onClick={() =>
-																										openAdjustModalForVariant(
-																											v.variantId,
-																											v.variantName,
-																											v.sku,
-																											{
-																												productName:
-																													product.productName ||
-																													product.name ||
-																													v.variantName,
-																												unitId:
-																													baseUnit.unitId,
-																												unitName:
-																													baseUnit.unitName,
-																												availableStock:
-																													availableStock,
-																												imageUrl:
-																													(v.imageUrl ||
-																														product.imageUrl) ??
-																													undefined,
-																											},
-																										)
-																									}
-																									className="h-9 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs rounded-xl px-3.5"
-																								>
-																									<Scale className="h-3.5 w-3.5" />{" "}
-																									{t("stocks.adjustStock")}
-																								</Button>
-																							</div>
-																						</div>
-
-																						{/* Row 2: Full Width Packaging Units & Retail Prices (Hierarchical Tree View) */}
-																						<div className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-3">
-																							{/* Top Bar: Title & Visual Tree Chain */}
-																							<div className="flex flex-col md:flex-row md:items-center justify-between gap-2 pb-1 border-b border-slate-200/60 dark:border-slate-800/60">
-																								<div className="flex items-center gap-2">
-																									<span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-																										<Tag className="size-3.5 text-purple-600 dark:text-purple-400" />
-																										Packaging Units & Conversion
-																										Tree
-																									</span>
-																									<Badge
-																										variant="outline"
-																										className="text-[10px] font-mono px-1.5 py-0 bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+																								return (
+																									<tr
+																										key={v.variantId}
+																										className="bg-slate-50/40 dark:bg-slate-900/30 hover:bg-purple-50/30 dark:hover:bg-purple-950/20 transition-colors border-b border-slate-100 dark:border-slate-800/60 group"
 																									>
-																										{allUnits.length} units
-																									</Badge>
-																								</div>
+																										{/* Col 1: Indent tree icon */}
+																										<td className="w-9 min-w-9 text-center p-1.5 sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 group-hover:bg-purple-50/50 dark:group-hover:bg-purple-950/40">
+																											<CornerDownRight className="size-3.5 mx-auto text-purple-400 dark:text-purple-500" />
+																										</td>
 
-																								{/* Visual Tree Hierarchy Path */}
-																								<div className="flex items-center gap-1.5 flex-wrap text-xs">
-																									<span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-																										<GitFork className="size-3 text-purple-500" />{" "}
-																										Hierarchy:
-																									</span>
-																									{allUnits.map((u, idx) => (
-																										<React.Fragment key={u.unitId}>
-																											{idx > 0 && (
-																												<ArrowRight className="size-3 text-purple-400 dark:text-purple-600 shrink-0" />
-																											)}
-																											<div
-																												className={cn(
-																													"inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-mono",
-																													u.isBase
-																														? "bg-purple-100/80 dark:bg-purple-950/70 border-purple-300 dark:border-purple-800 text-purple-900 dark:text-purple-200 font-bold"
-																														: "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300",
-																												)}
-																											>
-																												{u.formulaText}
-																											</div>
-																										</React.Fragment>
-																									))}
-																								</div>
-																							</div>
-
-																							{/* Unit Cards Grid */}
-																							<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
-																								{allUnits.map((u) => {
-																									return (
-																										<div
-																											key={u.unitId}
-																											className={cn(
-																												"p-3 rounded-xl border flex flex-col justify-between gap-2.5 transition-all shadow-2xs hover:shadow-xs",
-																												u.isBase
-																													? "bg-purple-50/70 dark:bg-purple-950/40 border-purple-200/90 dark:border-purple-800/80"
-																													: "bg-white dark:bg-slate-900/90 border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700",
-																											)}
-																										>
-																											{/* Unit Header */}
-																											<div className="space-y-1.5">
-																												<div className="flex items-center justify-between gap-1.5">
-																													<div className="flex items-center gap-1.5 min-w-0">
-																														<span className="font-extrabold text-xs text-foreground truncate">
-																															{u.unitName}
-																														</span>
-																														{u.isBase && (
-																															<Badge
-																																variant="secondary"
-																																className="text-[9px] px-1.5 py-0 bg-purple-200/70 text-purple-800 dark:bg-purple-900 dark:text-purple-200 font-bold shrink-0"
-																															>
-																																Base
-																															</Badge>
-																														)}
-																													</div>
-
-																													{/* Base Unit Multiplier Tag */}
-																													<span
-																														className={cn(
-																															"text-[10px] font-mono shrink-0 px-1.5 py-0.5 rounded-md",
-																															u.isBase
-																																? "text-muted-foreground font-medium"
-																																: "font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200/70 dark:border-purple-800/70",
-																														)}
+																										{/* Col 2: Variant item & identity */}
+																										<td className="min-w-[170px] max-w-[220px] p-2 sticky left-9 z-10 bg-slate-50 dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] group-hover:bg-purple-50/50 dark:group-hover:bg-purple-950/40">
+																											<div className="flex items-center gap-2 min-w-0">
+																												<StockProductImage
+																													src={extractVariantImageUrl(
+																														v,
+																														product,
+																														productImagesMap,
+																													)}
+																													alt={v.variantName}
+																													className="size-7 rounded-lg border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center transition-transform group-hover:scale-105"
+																												/>
+																												<div className="min-w-0">
+																													<p
+																														className="font-semibold text-xs text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors truncate"
+																														title={v.variantName}
 																													>
-																														× {u.baseQuantity}{" "}
-																														{baseUnit.unitName}
-																													</span>
-																												</div>
-
-																												{/* Hierarchical Conversion Formula Ribbon */}
-																												<div className="flex items-center justify-between gap-1 text-[11px] font-mono bg-slate-50 dark:bg-slate-950/60 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-800/70">
-																													<span className="text-slate-700 dark:text-slate-300 font-semibold truncate">
-																														{u.formulaText}
-																													</span>
-																													{u.savingsPercent &&
-																														u.savingsPercent >
-																															0 && (
-																															<span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/80 shrink-0 flex items-center gap-0.5">
-																																<Sparkles className="size-2.5" />
-																																Save{" "}
-																																{
-																																	u.savingsPercent
-																																}
-																																%
+																														{v.variantName}
+																													</p>
+																													<div className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground flex-wrap">
+																														<span>SKU: {v.sku}</span>
+																														{v.barcode && (
+																															<span className="text-slate-400 truncate max-w-[80px]">
+																																· {v.barcode}
 																															</span>
 																														)}
-																												</div>
-																											</div>
-
-																											{/* Selling Price & Available Equivalent */}
-																											<div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 space-y-1.5">
-																												<div className="flex items-center justify-between gap-1">
-																													<div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-																														<CircleDollarSign className="size-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-																														<span className="font-mono font-black text-xs text-emerald-700 dark:text-emerald-300">
-																															$
-																															{u.sellingPrice.toFixed(
-																																2,
-																															)}
-																														</span>
 																													</div>
-																													{!u.isBase && (
-																														<span className="text-[10px] font-mono text-muted-foreground">
-																															($
-																															{u.pricePerBaseUnit.toFixed(
-																																2,
-																															)}
-																															/
-																															{
-																																baseUnit.unitName
-																															}
-																															)
-																														</span>
-																													)}
-																												</div>
-
-																												<div className="flex items-center justify-between gap-1 text-[11px] font-mono">
-																													<span className="text-[10px] text-muted-foreground">
-																														Stock:
-																													</span>
-																													<span className="font-bold text-emerald-600 dark:text-emerald-400 truncate text-right">
-																														={" "}
-																														{
-																															u.availableEquivalentStr
-																														}
-																													</span>
 																												</div>
 																											</div>
-																										</div>
-																									);
-																								})}
-																							</div>
+																										</td>
+
+																										{/* Col 3: Units (All units in vertical rows) */}
+																										<td className="min-w-[70px] p-2 align-top">
+																											<div className="flex flex-col gap-1 py-0.5">
+																												{allUnits.map((u) => (
+																													<div
+																														key={u.unitId}
+																														className="h-6 flex items-center font-medium text-xs text-foreground"
+																													>
+																														<span>{u.unitName}</span>
+																														{u.isBase && (
+																															<span className="ml-1 text-[8px] px-1 py-0 rounded font-semibold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+																																Base
+																															</span>
+																														)}
+																													</div>
+																												))}
+																											</div>
+																										</td>
+
+																										{/* Col 4: Unit Cost (per unit) */}
+																										<td className="min-w-[95px] p-2 text-right align-top">
+																											<div className="flex flex-col gap-1 py-0.5 text-right">
+																												{allUnits.map((u) => {
+																													const unitCost =
+																														cost > 0
+																															? cost *
+																															  (u.baseQuantity || 1)
+																															: 0;
+																													return (
+																														<div
+																															key={u.unitId}
+																															className="h-6 flex items-center justify-end font-mono text-xs font-semibold text-slate-700 dark:text-slate-300"
+																														>
+																															{unitCost > 0
+																																? `$${unitCost.toFixed(
+																																		2,
+																																  )}/${u.unitName}`
+																																: "—"}
+																														</div>
+																													);
+																												})}
+																											</div>
+																										</td>
+
+																										{/* Col 5: Retail Price ($) (per unit, margin % removed) */}
+																										<td className="min-w-[100px] p-2 text-right align-top">
+																											<div className="flex flex-col gap-1 py-0.5 text-right">
+																												{allUnits.map((u) => (
+																													<div
+																														key={u.unitId}
+																														className="h-6 flex items-center justify-end font-mono text-xs font-bold text-foreground"
+																													>
+																														${u.sellingPrice.toFixed(2)}/{u.unitName}
+																													</div>
+																												))}
+																											</div>
+																										</td>
+
+																										{/* Col 6: On Hand (Cascading decomposition base on unit) */}
+																										<td className="min-w-[85px] p-2 text-right align-top">
+																											<div className="flex flex-col gap-1 py-0.5 text-right">
+																												{allUnits.map((u) => {
+																													const qty = onHandDecomp.get(u.unitId) ?? 0;
+																													return (
+																														<div
+																															key={u.unitId}
+																															className="h-6 flex items-center justify-end gap-1 font-mono text-xs font-bold text-blue-600 dark:text-blue-400"
+																														>
+																															<span>
+																																{qty.toLocaleString()}
+																															</span>
+																															<span className="text-[10px] font-normal text-muted-foreground w-7 text-left">
+																																{u.unitName}
+																															</span>
+																														</div>
+																													);
+																												})}
+																											</div>
+																										</td>
+
+																										{/* Col 7: Reserved (Cascading decomposition base on unit) */}
+																										<td className="min-w-[75px] p-2 text-right align-top">
+																											<div className="flex flex-col gap-1 py-0.5 text-right">
+																												{allUnits.map((u) => {
+																													const qty = reservedDecomp.get(u.unitId) ?? 0;
+																													return (
+																														<div
+																															key={u.unitId}
+																															className="h-6 flex items-center justify-end gap-1 font-mono text-xs"
+																														>
+																															<span
+																																className={cn(
+																																	"font-bold",
+																																	qty > 0
+																																		? "text-amber-600 dark:text-amber-400"
+																																		: "text-muted-foreground",
+																																)}
+																															>
+																																{qty.toLocaleString()}
+																															</span>
+																															<span className="text-[10px] font-normal text-muted-foreground w-7 text-left">
+																																{u.unitName}
+																															</span>
+																														</div>
+																													);
+																												})}
+																											</div>
+																										</td>
+
+																										{/* Col 8: Available (Cascading decomposition base on unit) */}
+																										<td className="min-w-[85px] p-2 text-right align-top">
+																											<div className="flex flex-col gap-1 py-0.5 text-right">
+																												{allUnits.map((u) => {
+																													const qty = availableDecomp.get(u.unitId) ?? 0;
+																													return (
+																														<div
+																															key={u.unitId}
+																															className="h-6 flex items-center justify-end gap-1 font-mono text-xs"
+																														>
+																															<span
+																																className={cn(
+																																	"font-bold",
+																																	availableStock <= 0
+																																		? "text-rose-600 dark:text-rose-400"
+																																		: isLowStock
+																																		? "text-amber-600 dark:text-amber-400"
+																																		: "text-emerald-600 dark:text-emerald-400",
+																																)}
+																															>
+																																{qty.toLocaleString()}
+																															</span>
+																															<span className="text-[10px] font-normal text-muted-foreground w-7 text-left">
+																																{u.unitName}
+																															</span>
+																														</div>
+																													);
+																												})}
+																											</div>
+																										</td>
+
+																										{/* Col 9: Sold (Cascading decomposition base on unit) */}
+																										<td className="min-w-[75px] p-2 text-right align-top">
+																											<div className="flex flex-col gap-1 py-0.5 text-right">
+																												{allUnits.map((u) => {
+																													const qty = soldDecomp.get(u.unitId) ?? 0;
+																													return (
+																														<div
+																															key={u.unitId}
+																															className="h-6 flex items-center justify-end gap-1 font-mono text-xs text-muted-foreground"
+																														>
+																															<span className="font-semibold text-foreground">
+																																{qty.toLocaleString()}
+																															</span>
+																															<span className="text-[10px] font-normal text-muted-foreground w-7 text-left">
+																																{u.unitName}
+																															</span>
+																														</div>
+																													);
+																												})}
+																											</div>
+																										</td>
+
+																										{/* Col 10: Stock Status */}
+																										<td className="min-w-[95px] p-2 text-center align-middle">
+																											{isOutOfStock ? (
+																												<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60">
+																													<span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
+																													{t("stocks.outOfStock")}
+																												</span>
+																											) : isLowStock ? (
+																												<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60">
+																													<span className="size-1.5 rounded-full bg-amber-500" />
+																													{t("stocks.lowStockAlert")}
+																												</span>
+																											) : (
+																												<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60">
+																													<span className="size-1.5 rounded-full bg-emerald-500" />
+																													{t("stocks.inStock")}
+																												</span>
+																											)}
+																										</td>
+
+																										{/* Col 11: Actions (Unit Hierarchy Popover placed before Adjust) */}
+																										<td className="sticky right-0 z-10 bg-slate-50 dark:bg-slate-900 border-l border-slate-200/80 dark:border-slate-800 p-2 text-center min-w-[185px] shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] group-hover:bg-purple-50/60 dark:group-hover:bg-purple-950/40 align-middle">
+																											<div className="flex items-center justify-center gap-1.5">
+																												{/* Unit Hierarchy Popover Button */}
+																												<UnitPricingPopover stockData={stockData}>
+																													{allUnits.length > 2 ? (
+																														<button
+																															type="button"
+																															className="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80 transition-colors cursor-pointer shrink-0"
+																															title="View Unit Hierarchy & Packaging Breakdown"
+																														>
+																															<Package className="size-3 text-purple-500 shrink-0" />
+																															<span>
+																																{baseUnit.unitName} ({allUnits.length})
+																															</span>
+																															<ChevronDown className="size-2.5 opacity-70 shrink-0" />
+																														</button>
+																													) : (
+																														<button
+																															type="button"
+																															className="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] font-mono bg-slate-100 hover:bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer shrink-0"
+																															title="View Unit Hierarchy"
+																														>
+																															<Package className="size-3 text-slate-500 shrink-0" />
+																															<span>
+																																{allUnits.length > 1
+																																	? `${allUnits.length} Units`
+																																	: baseUnit.unitName}
+																															</span>
+																															<ChevronDown className="size-2.5 opacity-60 shrink-0" />
+																														</button>
+																													)}
+																												</UnitPricingPopover>
+
+																												{/* Adjust Button */}
+																												<Button
+																													size="sm"
+																													onClick={() =>
+																														openAdjustModalForVariant(
+																															v.variantId,
+																															v.variantName,
+																															v.sku,
+																															{
+																																productName:
+																																	product.productName ||
+																																	product.name ||
+																																	v.variantName,
+																																unitId: baseUnit.unitId,
+																																unitName: baseUnit.unitName,
+																																availableStock: availableStock,
+																																imageUrl:
+																																	(v.imageUrl || product.imageUrl) ??
+																																	undefined,
+																															},
+																														)
+																													}
+																													className="h-7 px-2.5 text-[11px] font-semibold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-2xs cursor-pointer"
+																													title={t("stocks.adjustStock")}
+																												>
+																													<Scale className="size-3" />
+																													<span>Adjust</span>
+																												</Button>
+
+																												{/* Movements Button */}
+																												<Button
+																													size="sm"
+																													variant="ghost"
+																													onClick={() =>
+																														openVariantMovementsModal(
+																															v.variantId,
+																															v.variantName,
+																															v.sku,
+																														)
+																													}
+																													className="h-7 w-7 p-0 text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50 rounded-lg cursor-pointer"
+																													title={t("stocks.allMovements")}
+																												>
+																													<History className="size-3.5" />
+																												</Button>
+																											</div>
+																										</td>
+																									</tr>
+																								);
+																							})
+																						)}
+																					</tbody>
+																				</table>
+																			) : (
+																				/* 2. Interactive POS Cards Grid View (Scrollable) */
+																				<div className="p-3 sm:p-4">
+																					{displayedVariants.length === 0 ? (
+																						<div className="py-8 text-center text-xs text-muted-foreground">
+																							No variants matching "{variantSearches[prodId]}"
 																						</div>
-																					</div>
-																				);
-																			})}
+																					) : (
+																						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+																							{displayedVariants.map((v: StockVariantItem) => {
+																								const stockData = getNormalizedVariantStockData(
+																									v,
+																									product,
+																									variantDetailsMap,
+																								);
+																								return (
+																									<InteractiveVariantCard
+																										key={v.variantId}
+																										v={v}
+																										product={product}
+																										stockData={stockData}
+																										productImagesMap={productImagesMap}
+																										openAdjustModalForVariant={openAdjustModalForVariant}
+																										openVariantMovementsModal={openVariantMovementsModal}
+																										t={t}
+																									/>
+																								);
+																							})}
+																						</div>
+																					)}
+																				</div>
+																			)}
 																		</div>
-																	)}
-																</div>
-															</TableCell>
-														</TableRow>
-													)}
+
+																		{/* Footer summary bar */}
+																		<div className="flex items-center justify-between px-4 py-2 bg-slate-50/70 dark:bg-slate-900/50 border-t border-slate-200/70 dark:border-slate-800 text-[11px] text-muted-foreground flex-wrap gap-2">
+																			<div className="flex items-center gap-2">
+																				<span>
+																					{displayedVariants.length} of {variants.length} variant{variants.length === 1 ? "" : "s"}
+																				</span>
+																				<span className="text-slate-300 dark:text-slate-700">·</span>
+																				<span>
+																					Total On Hand:{" "}
+																					<strong className="text-foreground">
+																						{totalPhysical.toLocaleString()}
+																					</strong>
+																				</span>
+																				<span className="text-slate-300 dark:text-slate-700">·</span>
+																				<span>
+																					Available:{" "}
+																					<strong className="text-emerald-600 dark:text-emerald-400">
+																						{totalAvailable.toLocaleString()}
+																					</strong>
+																				</span>
+																			</div>
+
+																			<div className="flex items-center gap-1.5 shrink-0">
+																				<button
+																					type="button"
+																					onClick={() => {
+																						const scroller = document.getElementById(`variant-scroller-${prodId}`);
+																						const outer = scroller?.closest('[data-slot="table-container"]') as HTMLElement | null;
+																						const target = (scroller && scroller.scrollWidth > scroller.clientWidth) ? scroller : (outer || scroller);
+																						target?.scrollTo({ left: 0, behavior: "smooth" });
+																					}}
+																					className="h-6 px-2 rounded text-[10px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors font-medium flex items-center gap-0.5 cursor-pointer"
+																				>
+																					<ChevronLeft className="size-3" />
+																					<span>Start</span>
+																				</button>
+																				<button
+																					type="button"
+																					onClick={() => {
+																						const scroller = document.getElementById(`variant-scroller-${prodId}`);
+																						const outer = scroller?.closest('[data-slot="table-container"]') as HTMLElement | null;
+																						const target = (scroller && scroller.scrollWidth > scroller.clientWidth) ? scroller : (outer || scroller);
+																						target?.scrollTo({ left: 9999, behavior: "smooth" });
+																					}}
+																					className="h-6 px-2 rounded text-[10px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors font-bold flex items-center gap-0.5 cursor-pointer"
+																				>
+																					<span>Status & Actions</span>
+																					<ChevronRight className="size-3" />
+																				</button>
+																			</div>
+																		</div>
+																	</div>
+																</TableCell>
+															</TableRow>
+														);
+													})()}
 												</React.Fragment>
 											);
 										},
@@ -2303,6 +2852,7 @@ function StockPageContent() {
 								</div>
 							</div>
 						</div>
+						</>
 					)}
 				</ModernTabsContent>
 

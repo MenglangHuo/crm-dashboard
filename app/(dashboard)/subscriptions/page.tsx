@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { profileApi, featuresApi } from "@/lib/api/endpoints";
+import { featuresApi } from "@/lib/api/endpoints";
 import { useCompanyContext } from "@/components/providers/company-context";
 import {
 	CreditCard,
@@ -49,7 +49,7 @@ function SubscriptionsContent() {
 		selectedCompanyId,
 		setSelectedCompanyId,
 		companies,
-		isLoadingCompanies,
+		isLoadingCompanies: _isLoadingCompanies,
 		isSystemAdmin,
 	} = useCompanyContext();
 

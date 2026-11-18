@@ -7,14 +7,8 @@ import dynamic from "next/dynamic";
 import {
 	DollarSign,
 	ShoppingCart,
-	FileText,
-	TrendingUp,
 	CreditCard,
-	Percent,
-	Truck,
-	Receipt,
 	Clock,
-	Calendar,
 } from "lucide-react";
 
 import { useTheme } from "next-themes";
@@ -25,7 +19,6 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), {
 	ssr: false,
 });
 
-import { ModernButton } from "@/components/ui-custom/button";
 
 interface Props {
 	customerId: number | string;
@@ -37,8 +30,8 @@ import { useTranslation } from "@/lib/i18n/context";
 
 export function CustomerReportTab({
 	customerId,
-	customerName,
-	currency = "USD",
+	customerName: _customerName,
+	currency: _currency = "USD",
 }: Props) {
 	const { t } = useTranslation();
 	const [dateRange, setDateRange] = useState<"30d" | "90d" | "1y" | "all">(
@@ -89,7 +82,7 @@ export function CustomerReportTab({
 	const invoicesMetric = timeSeries.find((m) => m.metric === "invoices");
 	const paymentsMetric = timeSeries.find((m) => m.metric === "payments");
 
-	const categories =
+	const _categories =
 		revenueMetric?.series.map((p) => p.date) ||
 		ordersMetric?.series.map((p) => p.date) ||
 		[];
@@ -98,9 +91,9 @@ export function CustomerReportTab({
 		revenueMetric?.series.map((p) => Number(p.value || 0)) || [];
 	const profitValues =
 		revenueMetric?.series.map((p) => Number(p.profit || 0)) || [];
-	const orderCounts =
+	const _orderCounts =
 		ordersMetric?.series.map((p) => Number(p.count || 0)) || [];
-	const invoiceCounts =
+	const _invoiceCounts =
 		invoicesMetric?.series.map((p) => Number(p.count || 0)) || [];
 	const paymentValues =
 		paymentsMetric?.series.map((p) => Number(p.value || 0)) || [];

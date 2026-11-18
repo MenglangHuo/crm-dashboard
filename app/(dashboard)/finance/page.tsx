@@ -11,20 +11,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
 	Plus,
-	Loader2,
 	Receipt,
 	CreditCard,
 	DollarSign,
 	CheckCircle2,
 	Clock,
 	FileText,
-	ArrowUpRight,
+	QrCode,
+	Printer,
+	Zap,
 } from "lucide-react";
+import { useQuickActionDispatch } from "@/components/quick-action-modal-context";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	ModernTabs,
@@ -49,7 +49,6 @@ import {
 	ModernSelect,
 	ModernDatePicker,
 } from "@/components/ui-custom/form-controls";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Invoice validation schema
 const invoiceFormSchema = z.object({
@@ -78,9 +77,6 @@ const paymentFormSchema = z.object({
 
 type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
-
-import { useQuickActionDispatch } from "@/components/quick-action-modal-context";
-import { QrCode, Printer, Zap } from "lucide-react";
 
 export default function FinancePage() {
 	const { openQuickPay, openKhqr, openReceipt } = useQuickActionDispatch();
@@ -187,7 +183,7 @@ export default function FinancePage() {
 	// Process Payment Mutation
 	const processPaymentMutation = useMutation({
 		mutationFn: (values: PaymentFormValues) => {
-			const selectedInv = invoicesData?.items?.find(
+			const _selectedInv = invoicesData?.items?.find(
 				(i) => String(i.id) === String(values.invoiceId),
 			);
 			const payload: CreatePaymentRequest = {

@@ -33,7 +33,7 @@ export default function DepartmentsPage() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { can } = usePermissions();
-	const canCreateDepartment = can("DEPARTMENT", "CREATE");
+	const _canCreateDepartment = can("DEPARTMENT", "CREATE");
 	const canUpdateDepartment = can("DEPARTMENT", "UPDATE");
 	const canDeleteDepartment = can("DEPARTMENT", "DELETE");
 	const [search, setSearch] = useState("");

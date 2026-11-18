@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,11 +8,8 @@ import {
 	Trash2,
 	Palette,
 	Clock,
-	Sparkles,
 	MapPin,
 	ChevronRight,
-	GripVertical,
-	Check,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 

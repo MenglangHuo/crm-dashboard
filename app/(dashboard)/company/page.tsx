@@ -19,7 +19,6 @@ import {
 	Mail,
 	Phone,
 	MapPin,
-	FileText,
 	Users,
 	GitBranch,
 	Save,

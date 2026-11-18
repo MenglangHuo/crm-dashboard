@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import {
 	Check,
 	X,
-	Sparkles,
 	Copy,
 	CheckCheck,
 	Eye,
@@ -260,7 +259,7 @@ export function DateCell({ dateString }: { dateString: string }) {
 				day: "numeric",
 			});
 		}
-	} catch (e) {
+	} catch (_e) {
 		// fallback to dateString
 	}
 

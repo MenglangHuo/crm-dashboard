@@ -3,18 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-	AlertCircle,
 	AlertTriangle,
 	ArrowRight,
-	Boxes,
-	CheckCircle2,
-	FileText,
 	ShieldCheck,
-	Truck,
 	Warehouse,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import type { DashboardReportData } from "@/lib/types";
 
 export interface InventoryHealthBannerProps {
@@ -25,7 +19,7 @@ export function InventoryHealthBanner({ data }: InventoryHealthBannerProps) {
 	const outOfStock = data?.outOfStockCount ?? 0;
 	const lowStock = data?.lowStockCount ?? 0;
 	const totalProducts = data?.totalProducts ?? 0;
-	const totalUnpaid = data?.totalUnpaid ?? 0;
+	const _totalUnpaid = data?.totalUnpaid ?? 0;
 
 	const hasInventoryAlert = outOfStock > 0 || lowStock > 0;
 

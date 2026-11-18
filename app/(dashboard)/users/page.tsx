@@ -14,9 +14,6 @@ import {
 } from "@/lib/api/endpoints";
 import {
 	User,
-	UserBackendRole,
-	UserRolePermission,
-	Role,
 	Permission,
 } from "@/lib/types";
 import { extractUserRoleIds } from "@/lib/role-utils";
@@ -105,12 +102,9 @@ import {
 	Building2,
 	Phone,
 	Mail,
-	Calendar,
-	MapPin,
 	Sparkles,
 	Info,
 	CheckCircle2,
-	XCircle,
 	FileText,
 	Lock,
 	RotateCcw,
@@ -121,7 +115,6 @@ import {
 	Layers,
 	CheckSquare,
 	Square,
-	Search,
 	Trash2,
 	Download,
 	Edit3,
@@ -143,11 +136,9 @@ import {
 } from "@/components/ui-custom/modern-tabs";
 import { UserAuditLogsSection } from "@/components/users/user-audit-logs-section";
 import { UserAuditLogsModal } from "@/components/users/user-audit-logs-modal";
-import { CustomPermissionsModal } from "@/components/users/custom-permissions-modal";
 import {
 	DataTable,
 	ColumnDef,
-	UserDetailCell,
 	StatusBadgeCell,
 	RowAction,
 } from "@/components/ui-custom/data-table";
@@ -267,7 +258,7 @@ export default function UsersPage() {
 	const canDeleteUser = can("USER", "DELETE");
 
 	const [search, setSearch] = useState("");
-	const [statusFilter, setStatusFilter] = useState<string>("ALL");
+	const [statusFilter, _setStatusFilter] = useState<string>("ALL");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
 
@@ -325,7 +316,7 @@ export default function UsersPage() {
 	]);
 
 	// Dialog state for Direct Custom Dynamic Permissions (?companyId=...)
-	const [customPermissionsUser, setCustomPermissionsUser] =
+	const [_customPermissionsUser, setCustomPermissionsUser] =
 		useState<User | null>(null);
 
 	const { data: usersData, isLoading } = useQuery({
@@ -339,12 +330,12 @@ export default function UsersPage() {
 		queryFn: () => rolesApi.list({ limit: 100 }),
 	});
 
-	const { data: divisionsData } = useQuery({
+	const { data: _divisionsData } = useQuery({
 		queryKey: ["divisions-all"],
 		queryFn: () => divisionsApi.list({ limit: 100 }),
 	});
 
-	const { data: departmentsData } = useQuery({
+	const { data: _departmentsData } = useQuery({
 		queryKey: ["departments-all"],
 		queryFn: () => departmentsApi.list({ limit: 100 }),
 	});

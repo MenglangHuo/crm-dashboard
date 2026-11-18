@@ -30,11 +30,10 @@ export function isUserSystemAdmin(userProfile: any): boolean {
 
 	// 1. Explicit system admin boolean flags or accountType (Platform level only)
 	if (
-		userProfile.isSystemAdmin === true ||
-		userProfile.isSystem === true ||
+	
 		userProfile.systemAdmin === true ||
-		userProfile.accountType === "SYSTEM_ADMIN" ||
-		userProfile.accountType === "SYSTEMADMIN"
+		userProfile.accountType === "SYSTEM_ADMIN"
+		
 	) {
 		return true;
 	}

@@ -2,14 +2,7 @@
 
 import * as React from "react";
 import {
-	Activity,
-	ArrowUpRight,
-	Clock,
-	Download,
 	RefreshCw,
-	SlidersHorizontal,
-	Sparkles,
-	User,
 	Users,
 	Check,
 	Search,
@@ -17,7 +10,6 @@ import {
 	Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
 	ModernDateRangePicker,
 	type DateRangeValue,
@@ -50,8 +42,8 @@ export interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({
-	title = "Executive Intelligence",
-	description = "Comprehensive financial reporting, dynamic time-series metrics, and period-over-period income variance.",
+	title: _title = "Executive Intelligence",
+	description: _description = "Comprehensive financial reporting, dynamic time-series metrics, and period-over-period income variance.",
 	lastUpdated,
 	isRefreshing = false,
 	onRefresh,

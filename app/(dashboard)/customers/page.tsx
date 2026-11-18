@@ -3,30 +3,23 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customersApi } from "@/lib/api/endpoints";
-import { Customer, Province } from "@/lib/types";
-import { CAMBODIA_PROVINCES, getProvinceByCode } from "@/lib/data/provinces";
+import { Customer } from "@/lib/types";
+import { getProvinceByCode } from "@/lib/data/provinces";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
 	Plus,
-	Loader2,
 	Phone,
 	MapPin,
 	Building2,
 	Users,
 	Zap,
-	Trash2,
-	RotateCcw,
 	ExternalLink,
 	Edit3,
 	Compass,
 	List,
 	Eye,
-	Image as ImageIcon,
-	CheckCircle2,
-	Clock,
-	Sparkles,
 	Truck,
 } from "lucide-react";
 
@@ -37,7 +30,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { ModernButton } from "@/components/ui-custom/button";
 import {
 	ModernSwitch,
 	ModernSearchSelect,
@@ -76,7 +68,7 @@ export default function CustomersPage() {
 	const router = useRouter();
 	const queryClient = useQueryClient();
 	const { can } = usePermissions();
-	const canCreateCustomer = can("CUSTOMER", "CREATE");
+	const _canCreateCustomer = can("CUSTOMER", "CREATE");
 	const canUpdateCustomer = can("CUSTOMER", "UPDATE");
 	const canDeleteCustomer = can("CUSTOMER", "DELETE");
 	const { selectedCompanyId } = useCompanyContext();
@@ -204,7 +196,7 @@ export default function CustomersPage() {
 	}, [selectedProvinceCode, domainFilterGroup]);
 
 	// 3. Fetch Customers List
-	const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
+	const { data, isLoading, isFetching: _isFetching, isError, error, refetch } = useQuery({
 		queryKey: [
 			"customers",
 			selectedCompanyId,
@@ -234,7 +226,7 @@ export default function CustomersPage() {
 			toast.error(err?.message || "Failed to delete customer"),
 	});
 
-	const restoreMutation = useMutation({
+	const _restoreMutation = useMutation({
 		mutationFn: (id: string | number) => customersApi.restore(id),
 		onSuccess: () => {
 			toast.success("Customer reactivated successfully");

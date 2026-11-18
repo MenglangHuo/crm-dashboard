@@ -5,12 +5,18 @@
 	"scripts": {
 		"dev": "next dev -p 4000",
 		"dev:prod": "dotenv -e .env.production -- next dev -p 4000",
+		"prebuild": "pnpm typecheck && pnpm lint",
+		"prebuild:prod": "pnpm prebuild",
+		"prebuild:dev": "pnpm prebuild",
 		"build": "next build",
 		"build:prod": "next build",
 		"build:dev": "dotenv -e .env.development -- next build",
+		"build:quick": "next build",
 		"start": "next start -p 4000",
 		"lint": "eslint .",
+		"lint:fix": "eslint --fix .",
 		"typecheck": "tsc --noEmit",
+		"check": "pnpm typecheck && pnpm lint",
 		"version:patch": "npm version patch --no-git-tag-version",
 		"version:minor": "npm version minor --no-git-tag-version",
 		"version:major": "npm version major --no-git-tag-version"

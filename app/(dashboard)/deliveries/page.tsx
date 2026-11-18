@@ -41,7 +41,6 @@ import {
 	UserCheck,
 	ShieldCheck,
 	Eye,
-	Search,
 	Navigation,
 	Globe,
 	RotateCcw,
@@ -90,11 +89,11 @@ export default function DeliveriesPage() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { canAny } = usePermissions();
-	const canCreateDelivery = canAny(["DELIVERY:CREATE", "LOCATION:CREATE"]);
+	const _canCreateDelivery = canAny(["DELIVERY:CREATE", "LOCATION:CREATE"]);
 	const canUpdateDelivery = canAny(["DELIVERY:UPDATE", "LOCATION:UPDATE"]);
 	const canDeleteDelivery = canAny(["DELIVERY:DELETE", "LOCATION:DELETE"]);
 	const [search, setSearch] = useState("");
-	const [statusFilter, setStatusFilter] = useState<string | undefined>(
+	const [statusFilter, _setStatusFilter] = useState<string | undefined>(
 		undefined,
 	);
 	const [page, setPage] = useState(1);

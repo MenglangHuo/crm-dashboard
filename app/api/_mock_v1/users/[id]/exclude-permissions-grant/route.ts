@@ -5,7 +5,7 @@ export async function DELETE(
 	request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
-	const { profile, error } = await requireAuth("users.manage_permissions");
+	const { profile: _profile, error } = await requireAuth("users.manage_permissions");
 	if (error) return error;
 	const { id } = await params;
 	const user = db.users.find((u) => String(u.id) === String(id));

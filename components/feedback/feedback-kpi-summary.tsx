@@ -6,9 +6,6 @@ import {
 	HelpCircle,
 	BarChart3,
 	Star,
-	TrendingUp,
-	CheckCircle2,
-	Users,
 } from "lucide-react";
 
 import { useTranslation } from "@/lib/i18n/context";
@@ -26,7 +23,7 @@ export function FeedbackKpiSummary({
 	totalQuestions,
 	totalSubmissions,
 	averageCsat,
-	completedRate = 98.4,
+	completedRate: _completedRate = 98.4,
 }: FeedbackKpiProps) {
 	const { t } = useTranslation();
 

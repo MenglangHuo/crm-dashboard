@@ -1,24 +1,18 @@
 "use client";
 
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { paymentsApi, invoicesApi, fileUrl } from "@/lib/api/endpoints";
-import { Payment, PaymentMethod, CreatePaymentRequest } from "@/lib/types";
-import { getErrorMessage } from "@/lib/api/client";
-import { toast } from "sonner";
+import { Payment } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	DollarSign,
-	Loader2,
 	Zap,
 	Building2,
-	CheckCircle2,
-	Calendar,
 	History,
 	UserCheck,
 	FileText,
-	Eye,
 	X,
 } from "lucide-react";
 import {
@@ -43,7 +37,7 @@ export function InvoicePaymentsModal({
 	onOpenInvoiceDetails,
 }: InvoicePaymentsModalProps) {
 	const { t } = useTranslation();
-	const queryClient = useQueryClient();
+	const _queryClient = useQueryClient();
 	const { openQuickPay } = useQuickActions();
 
 	const [previewReceiptModal, setPreviewReceiptModal] = useState<string | null>(

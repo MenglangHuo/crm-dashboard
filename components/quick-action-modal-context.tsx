@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { Product, Customer, Loan, Invoice, Payment } from "@/lib/types";
+import { Invoice } from "@/lib/types";
 
 export interface LoanWizardInitialValues {
 	productId?: string;

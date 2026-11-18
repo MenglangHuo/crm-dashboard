@@ -1,4 +1,3 @@
-import { AppNotification } from "./types";
 
 export interface ResolvableNotification {
 	type?: string | null;

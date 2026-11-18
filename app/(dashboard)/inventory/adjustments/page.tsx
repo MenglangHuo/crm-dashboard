@@ -4,7 +4,6 @@ import React, { Suspense } from "react";
 import { StockAdjustmentsAuditView } from "@/components/inventory/stock-adjustments-audit-view";
 import { History, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 
 function StockAdjustmentsPageContent() {

@@ -13,9 +13,8 @@ import {
 	Trash2,
 	Edit3,
 	Briefcase,
-	MessageSquare,
-	ShieldCheck,
 	Search,
+	Check,
 } from "lucide-react";
 import { ModernButton } from "@/components/ui-custom/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +38,6 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Check } from "lucide-react";
 
 interface Props {
 	customerId: number | string;

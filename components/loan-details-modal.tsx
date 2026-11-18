@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loansApi, financeApi } from "@/lib/api/endpoints";
-import { LoanDetails, LoanSchedule, Invoice } from "@/lib/types";
+import { LoanSchedule } from "@/lib/types";
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -17,23 +17,15 @@ import {
 import { Progress } from "@/components/ui/progress";
 import {
 	CreditCard,
-	User,
-	Clock,
 	CheckCircle2,
 	AlertCircle,
 	RefreshCw,
 	Zap,
 	ArrowRight,
-	FileText,
-	DollarSign,
 	Calendar,
-	Percent,
 	Receipt,
-	Loader2,
 	Copy,
 	Check,
-	Building2,
-	ShieldCheck,
 	Package,
 } from "lucide-react";
 import {

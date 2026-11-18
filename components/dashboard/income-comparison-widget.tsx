@@ -4,10 +4,6 @@ import * as React from "react";
 import {
 	ArrowDownRight,
 	ArrowUpRight,
-	Calendar,
-	ChevronRight,
-	DollarSign,
-	Layers,
 	Minus,
 	Scale,
 	TrendingDown,
@@ -15,7 +11,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { IncomeComparisonData, IncomeComparisonItem } from "@/lib/types";
+import type { IncomeComparisonData } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
 
 export interface IncomeComparisonWidgetProps {

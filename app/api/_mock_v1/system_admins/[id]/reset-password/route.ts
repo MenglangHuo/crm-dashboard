@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { db, now } from "@/lib/server/db";
+import { db } from "@/lib/server/db";
 import { ok, fail, requireAuth } from "@/lib/server/api";
 
 export async function POST(

@@ -10,11 +10,9 @@ import {
 	ModernModalCancelButton,
 } from "@/components/ui-custom/modal";
 import {
-	ModernInput,
 	ModernSelect,
 } from "@/components/ui-custom/form-controls";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui-custom/data-table";
 import { useTranslation } from "@/lib/i18n/context";
 import {
@@ -22,14 +20,10 @@ import {
 	TrendingUp,
 	TrendingDown,
 	RefreshCw,
-	User,
 	Package,
-	Layers,
 	Search,
-	Filter,
 	DollarSign,
 	Calendar,
-	Sparkles,
 	ArrowUpRight,
 	ArrowDownRight,
 	MinusCircle,
@@ -49,7 +43,7 @@ export function ProductPriceHistoryModal({
 	isOpen,
 	onClose,
 	productId,
-	productName,
+	productName: _productName,
 	productVariants = [],
 	productUnits = [],
 }: ProductPriceHistoryModalProps) {
@@ -61,7 +55,7 @@ export function ProductPriceHistoryModal({
 	const [viewMode, setViewMode] = useState<"timeline" | "matrix">("timeline");
 
 	// Query ERP summary and current snapshots
-	const { data: summaryData, isLoading: isLoadingSummary } = useQuery({
+	const { data: summaryData, isLoading: _isLoadingSummary } = useQuery({
 		queryKey: ["product-price-history-summary", productId],
 		queryFn: () => priceHistoryApi.getProductSummary(productId!),
 		enabled: !!productId && isOpen,

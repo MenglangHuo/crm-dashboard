@@ -7,9 +7,6 @@ import { toast } from "sonner";
 import {
 	MapPin,
 	Navigation,
-	Loader2,
-	Calendar,
-	User,
 	FileText,
 } from "lucide-react";
 import {

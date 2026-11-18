@@ -17,7 +17,6 @@ import {
 	RefreshCw,
 	MoreHorizontal,
 	Eye,
-	CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -181,7 +180,7 @@ export default function AttachmentsPage() {
 			try {
 				await deleteMutation.mutateAsync(id);
 				successCount++;
-			} catch (err) {
+			} catch (_err) {
 				// continue batch
 			}
 		}
@@ -198,7 +197,7 @@ export default function AttachmentsPage() {
 				window.open(res.downloadUrl, "_blank");
 				toast.success(`Downloading ${attachment.fileName}`);
 			}
-		} catch (err: any) {
+		} catch (_err: any) {
 			toast.error("Failed to generate download URL");
 		}
 	};

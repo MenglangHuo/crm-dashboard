@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Code2, Eye, Sliders } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 interface GenericJsonEditorProps {
 	value: any;
@@ -17,8 +17,8 @@ export function GenericJsonEditor({
 	onChange,
 	disabled = false,
 }: GenericJsonEditorProps) {
-	const [showRawJson, setShowRawJson] = useState(false);
-	const [rawText, setRawText] = useState("");
+	const [_showRawJson, _setShowRawJson] = useState(false);
+	const [_rawText, _setRawText] = useState("");
 	const [newKey, setNewKey] = useState("");
 	const [newValue, setNewValue] = useState("");
 

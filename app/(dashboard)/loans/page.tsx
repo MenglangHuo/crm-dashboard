@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loansApi, customersApi, productsApi } from "@/lib/api/endpoints";
-import { Loan, Customer, Product } from "@/lib/types";
+import { Loan, Customer } from "@/lib/types";
 import { getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -14,22 +14,17 @@ import {
 	CheckCircle2,
 	RefreshCw,
 	FileText,
-	User,
 	Clock,
 	Percent,
 	DollarSign,
 	TrendingUp,
 	ShieldCheck,
-	Building2,
-	Calendar,
 	Sparkles,
 	Info,
 	Eye,
 	AlertCircle,
-	Package,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
 	DataTable,
@@ -47,13 +42,8 @@ import {
 	ModernSelect,
 	ModernTextarea,
 } from "@/components/ui-custom/form-controls";
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-	SheetDescription,
-} from "@/components/ui/sheet";
+
+
 
 import { LoanDetailsModal } from "@/components/loan-details-modal";
 
@@ -441,7 +431,7 @@ export default function LoansPage() {
 			cell: ({ row }) => {
 				const pct = ((row.interestRateBps || 0) / 100).toFixed(2);
 				const totalInt = row.totalInterest || 0;
-				const totalPayable = (row.principal || 0) + totalInt;
+				const _totalPayable = (row.principal || 0) + totalInt;
 
 				return (
 					<div>

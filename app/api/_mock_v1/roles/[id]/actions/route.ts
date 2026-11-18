@@ -5,7 +5,7 @@ export async function updateRoleActionsHandler(
 	request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
-	const { profile, error } = await requireAuth();
+	const { profile: _profile, error } = await requireAuth();
 	if (error) return error;
 
 	const { id } = await params;

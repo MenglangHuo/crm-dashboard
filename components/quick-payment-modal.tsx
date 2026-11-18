@@ -71,7 +71,7 @@ export function QuickPaymentModal() {
 	const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
 	const [paymentAmount, setPaymentAmount] = useState<number>(0);
 	const currency = "USD";
-	const paymentMethod = "BANK_TRANSFER";
+	const _paymentMethod = "BANK_TRANSFER";
 	const [reference, setReference] = useState("");
 	const [paymentDate, setPaymentDate] = useState(
 		new Date().toISOString().split("T")[0],
@@ -497,8 +497,8 @@ export function QuickPaymentModal() {
 
 			return await financeApi.processPayment(payload, idempotencyKey);
 		},
-		onSuccess: (payment) => {
-			const cust = customersData?.items?.find(
+		onSuccess: (_payment) => {
+			const _cust = customersData?.items?.find(
 				(c) => String(c.id) === String(selectedCustomerId),
 			);
 			toast.success(

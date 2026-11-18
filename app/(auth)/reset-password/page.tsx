@@ -18,8 +18,6 @@ import {
 	Eye,
 	EyeOff,
 	ShieldCheck,
-	CheckCircle2,
-	Shield,
 	LogIn,
 	KeyRound,
 } from "lucide-react";

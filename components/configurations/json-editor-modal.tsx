@@ -2,13 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import {
-	Code2,
 	Copy,
 	Check,
 	RotateCcw,
 	Sparkles,
 	AlertCircle,
-	X,
 	FileJson,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";

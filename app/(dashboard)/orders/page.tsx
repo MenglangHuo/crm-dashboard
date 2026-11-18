@@ -22,7 +22,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/permission-guard";
-import { PermissionGate } from "@/components/auth/permission-gate";
 import { PosOrderStudioModal } from "@/components/orders/pos-order-studio-modal";
 import { CreateOrderModal } from "@/components/orders/create-order-modal";
 import { OrderDetailsDrawer } from "@/components/orders/order-details-drawer";
@@ -33,7 +32,6 @@ import { OrderActionReasonModal } from "@/components/orders/order-action-reason-
 import { OrderTimelineDrawer } from "@/components/orders/order-timeline-drawer";
 import {
 	ShoppingCart,
-	Store,
 	Boxes,
 	ShieldCheck,
 	Receipt,
@@ -79,10 +77,10 @@ function OrdersPageContent() {
 	const { selectedCompanyId } = useCompanyContext();
 	const { t } = useTranslation();
 	const {
-		isAdmin,
+		isAdmin: _isAdmin,
 		isSale,
 		canCreateOrder,
-		canPostOrder,
+		canPostOrder: _canPostOrder,
 		canUnpostOrder,
 		canVerifyStock,
 		canApproveSale,

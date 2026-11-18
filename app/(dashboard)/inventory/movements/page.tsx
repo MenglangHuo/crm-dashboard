@@ -29,8 +29,6 @@ import {
 } from "@/components/ui/select";
 import {
 	Loader2,
-	Plus,
-	SlidersHorizontal,
 	ArrowUpRight,
 	ArrowDownLeft,
 } from "lucide-react";

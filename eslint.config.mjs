@@ -14,7 +14,7 @@ export default tseslint.config(
 	...tseslint.configs.recommended,
 	{
 		linterOptions: {
-			reportUnusedDisableDirectives: "off",
+			reportUnusedDisableDirectives: "warn",
 		},
 		plugins: {
 			"unused-imports": unusedImports,
@@ -32,9 +32,22 @@ export default tseslint.config(
 			"@typescript-eslint/ban-ts-comment": "off",
 			"@typescript-eslint/no-empty-object-type": "off",
 			"no-unused-vars": "off",
-			"prefer-const": "warn",
-			"unused-imports/no-unused-imports": "warn",
-			"unused-imports/no-unused-vars": "off",
+			"no-var": "error",
+			"prefer-const": "error",
+			"no-duplicate-imports": "error",
+			"no-debugger": "error",
+			"unused-imports/no-unused-imports": "error",
+			"unused-imports/no-unused-vars": [
+				"error",
+				{
+					"vars": "all",
+					"varsIgnorePattern": "^_",
+					"args": "after-used",
+					"argsIgnorePattern": "^_",
+					"caughtErrors": "none",
+					"ignoreRestSiblings": true,
+				},
+			],
 		},
 	},
 );

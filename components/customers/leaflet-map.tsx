@@ -4,8 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { Customer } from "@/lib/types";
 import {
 	Loader2,
-	Layers,
-	Navigation,
 	ZoomIn,
 	ZoomOut,
 	MapPin,
@@ -63,7 +61,7 @@ function escapeHtml(str?: string | null): string {
 function formatLastVisitedInfo(
 	lastVisitedAt?: string | null,
 	daysSinceVisit?: number | null,
-	visitStatusLabel?: string,
+	_visitStatusLabel?: string,
 ) {
 	if (lastVisitedAt) {
 		try {

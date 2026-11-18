@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ShieldAlert, ArrowLeft, LayoutDashboard, Lock } from "lucide-react";
+import { ShieldAlert, LayoutDashboard, Lock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 
 export interface PermissionGuardProps {

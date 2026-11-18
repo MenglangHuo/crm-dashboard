@@ -1,134 +1,121 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-	productsApi,
-	categoriesApi,
-	brandsApi,
-	unitsApi,
-	uploadFile,
-	uploadFileWithAttachment,
-	uploadService,
-	fileUrl,
-	storageApi,
-	priceHistoryApi,
-	safeImageUrl,
-	DEFAULT_IMAGE_URL,
-} from "@/lib/api/endpoints";
-import {
-	Product,
-	Category,
-	Brand,
-	Unit,
-	ProductDetails,
-	VariantOperations,
-	ProductUnit,
-	VariantUnit,
-} from "@/lib/types";
-import { getErrorMessage } from "@/lib/api/client";
-import { toast } from "sonner";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { cn } from "@/lib/utils";
+import { MediaPickerModal } from "@/components/attachments/media-picker-modal";
+import { PermissionGate } from "@/components/auth/permission-gate";
+import { PermissionGuard } from "@/components/auth/permission-guard";
+import { MapProductUnitModal } from "@/components/map-product-unit-modal";
+import { ProductPriceHistoryModal } from "@/components/product-price-history-modal";
+import { useCompanyContext } from "@/components/providers/company-context";
 import { useQuickActionDispatch } from "@/components/quick-action-modal-context";
 import {
-	RowAction,
-	PRODUCT_DOMAIN_FILTERS,
-	FilterCriterion,
-	buildSearchFilterPayload,
-} from "@/components/ui-custom/data-table";
-import { MediaPickerModal } from "@/components/attachments/media-picker-modal";
-import { ProductPriceHistoryModal } from "@/components/product-price-history-modal";
-import { MapProductUnitModal } from "@/components/map-product-unit-modal";
-import {
-	UnitHierarchyTree,
-	buildUnitTree,
-} from "@/components/unit-hierarchy-tree";
-import { useTranslation } from "@/lib/i18n/context";
-import { useCompanyContext } from "@/components/providers/company-context";
-import { useDebounce } from "@/hooks/use-debounce";
-import { usePermissions } from "@/hooks/use-permissions";
-import { PermissionGuard } from "@/components/auth/permission-guard";
-import { PermissionGate } from "@/components/auth/permission-gate";
-import {
-	Loader2,
-	Package,
-	Tag,
-	Tags,
-	Bookmark,
-	Sparkles,
-	ListPlus,
-	Plus,
-	Trash2,
-	AlertCircle,
-	AlertTriangle,
-	CheckCircle2,
-	FileSpreadsheet,
-	Eye,
-	DollarSign,
-	TrendingUp,
-	Boxes,
-	Layers,
-	Scale,
-	LayoutGrid,
-	LayoutList,
-	Upload,
-	Image as ImageIcon,
-	FileImage,
-	Pencil,
-	ExternalLink,
-	FolderOpen,
-	X,
-	Search,
-	SlidersHorizontal,
-	RotateCcw,
-	History,
-	ArrowUpRight,
-	ArrowDownLeft,
-	TrendingDown,
-	RefreshCw,
-	User,
-	ChevronDown,
-	CornerDownRight,
-	FolderPlus,
-	Camera,
-} from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-	DataTable,
 	ColumnDef,
+	DataTable,
+	FilterCriterion,
+	PRODUCT_DOMAIN_FILTERS,
+	RowAction,
 	StatusBadgeCell,
 	UserDetailCell,
+	buildSearchFilterPayload,
 } from "@/components/ui-custom/data-table";
 import {
+	buildUnitTree
+} from "@/components/unit-hierarchy-tree";
+import { useDebounce } from "@/hooks/use-debounce";
+import { usePermissions } from "@/hooks/use-permissions";
+import { getErrorMessage } from "@/lib/api/client";
+import {
+	DEFAULT_IMAGE_URL,
+	brandsApi,
+	categoriesApi,
+	fileUrl,
+	priceHistoryApi,
+	productsApi,
+	safeImageUrl,
+	unitsApi,
+	uploadService
+} from "@/lib/api/endpoints";
+import { useTranslation } from "@/lib/i18n/context";
+import {
+	Brand,
+	Category,
+	Product,
+	Unit,
+	VariantOperations,
+	VariantUnit
+} from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	AlertCircle,
+	AlertTriangle,
+	Bookmark,
+	Boxes,
+	Camera,
+	ChevronDown,
+	CornerDownRight,
+	Eye,
+	FolderOpen,
+	FolderPlus,
+	History,
+	Layers,
+	LayoutGrid,
+	LayoutList,
+	Loader2,
+	Package,
+	Pencil,
+	Plus,
+	RefreshCw,
+	RotateCcw,
+	Scale,
+	Search,
+	SlidersHorizontal,
+	Sparkles,
+	Tag,
+	Tags,
+	Trash2,
+	TrendingDown,
+	TrendingUp,
+	Upload,
+	User,
+	X
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import * as z from "zod";
+
+
+import {
+	CategoryTreeSelect,
+	ModernInput,
+	ModernSelect,
+	ModernSwitch,
+	ModernTagsInput,
+	ModernTextarea,
+} from "@/components/ui-custom/form-controls";
+import {
 	ModernModal,
-	ModernModalFooter,
 	ModernModalCancelButton,
+	ModernModalFooter,
 	ModernModalSubmitButton,
 } from "@/components/ui-custom/modal";
 import {
-	ModernInput,
-	ModernSelect,
-	ModernTextarea,
-	ModernSwitch,
-	ModernTagsInput,
-	CategoryTreeSelect,
-} from "@/components/ui-custom/form-controls";
-import {
 	ModernTabs,
+	ModernTabsContent,
 	ModernTabsList,
 	ModernTabsTrigger,
-	ModernTabsContent,
 } from "@/components/ui-custom/modern-tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
 	Table,
 	TableBody,
@@ -137,6 +124,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 
 // ============================================================
 // Schemas
@@ -284,7 +272,7 @@ function ProductsTab() {
 	const queryClient = useQueryClient();
 	const { t } = useTranslation();
 	const { can } = usePermissions();
-	const canCreateProduct = can("PRODUCT", "CREATE");
+	const _canCreateProduct = can("PRODUCT", "CREATE");
 	const canUpdateProduct = can("PRODUCT", "UPDATE");
 	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const { selectedCompanyId } = useCompanyContext();
@@ -341,7 +329,7 @@ function ProductsTab() {
 	const [excludedVariants, setExcludedVariants] = useState<
 		Record<string, string>[]
 	>([]);
-	const [customAttributes, setCustomAttributes] = useState<
+	const [_customAttributes, setCustomAttributes] = useState<
 		{ key: string; value: string }[]
 	>([]);
 	const [variantDimensions, setVariantDimensions] = useState<{
@@ -383,9 +371,9 @@ function ProductsTab() {
 	const [newVarSku, setNewVarSku] = useState("");
 	const [newVarBarcode, setNewVarBarcode] = useState("");
 	const [newVarPrice, setNewVarPrice] = useState("0");
-	const [newVarCost, setNewVarCost] = useState("0");
-	const [newVarStock, setNewVarStock] = useState("10");
-	const [newVarColor, setNewVarColor] = useState("");
+	const [_newVarCost, setNewVarCost] = useState("0");
+	const [_newVarStock, setNewVarStock] = useState("10");
+	const [_newVarColor, setNewVarColor] = useState("");
 	const [newVarUnitId, setNewVarUnitId] = useState("");
 	const [newVarThumbnail, setNewVarThumbnail] = useState("");
 	const [newVarNetWeight, setNewVarNetWeight] = useState("");
@@ -433,7 +421,7 @@ function ProductsTab() {
 	}, []);
 
 	// Price History Grouping View Mode ("all" | "byUnit")
-	const [priceHistoryGroupMode, setPriceHistoryGroupMode] = useState<
+	const [_priceHistoryGroupMode, _setPriceHistoryGroupMode] = useState<
 		"all" | "byUnit"
 	>("all");
 
@@ -465,7 +453,7 @@ function ProductsTab() {
 	const [historyModalProduct, setHistoryModalProduct] = useState<any>(null);
 
 	// Fetch variant-specific price history if selected
-	const { data: variantPriceHistory } = useQuery({
+	const { data: _variantPriceHistory } = useQuery({
 		queryKey: ["variant-price-history", selectedVariantIdForHistory],
 		queryFn: () => priceHistoryApi.getByVariant(selectedVariantIdForHistory!),
 		enabled: !!selectedVariantIdForHistory,
@@ -524,7 +512,7 @@ function ProductsTab() {
 				variantId: variantForImageUpdate.id,
 				imageUrl: finalUrl,
 			});
-		} catch (err) {
+		} catch (_err) {
 			toast.error("Failed to upload variant image");
 		} finally {
 			if (e.target) e.target.value = "";
@@ -532,11 +520,11 @@ function ProductsTab() {
 	};
 
 	// Batch Import State
-	const [isBatchImportOpen, setIsBatchImportOpen] = useState(false);
-	const [batchDefaultBrandId, setBatchDefaultBrandId] = useState("");
-	const [batchDefaultCategoryId, setBatchDefaultCategoryId] = useState("");
-	const [batchDefaultCurrency, setBatchDefaultCurrency] = useState("USD");
-	const [batchRows, setBatchRows] = useState<
+	const [_isBatchImportOpen, _setIsBatchImportOpen] = useState(false);
+	const [_batchDefaultBrandId, _setBatchDefaultBrandId] = useState("");
+	const [_batchDefaultCategoryId, _setBatchDefaultCategoryId] = useState("");
+	const [_batchDefaultCurrency, _setBatchDefaultCurrency] = useState("USD");
+	const [_batchRows, _setBatchRows] = useState<
 		{
 			id: string;
 			name: string;
@@ -566,7 +554,7 @@ function ProductsTab() {
 			condition: "NEW",
 		},
 	]);
-	const [batchImportResult, setBatchImportResult] = useState<any>(null);
+	const [_batchImportResult, setBatchImportResult] = useState<any>(null);
 
 	// Active Domain Filters State for Advanced Search
 	const [activeDomainFilters, setActiveDomainFilters] = useState<
@@ -943,7 +931,7 @@ function ProductsTab() {
 	}, [categoriesData]);
 
 	// KPI Metrics Calculation
-	const metrics = useMemo(() => {
+	const _metrics = useMemo(() => {
 		const items = productsData?.items || [];
 		const totalCount = productsData?.total || items.length;
 		const availableCount = items.filter(
@@ -1139,7 +1127,7 @@ function ProductsTab() {
 		onError: (error) => toast.error(getErrorMessage(error)),
 	});
 
-	const batchImportMutation = useMutation({
+	const _batchImportMutation = useMutation({
 		mutationFn: productsApi.importBatch,
 		onSuccess: (res) => {
 			setBatchImportResult(res);
@@ -1613,7 +1601,7 @@ function ProductsTab() {
 		});
 	};
 
-	const toggleActive = (product: Product) => {
+	const _toggleActive = (product: Product) => {
 		updateMutation.mutate({
 			id: product.id,
 			body: {
@@ -1630,7 +1618,7 @@ function ProductsTab() {
 			width: "40px",
 			cell: ({ row }: { row: any }) => {
 				const isExpanded = expandedProductIds.includes(String(row.id));
-				const hasVariantsCount = row.variants?.length > 0;
+				const _hasVariantsCount = row.variants?.length > 0;
 				return (
 					<Button
 						variant="ghost"
@@ -1912,14 +1900,7 @@ function ProductsTab() {
 				});
 			},
 		},
-		{
-			label: "Price History",
-			icon: <History className="h-3.5 w-3.5 text-purple-500" />,
-			onClick: (product) => {
-				setHistoryModalProduct(product);
-				setIsStandaloneHistoryOpen(true);
-			},
-		},
+		
 	];
 
 	return (
@@ -2045,6 +2026,16 @@ function ProductsTab() {
 							product={product}
 							categoryMap={categoryMap}
 							brandMap={brandMap}
+							onOpenPriceHistory={(prod, variant) => {
+								if (variant?.id) {
+									setSelectedVariantIdForHistory(variant.id);
+								} else {
+									setSelectedVariantIdForHistory(null);
+								}
+								setHistoryModalProduct(prod);
+								setIsStandaloneHistoryOpen(true);
+							}}
+							onOpenDetails={() => setSelectedProductDetails(product)}
 						/>
 					)}
 				/>
@@ -3353,7 +3344,7 @@ function ProductsTab() {
 														id: targetProduct.id,
 														imageUrl: finalUrl,
 													});
-												} catch (err) {
+												} catch (_err) {
 													toast.dismiss(toastId);
 													toast.error("Failed to upload product image");
 												} finally {
@@ -4054,7 +4045,7 @@ function ProductsTab() {
 											id: "multiplier",
 											header: t("products.conversionRatio"),
 											cell: ({ row }) => {
-												const hasParent = Boolean(
+												const _hasParent = Boolean(
 													row.parentUnitId && row.parentUnitName,
 												);
 												if (row.isBase) {
@@ -5262,7 +5253,7 @@ function CategoriesTab() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { can } = usePermissions();
-	const canCreateProduct = can("PRODUCT", "CREATE");
+	const _canCreateProduct = can("PRODUCT", "CREATE");
 	const canUpdateProduct = can("PRODUCT", "UPDATE");
 	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const [search, setSearch] = useState("");
@@ -6459,7 +6450,7 @@ function BrandsTab() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { can } = usePermissions();
-	const canCreateProduct = can("PRODUCT", "CREATE");
+	const _canCreateProduct = can("PRODUCT", "CREATE");
 	const canUpdateProduct = can("PRODUCT", "UPDATE");
 	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const [search, setSearch] = useState("");
@@ -7048,7 +7039,7 @@ function UnitsTab() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { can } = usePermissions();
-	const canCreateProduct = can("PRODUCT", "CREATE");
+	const _canCreateProduct = can("PRODUCT", "CREATE");
 	const canUpdateProduct = can("PRODUCT", "UPDATE");
 	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const [search, setSearch] = useState("");
@@ -7871,7 +7862,7 @@ function getVariantStock(v: any, product?: any): number {
 	return Number(val) || 0;
 }
 
-function renderVariantAttributes(v: any) {
+function _renderVariantAttributes(v: any) {
 	if (!v) return <span className="text-slate-400">—</span>;
 
 	if (
@@ -7957,161 +7948,1090 @@ function renderVariantAttributes(v: any) {
 	return <span className="text-slate-400">—</span>;
 }
 
+/**
+ * Cascading / Hierarchical multi-unit stock decomposition.
+ * Breaks down total quantity into discrete whole units from largest packaging tier down to smallest base tier.
+ */
+function decomposeQuantityByUnits(
+	totalQty: number,
+	allUnits: any[],
+): Map<string | number, number> {
+	const result = new Map<string | number, number>();
+	if (!allUnits || allUnits.length === 0) return result;
+
+	// Sort descending by baseQuantity so largest packaging tier takes first quotient
+	const sortedDesc = [...allUnits].sort(
+		(a, b) => (b.baseQuantity || 1) - (a.baseQuantity || 1),
+	);
+
+	let remaining = Math.max(0, totalQty);
+	for (let i = 0; i < sortedDesc.length; i++) {
+		const unit = sortedDesc[i];
+		const bQty = unit.baseQuantity || 1;
+		if (i === sortedDesc.length - 1 || bQty <= 1) {
+			// Smallest / base unit absorbs remaining quotient
+			result.set(unit.unitId, remaining);
+			remaining = 0;
+		} else {
+			const count = Math.floor(remaining / bQty);
+			result.set(unit.unitId, count);
+			remaining = remaining % bQty;
+		}
+	}
+
+	return result;
+}
+
+interface NormalizedProductUnit {
+	unitId: string | number;
+	unitName: string;
+	symbol?: string;
+	baseQuantity: number;
+	parentQuantity: number | null;
+	parentUnitId: string | number | null;
+	parentUnitName: string | null;
+	sellingPrice: number;
+	pricePerBaseUnit: number;
+	formulaText: string;
+	isBase: boolean;
+}
+
+function getNormalizedProductVariantData(
+	v: any,
+	product: any,
+	fetchedUnits?: VariantUnit[],
+): NormalizedProductUnit[] {
+	// Gather raw units from all potential sources
+	const rawUnitsList: any[] = [
+		...(Array.isArray(fetchedUnits) ? fetchedUnits : []),
+		...(Array.isArray(v?.unitBreakdown) ? v.unitBreakdown : []),
+		...(Array.isArray(v?.units) ? v.units : []),
+		...(Array.isArray(v?.unitPrices) ? v.unitPrices : []),
+		...(Array.isArray(product?.units) ? product.units : []),
+		...(Array.isArray(product?.unitBreakdown) ? product.unitBreakdown : []),
+	];
+
+	// Deduplicate raw units by unitId
+	const deduplicatedUnitsMap = new Map<string | number, any>();
+	rawUnitsList.forEach((u: any) => {
+		const uId = u.unitId ?? u.id;
+		if (uId && !deduplicatedUnitsMap.has(String(uId))) {
+			deduplicatedUnitsMap.set(String(uId), u);
+		}
+	});
+
+	let rawUnits: any[] = Array.from(deduplicatedUnitsMap.values());
+
+	const baseUnitPrice = getVariantPrice(v, product);
+	const fallbackBaseName =
+		v?.unitName ||
+		product?.unitName ||
+		product?.baseUnitName ||
+		product?.unit?.name ||
+		"Pcs";
+
+	if (rawUnits.length === 0) {
+		rawUnits = [
+			{
+				unitId: "base",
+				unitName: fallbackBaseName,
+				isBase: true,
+				baseQuantity: 1,
+				sellingPrice: baseUnitPrice,
+			},
+		];
+	}
+
+	const unitNameMap = new Map<string | number, string>();
+	rawUnits.forEach((u) => {
+		const uId = u.unitId ?? u.id;
+		unitNameMap.set(String(uId), u.unitName || u.name || "Unit");
+	});
+
+	// Map units
+	const mappedUnits: NormalizedProductUnit[] = rawUnits.map((u: any) => {
+		const baseQty = Math.max(1, Number(u.baseQuantity ?? u.conversionFactor ?? 1));
+		const pQty =
+			u.parentQuantity !== undefined && u.parentQuantity !== null
+				? Number(u.parentQuantity)
+				: null;
+
+		let price = Number(
+			u.sellingPrice ??
+				u.finalPrice ??
+				u.unitPrice ??
+				u.price ??
+				u.sellPrice ??
+				0,
+		);
+
+		if ((price === 0 || isNaN(price)) && v?.unitPrices) {
+			const uPriceObj = v.unitPrices.find(
+				(up: any) => String(up.unitId) === String(u.unitId ?? u.id),
+			);
+			if (uPriceObj) {
+				price = Number(
+					uPriceObj.finalPrice ??
+						uPriceObj.unitPrice ??
+						uPriceObj.price ??
+						0,
+				);
+			}
+		}
+
+		const isBase = Boolean(
+			u.isBase ||
+				u.is_base ||
+				(u.unitId && u.baseUnitId && String(u.unitId) === String(u.baseUnitId)) ||
+				(baseQty === 1 && !u.parentUnitId),
+		);
+
+		if (price === 0 && !isBase && baseUnitPrice > 0 && baseQty > 1) {
+			price = baseUnitPrice * baseQty;
+		} else if (isBase && (price === 0 || isNaN(price))) {
+			price = baseUnitPrice;
+		}
+
+		const parentName =
+			u.parentUnitName ||
+			(u.parentUnitId ? unitNameMap.get(String(u.parentUnitId)) : null) ||
+			(!isBase ? fallbackBaseName : null);
+
+		let formulaText = "";
+		if (isBase) {
+			formulaText = `1 ${u.unitName || u.name || fallbackBaseName} (Base)`;
+		} else {
+			const displayParentQty = pQty ?? baseQty;
+			formulaText = `1 ${u.unitName || u.name} = ${displayParentQty} ${parentName || fallbackBaseName}`;
+		}
+
+		const unitPriceFinal = isNaN(price) ? 0 : price;
+		const pricePerBaseUnit =
+			isBase || baseQty <= 1 ? unitPriceFinal : unitPriceFinal / baseQty;
+
+		return {
+			unitId: u.unitId ?? u.id,
+			unitName: u.unitName || u.name || fallbackBaseName,
+			symbol: u.symbol || "",
+			baseQuantity: baseQty,
+			parentQuantity: pQty,
+			parentUnitId: u.parentUnitId ?? null,
+			parentUnitName: parentName,
+			sellingPrice: unitPriceFinal,
+			pricePerBaseUnit,
+			formulaText,
+			isBase,
+		};
+	});
+
+	let baseUnitCandidate = mappedUnits.find((u) => u.isBase);
+	if (!baseUnitCandidate) {
+		baseUnitCandidate = mappedUnits
+			.slice()
+			.sort((a, b) => a.baseQuantity - b.baseQuantity)[0];
+		if (baseUnitCandidate) baseUnitCandidate.isBase = true;
+	}
+
+	// Sort units: base first, then ascending baseQuantity
+	mappedUnits.sort((a, b) => {
+		if (a.isBase && !b.isBase) return -1;
+		if (!a.isBase && b.isBase) return 1;
+		return a.baseQuantity - b.baseQuantity;
+	});
+
+	return mappedUnits;
+}
+
+function ProductVariantUnitPricingPopover({
+	allUnits,
+	baseUnit,
+	packageUnits: _packageUnits,
+	stockQty,
+	children,
+}: {
+	allUnits: NormalizedProductUnit[];
+	baseUnit: NormalizedProductUnit;
+	packageUnits: NormalizedProductUnit[];
+	stockQty: number;
+	children: React.ReactNode;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger render={children as React.ReactElement} />
+			<DropdownMenuContent
+				align="end"
+				className="w-80 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl space-y-2.5 z-50"
+			>
+				<div className="flex items-center justify-between border-b pb-2 border-slate-100 dark:border-slate-800">
+					<div className="flex items-center gap-1.5">
+						<Tag className="size-3.5 text-purple-600 dark:text-purple-400" />
+						<span className="font-bold text-xs text-foreground uppercase tracking-wider">
+							Packaging & Price Schedule
+						</span>
+					</div>
+					<span className="text-[10px] font-mono text-muted-foreground bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded font-semibold">
+						{allUnits.length} {allUnits.length === 1 ? "Unit" : "Tiers"}
+					</span>
+				</div>
+
+				<div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
+					{allUnits.map((u) => {
+						const divisor = u.baseQuantity > 0 ? u.baseQuantity : 1;
+						const whole = Math.floor(stockQty / divisor);
+						const rem = stockQty % divisor;
+						const stockEquiv = u.isBase
+							? `${stockQty} ${u.unitName}`
+							: whole > 0
+							? `${whole} ${u.unitName}${rem > 0 ? ` + ${rem} ${baseUnit.unitName}` : ""}`
+							: `${rem} ${baseUnit.unitName}`;
+
+						return (
+							<div
+								key={u.unitId}
+								className={cn(
+									"p-2 rounded-lg border text-xs flex items-center justify-between gap-2",
+									u.isBase
+										? "bg-purple-50/70 dark:bg-purple-950/40 border-purple-200/80 dark:border-purple-800/80"
+										: "bg-slate-50/60 dark:bg-slate-800/50 border-slate-200/70 dark:border-slate-700/70",
+								)}
+							>
+								<div className="space-y-0.5 min-w-0">
+									<div className="flex items-center gap-1.5">
+										<span className="font-bold text-xs text-foreground truncate">
+											{u.unitName}
+										</span>
+										{u.isBase ? (
+											<span className="text-[9px] font-bold px-1 py-0 rounded bg-purple-200 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+												Base
+											</span>
+										) : (
+											<span className="text-[10px] font-mono text-muted-foreground truncate">
+												{u.formulaText}
+											</span>
+										)}
+									</div>
+									<span className="text-[10px] font-mono text-muted-foreground block truncate">
+										Stock: {stockEquiv}
+									</span>
+								</div>
+
+								<div className="text-right shrink-0">
+									<div className="flex items-baseline justify-end gap-1 font-mono">
+										<span className="font-black text-xs text-emerald-600 dark:text-emerald-400">
+											${u.sellingPrice.toFixed(2)}
+										</span>
+									</div>
+									{!u.isBase && u.baseQuantity > 1 && (
+										<div className="flex items-center justify-end gap-1">
+											<span className="text-[9px] font-mono text-muted-foreground">
+												(${u.pricePerBaseUnit.toFixed(2)}/{baseUnit.unitName})
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+						);
+					})}
+				</div>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function ProductVariantTableRow({
+	v,
+	product,
+	lowStockThreshold = 5,
+	onOpenPriceHistory: _onOpenPriceHistory,
+	onOpenDetails,
+}: {
+	v: any;
+	product: any;
+	lowStockThreshold?: number;
+	onOpenPriceHistory?: (product: any, variant?: any) => void;
+	onOpenDetails?: () => void;
+}) {
+	const variantId = v.id || v.variantId;
+	const { data: fetchedVariantUnits } = useQuery<VariantUnit[]>({
+		queryKey: ["variant-units", variantId],
+		queryFn: () => productsApi.getVariantUnits(variantId),
+		enabled: Boolean(variantId && !v.isSimpleProduct),
+		staleTime: 60 * 1000,
+	});
+
+	const allUnits = useMemo(() => {
+		return getNormalizedProductVariantData(v, product, fetchedVariantUnits);
+	}, [v, product, fetchedVariantUnits]);
+
+	const baseUnit = allUnits.find((u) => u.isBase) || allUnits[0];
+	const packageUnits = allUnits.filter((u) => !u.isBase);
+
+	const physicalStock = Number(
+		v.totalPhysicalQty ??
+			v.physicalStock ??
+			v.stockQty ??
+			v.stockQuantity ??
+			v.inventorySummary?.totalPhysicalQty ??
+			v.inventorySummary?.availableQty ??
+			product.stockQty ??
+			0,
+	);
+	const reservedStock = Number(
+		v.reservedQty ??
+			v.reservedStock ??
+			v.reservedQuantity ??
+			v.inventorySummary?.reservedQty ??
+			0,
+	);
+	const availableStock = Number(
+		v.availableQty ??
+			v.availableStock ??
+			v.availableQuantity ??
+			v.inventorySummary?.availableQty ??
+			Math.max(0, physicalStock - reservedStock),
+	);
+	const soldStock = Number(
+		v.soldQty ??
+			v.soldStock ??
+			v.soldQuantity ??
+			v.inventorySummary?.soldQty ??
+			0,
+	);
+
+	const _cost = Number(
+		v.cost ??
+			v.costPrice ??
+			v.baseCost ??
+			v.importCost ??
+			v.unitCost ??
+			v.inventorySummary?.cost ??
+			product.cost ??
+			0,
+	);
+
+	const isOutOfStock = availableStock <= 0;
+	const isLowStock = !isOutOfStock && availableStock <= lowStockThreshold;
+
+	const onHandDecomp = useMemo(() => {
+		return decomposeQuantityByUnits(physicalStock, allUnits);
+	}, [physicalStock, allUnits]);
+
+	const reservedDecomp = useMemo(() => {
+		return decomposeQuantityByUnits(reservedStock, allUnits);
+	}, [reservedStock, allUnits]);
+
+	const _availableDecomp = useMemo(() => {
+		return decomposeQuantityByUnits(availableStock, allUnits);
+	}, [availableStock, allUnits]);
+
+	const _soldDecomp = useMemo(() => {
+		return decomposeQuantityByUnits(soldStock, allUnits);
+	}, [soldStock, allUnits]);
+
+	const _variantBarcode =
+		v.barcode ||
+		v.barCode ||
+		v.baseBarcode ||
+		(v.isSimpleProduct ? product.baseBarcode || product.barcode : null);
+
+	return (
+		<tr className="bg-white dark:bg-slate-950 hover:bg-purple-50/40 dark:hover:bg-purple-950/20 transition-colors border-b border-slate-100 dark:border-slate-800/60 group">
+			{/* Col 1: Variant / Identity */}
+			<td className="min-w-[150px] max-w-[200px] p-2 align-middle">
+				<div className="flex items-center gap-2 min-w-0">
+					<img
+						src={safeImageUrl(v.thumbnail || v.imageUrl || product.imageUrl)}
+						alt={v.name || v.variantName || v.sku}
+						className="size-7 rounded-lg border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 object-cover"
+						onError={(e) => {
+							e.currentTarget.onerror = null;
+							e.currentTarget.src = DEFAULT_IMAGE_URL;
+						}}
+					/>
+					<div className="min-w-0 flex-1 space-y-0.5">
+						<p
+							className="font-bold text-xs text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors truncate"
+							title={v.name || v.variantName || v.sku}
+						>
+							{v.name || v.variantName || v.sku}
+						</p>
+						<div className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground flex-wrap">
+							<span>{v.sku || "—"}</span>
+							
+						</div>
+					</div>
+				</div>
+			</td>
+
+			{/* Col 2: Units of Measure */}
+			<td className="min-w-[60px] p-2 align-middle whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5">
+					{allUnits.map((u) => (
+						<div
+							key={u.unitId}
+							className="h-6 flex items-center font-medium text-xs text-foreground whitespace-nowrap"
+						>
+							<span>{u.unitName}</span>
+							{u.isBase && (
+								<span className="ml-1 text-[8px] px-1 py-0 rounded font-semibold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 shrink-0">
+									Base
+								</span>
+							)}
+						</div>
+					))}
+				</div>
+			</td>
+
+
+			{/* Col 4: Retail Price ($) */}
+			<td className="min-w-[95px] p-2 text-right align-middle whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5 text-right">
+					{allUnits.map((u) => (
+						<div
+							key={u.unitId}
+							className="h-6 flex items-center justify-end font-mono text-xs font-bold text-foreground whitespace-nowrap"
+						>
+							${u.sellingPrice.toFixed(2)}/{u.unitName}
+						</div>
+					))}
+				</div>
+			</td>
+
+			{/* Col 5: On Hand */}
+			<td className="min-w-[75px] p-2 text-right align-middle whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5 text-right">
+					{allUnits.map((u) => {
+						const qty = onHandDecomp.get(u.unitId) ?? 0;
+						return (
+							<div
+								key={u.unitId}
+								className="h-6 flex items-center justify-end gap-1 font-mono text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap"
+							>
+								<span>{qty.toLocaleString()}</span>
+								<span className="text-[10px] font-normal text-muted-foreground w-6 text-left shrink-0">
+									{u.unitName}
+								</span>
+							</div>
+						);
+					})}
+				</div>
+			</td>
+
+			{/* Col 6: Reserved */}
+			<td className="min-w-[65px] p-2 text-right align-middle whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5 text-right">
+					{allUnits.map((u) => {
+						const qty = reservedDecomp.get(u.unitId) ?? 0;
+						return (
+							<div
+								key={u.unitId}
+								className="h-6 flex items-center justify-end gap-1 font-mono text-xs whitespace-nowrap"
+							>
+								<span
+									className={cn(
+										"font-bold",
+										qty > 0
+											? "text-amber-600 dark:text-amber-400"
+											: "text-muted-foreground",
+									)}
+								>
+									{qty.toLocaleString()}
+								</span>
+								<span className="text-[10px] font-normal text-muted-foreground w-6 text-left shrink-0">
+									{u.unitName}
+								</span>
+							</div>
+						);
+					})}
+				</div>
+			</td>
+{/*  */}
+
+	
+			{/* Col 9: Stock Status */}
+			<td className="min-w-[85px] p-2 text-center align-middle whitespace-nowrap">
+				{isOutOfStock ? (
+					<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 whitespace-nowrap">
+						<span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
+						Out of Stock
+					</span>
+				) : isLowStock ? (
+					<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60 whitespace-nowrap">
+						<span className="size-1.5 rounded-full bg-amber-500" />
+						Low Stock
+					</span>
+				) : (
+					<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60 whitespace-nowrap">
+						<span className="size-1.5 rounded-full bg-emerald-500" />
+						In Stock
+					</span>
+				)}
+			</td>
+
+			{/* Col 10: Actions */}
+			<td className="p-2 text-center align-middle whitespace-nowrap min-w-[140px]">
+				<div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+					<ProductVariantUnitPricingPopover
+						allUnits={allUnits}
+						baseUnit={baseUnit}
+						packageUnits={packageUnits}
+						stockQty={physicalStock}
+					>
+						{allUnits.length > 2 ? (
+							<button
+								type="button"
+								className="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80 transition-colors cursor-pointer shrink-0"
+								title="View Unit Hierarchy & Packaging Breakdown"
+							>
+								<Package className="size-3 text-purple-500 shrink-0" />
+								<span>
+									{baseUnit.unitName} ({allUnits.length})
+								</span>
+								<ChevronDown className="size-2.5 opacity-70 shrink-0" />
+							</button>
+						) : (
+							<button
+								type="button"
+								className="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] font-mono bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80 transition-colors cursor-pointer shrink-0"
+								title="View Unit Hierarchy"
+							>
+								<Package className="size-3 text-purple-500 shrink-0" />
+								<span>
+									{allUnits.length > 1
+										? `${allUnits.length} Units`
+										: baseUnit.unitName}
+								</span>
+								<ChevronDown className="size-2.5 opacity-60 shrink-0" />
+							</button>
+						)}
+					</ProductVariantUnitPricingPopover>
+
+				
+
+					{onOpenDetails && (
+						<Button
+							size="sm"
+							variant="ghost"
+							onClick={onOpenDetails}
+							className="h-7 w-7 p-0 text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50 rounded-lg cursor-pointer shrink-0"
+							title="View Details"
+						>
+							<Eye className="size-3.5" />
+						</Button>
+					)}
+				</div>
+			</td>
+		</tr>
+	);
+}
+
+function ProductVariantCardItem({
+	v,
+	product,
+	lowStockThreshold = 5,
+	onOpenPriceHistory: _onOpenPriceHistory,
+	onOpenDetails,
+}: {
+	v: any;
+	product: any;
+	lowStockThreshold?: number;
+	onOpenPriceHistory?: (product: any, variant?: any) => void;
+	onOpenDetails?: () => void;
+}) {
+	const variantId = v.id || v.variantId;
+	const { data: fetchedVariantUnits } = useQuery<VariantUnit[]>({
+		queryKey: ["variant-units", variantId],
+		queryFn: () => productsApi.getVariantUnits(variantId),
+		enabled: Boolean(variantId && !v.isSimpleProduct),
+		staleTime: 60 * 1000,
+	});
+
+	const allUnits = useMemo(() => {
+		return getNormalizedProductVariantData(v, product, fetchedVariantUnits);
+	}, [v, product, fetchedVariantUnits]);
+
+	const baseUnit = allUnits.find((u) => u.isBase) || allUnits[0];
+	const packageUnits = allUnits.filter((u) => !u.isBase);
+
+	const physicalStock = Number(
+		v.totalPhysicalQty ??
+			v.physicalStock ??
+			v.stockQty ??
+			v.stockQuantity ??
+			v.inventorySummary?.totalPhysicalQty ??
+			v.inventorySummary?.availableQty ??
+			product.stockQty ??
+			0,
+	);
+	const reservedStock = Number(
+		v.reservedQty ??
+			v.reservedStock ??
+			v.reservedQuantity ??
+			v.inventorySummary?.reservedQty ??
+			0,
+	);
+	const availableStock = Number(
+		v.availableQty ??
+			v.availableStock ??
+			v.availableQuantity ??
+			v.inventorySummary?.availableQty ??
+			Math.max(0, physicalStock - reservedStock),
+	);
+	const soldStock = Number(
+		v.soldQty ??
+			v.soldStock ??
+			v.soldQuantity ??
+			v.inventorySummary?.soldQty ??
+			0,
+	);
+
+	const cost = Number(
+		v.cost ??
+			v.costPrice ??
+			v.baseCost ??
+			v.importCost ??
+			v.unitCost ??
+			v.inventorySummary?.cost ??
+			product.cost ??
+			0,
+	);
+
+	const isOutOfStock = availableStock <= 0;
+	const isLowStock = !isOutOfStock && availableStock <= lowStockThreshold;
+
+	const onHandDecomp = useMemo(() => {
+		return decomposeQuantityByUnits(physicalStock, allUnits);
+	}, [physicalStock, allUnits]);
+
+	const reservedDecomp = useMemo(() => {
+		return decomposeQuantityByUnits(reservedStock, allUnits);
+	}, [reservedStock, allUnits]);
+
+	const availableDecomp = useMemo(() => {
+		return decomposeQuantityByUnits(availableStock, allUnits);
+	}, [availableStock, allUnits]);
+
+	const soldDecomp = useMemo(() => {
+		return decomposeQuantityByUnits(soldStock, allUnits);
+	}, [soldStock, allUnits]);
+
+	const variantBarcode =
+		v.barcode ||
+		v.barCode ||
+		v.baseBarcode ||
+		(v.isSimpleProduct ? product.baseBarcode || product.barcode : null);
+
+	const [activeUnitId, setActiveUnitId] = useState<string | number>(
+		baseUnit.unitId,
+	);
+	const activeUnit =
+		allUnits.find((u) => String(u.unitId) === String(activeUnitId)) || baseUnit;
+	const activePrice = activeUnit.sellingPrice;
+	const activeCost = cost > 0 ? cost * (activeUnit.baseQuantity || 1) : 0;
+	const activeOnHand = onHandDecomp.get(activeUnit.unitId) ?? 0;
+	const activeReserved = reservedDecomp.get(activeUnit.unitId) ?? 0;
+	const activeAvailable = availableDecomp.get(activeUnit.unitId) ?? 0;
+	const activeSold = soldDecomp.get(activeUnit.unitId) ?? 0;
+
+	return (
+		<div className="rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs hover:shadow-sm hover:border-purple-300 dark:hover:border-purple-800/60 transition-all flex flex-col justify-between overflow-hidden group text-xs">
+			{/* Body Section */}
+			<div className="p-3 space-y-2.5">
+				{/* 1. Header: Image + Variant Name + SKU & Barcode + Stock Status */}
+				<div className="flex items-start gap-2.5">
+					<img
+						src={safeImageUrl(v.thumbnail || v.imageUrl || product.imageUrl)}
+						alt={v.name || v.variantName || v.sku}
+						className="size-10 rounded-lg border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-800 object-cover flex items-center justify-center transition-transform group-hover:scale-105"
+						onError={(e) => {
+							e.currentTarget.onerror = null;
+							e.currentTarget.src = DEFAULT_IMAGE_URL;
+						}}
+					/>
+					<div className="min-w-0 flex-1 space-y-0.5">
+						<div className="flex items-center justify-between gap-1.5">
+							<h4
+								className="font-bold text-xs sm:text-sm text-foreground leading-tight truncate"
+								title={v.name || v.variantName || v.sku}
+							>
+								{v.name || v.variantName || v.sku}
+							</h4>
+							{/* Stock Status Pill */}
+							<div className="shrink-0">
+								{isOutOfStock ? (
+									<span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 whitespace-nowrap">
+										<span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
+										Out of Stock
+									</span>
+								) : isLowStock ? (
+									<span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60 whitespace-nowrap">
+										<span className="size-1.5 rounded-full bg-amber-500" />
+										Low Stock
+									</span>
+								) : (
+									<span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60 whitespace-nowrap">
+										<span className="size-1.5 rounded-full bg-emerald-500" />
+										In Stock
+									</span>
+								)}
+							</div>
+						</div>
+
+						{/* SKU & Barcode */}
+						<div className="flex items-center gap-1 font-mono text-[9px] text-muted-foreground flex-wrap">
+							<span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded border border-slate-200/80 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-300">
+								SKU: {v.sku || "—"}
+							</span>
+							{variantBarcode && (
+								<span className="text-slate-400 truncate max-w-[120px]">
+									· {variantBarcode}
+								</span>
+							)}
+						</div>
+					</div>
+				</div>
+
+				{/* 2. Unit of Measure (UoM) tabs */}
+				{allUnits.length > 1 ? (
+					<div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 overflow-x-auto [scrollbar-width:none]">
+						{allUnits.map((u) => {
+							const isSelected = String(u.unitId) === String(activeUnitId);
+							return (
+								<button
+									key={u.unitId}
+									type="button"
+									onClick={() => setActiveUnitId(u.unitId)}
+									className={cn(
+										"h-6 px-2 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap",
+										isSelected
+											? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-2xs border border-slate-200/60 dark:border-slate-700"
+											: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+									)}
+								>
+									<span>{u.unitName}</span>
+									{u.isBase ? (
+										<span className="text-[8px] px-1 py-0 rounded font-semibold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+											Base
+										</span>
+									) : (
+										<span className="text-[9px] font-mono text-muted-foreground font-normal">
+											×{u.baseQuantity}
+										</span>
+									)}
+								</button>
+							);
+						})}
+					</div>
+				) : (
+					<div className="flex items-center justify-between text-[10px] px-2 py-0.5 rounded-md bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 text-muted-foreground">
+						<span className="font-semibold uppercase tracking-wider flex items-center gap-1 text-slate-500">
+							<Package className="size-2.5 text-purple-500" /> Unit
+						</span>
+						<span className="font-mono text-[11px] font-semibold text-foreground flex items-center gap-1">
+							<span>{baseUnit.unitName}</span>
+							<span className="text-[8px] px-1 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-bold">
+								Base
+							</span>
+						</span>
+					</div>
+				)}
+
+				{/* 3. Side-by-Side Metrics: Stock Qty & Retail Price */}
+				<div className="grid grid-cols-2 gap-2">
+					{/* Left: Stock Qty */}
+					<div className="rounded-lg p-2.5 bg-slate-50/80 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 flex flex-col justify-between space-y-1">
+						<div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+							<span>On Hand</span>
+						</div>
+						<div className="flex items-baseline gap-0.5">
+							<span
+								className={cn(
+									"font-mono text-lg sm:text-xl font-bold tracking-tight leading-tight",
+									physicalStock <= 0
+										? "text-rose-600 dark:text-rose-400"
+										: isLowStock
+										? "text-amber-600 dark:text-amber-400"
+										: "text-blue-600 dark:text-blue-400",
+								)}
+							>
+								{activeOnHand.toLocaleString()}
+							</span>
+							<span className="text-[10px] font-medium text-muted-foreground font-mono ml-1">
+								{activeUnit.unitName}
+							</span>
+						</div>
+						{/* Secondary Micro-Metrics: Reserved & Sold */}
+						<div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-1 text-xs font-mono h-[30px]">
+							<div className="flex flex-col justify-center">
+								<span className="text-[8px] uppercase font-bold text-slate-500 leading-none">
+									Reserved
+								</span>
+								<span
+									className={cn(
+										"text-[11px] font-bold mt-0.5",
+										activeReserved > 0
+											? "text-amber-600 dark:text-amber-400"
+											: "text-slate-400",
+									)}
+								>
+									{activeReserved.toLocaleString()}
+								</span>
+							</div>
+							<div className="flex flex-col items-end justify-center">
+								<span className="text-[8px] uppercase font-bold text-slate-500 leading-none">
+									Sold
+								</span>
+								<span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 mt-0.5">
+									{activeSold.toLocaleString()}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Right: Retail Price & Cost */}
+					<div className="rounded-lg p-2.5 bg-slate-50/80 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 flex flex-col justify-between space-y-1">
+						<div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+							<span>Price</span>
+						</div>
+						<div className="flex items-baseline gap-0.5">
+							<span className="font-mono text-lg sm:text-xl font-bold tracking-tight leading-tight text-emerald-700 dark:text-emerald-400">
+								${activePrice.toFixed(2)}
+							</span>
+							<span className="text-[10px] font-medium text-muted-foreground font-mono ml-0.5">
+								/{activeUnit.unitName}
+							</span>
+						</div>
+						<div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-1 text-xs font-mono h-[30px]">
+							<div className="flex flex-col justify-center">
+								<span className="text-[8px] uppercase font-bold text-slate-500 leading-none">
+									Cost
+								</span>
+								<span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-0.5">
+									{activeCost > 0 ? `$${activeCost.toFixed(2)}` : "—"}
+								</span>
+							</div>
+							<div className="flex flex-col items-end justify-center">
+								<span className="text-[8px] uppercase font-bold text-slate-500 leading-none">
+									Available
+								</span>
+								<span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+									{activeAvailable.toLocaleString()}
+								</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{/* 4. Footer Actions */}
+			<div className="p-2 px-3 bg-slate-50/90 dark:bg-slate-900/90 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1.5">
+				<ProductVariantUnitPricingPopover
+					allUnits={allUnits}
+					baseUnit={baseUnit}
+					packageUnits={packageUnits}
+					stockQty={physicalStock}
+				>
+					<button
+						type="button"
+						className="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] font-mono bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80 transition-colors cursor-pointer shrink-0"
+						title="View Unit Hierarchy & Packaging Breakdown"
+					>
+						<Package className="size-3 text-purple-500 shrink-0" />
+						<span>
+							{allUnits.length > 1
+								? `${allUnits.length} Units`
+								: baseUnit.unitName}
+						</span>
+						<ChevronDown className="size-2.5 opacity-60 shrink-0" />
+					</button>
+				</ProductVariantUnitPricingPopover>
+
+				<div className="flex items-center gap-1">
+					<Button
+						size="sm"
+						onClick={() => {
+							window.location.href = `/inventory/stock?search=${encodeURIComponent(
+								v.sku || v.name || "",
+							)}`;
+						}}
+						className="h-7 px-2 text-xs font-semibold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer"
+						title="Adjust Stock in Inventory"
+					>
+						<Scale className="size-3" />
+						<span className="text-[11px]">Adjust</span>
+					</Button>
+
+					{onOpenDetails && (
+						<Button
+							size="sm"
+							variant="ghost"
+							onClick={onOpenDetails}
+							className="h-7 px-2 text-xs font-semibold gap-1 text-slate-600 dark:text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-lg cursor-pointer"
+							title="View Details"
+						>
+							<Eye className="size-3.5" />
+							<span className="text-[11px]">Details</span>
+						</Button>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function ProductVariantsAccordionSubRow({
 	product,
-	categoryMap,
-	brandMap,
+	categoryMap: _categoryMap,
+	brandMap: _brandMap,
+	onOpenPriceHistory,
+	onOpenDetails,
 }: {
 	product: any;
 	categoryMap: Map<string, string>;
 	brandMap: Map<string, string>;
+	onOpenPriceHistory?: (product: any, variant?: any) => void;
+	onOpenDetails?: () => void;
 }) {
 	const variants = product.variants || [];
-	const units = product.units || [];
+	const _units = product.units || [];
+
+	const effectiveVariants =
+		variants.length > 0
+			? variants
+			: [
+					{
+						id: product.id,
+						variantId: product.id,
+						name: product.name,
+						sku: product.baseSku || product.sku,
+						barcode: product.baseBarcode || product.barcode,
+						imageUrl: product.imageUrl,
+						stockQty: product.stockQty,
+						units: product.units,
+						unitBreakdown: product.unitBreakdown,
+						isActive: product.isActive,
+						isSimpleProduct: true,
+					},
+			  ];
+
+	const [variantViewMode, _setVariantViewMode] = useState<"table" | "cards">("table");
+
+	const _totalPhysical = effectiveVariants.reduce(
+		(acc: number, v: any) =>
+			acc +
+			Number(
+				v.totalPhysicalQty ??
+					v.physicalStock ??
+					v.stockQty ??
+					v.stockQuantity ??
+					v.inventorySummary?.totalPhysicalQty ??
+					product.stockQty ??
+					0,
+			),
+		0,
+	);
+	const _totalAvailable = effectiveVariants.reduce(
+		(acc: number, v: any) =>
+			acc +
+			Number(
+				v.availableQty ??
+					v.availableStock ??
+					v.availableQuantity ??
+					v.inventorySummary?.availableQty ??
+					(v.totalPhysicalQty ?? v.stockQty ?? product.stockQty ?? 0) -
+						(v.reservedQty ?? v.inventorySummary?.reservedQty ?? 0),
+			),
+		0,
+	);
 
 	return (
 		<div className="p-3 bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-inner text-xs">
-			<div className="flex items-center justify-between border-b pb-2 dark:border-slate-800">
+			{/* Sub-row Header Toolbar */}
+			<div className="flex items-center justify-between border-b pb-2 dark:border-slate-800 flex-wrap gap-2">
 				<div className="flex items-center gap-2">
 					<Layers className="h-4 w-4 text-purple-600 dark:text-purple-400" />
 					<span className="font-bold text-slate-800 dark:text-slate-200">
 						{product.name} —{" "}
-						{variants.length > 0
-							? `${variants.length} Variants List`
-							: "Single Variant Product Details"}
+						{effectiveVariants.length > 0
+							? `${effectiveVariants.length} Variant${effectiveVariants.length === 1 ? "" : "s"} List`
+							: "Product Units & Inventory"}
 					</span>
+				
 				</div>
-				<div className="flex items-center gap-2">
-					<Badge variant="outline" className="text-[10px] font-mono">
-						ID: #{product.id}
-					</Badge>
-					{product.baseSku && (
-						<Badge variant="secondary" className="text-[10px] font-mono">
-							Base SKU: {product.baseSku}
-						</Badge>
-					)}
-				</div>
+
+		
 			</div>
 
-			{variants.length > 0 ? (
-				<div className="overflow-x-auto rounded-lg border border-slate-200/80 dark:border-slate-800 min-w-0 max-w-full">
-					<table className="w-full text-left text-xs min-w-[700px]">
-						<thead className="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-semibold border-b">
-							<tr>
-								<th className="p-2.5">Variant Name</th>
-								<th className="p-2.5">SKU Code</th>
-								<th className="p-2.5">Barcode</th>
-								<th className="p-2.5">Retail Price</th>
-								<th className="p-2.5">Cost</th>
-								<th className="p-2.5">Stock Qty</th>
-								<th className="p-2.5">Attributes</th>
-								<th className="p-2.5">Status</th>
+			{/* Main Content: Table or Cards */}
+			{variantViewMode === "table" ? (
+				<div
+					id={`prod-variants-scroller-${product.id}`}
+					className={cn(
+						"w-full max-w-full overflow-x-auto rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-950",
+						"[scrollbar-width:thin] [scrollbar-color:theme(colors.purple.400)_theme(colors.slate.100)] dark:[scrollbar-color:theme(colors.purple.600)_theme(colors.slate.900)]",
+						"[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2",
+						"[&::-webkit-scrollbar-track]:bg-slate-100/90 dark:[&::-webkit-scrollbar-track]:bg-slate-900/90",
+						"[&::-webkit-scrollbar-thumb]:bg-purple-300 dark:[&::-webkit-scrollbar-thumb]:bg-purple-700 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-purple-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-purple-600",
+					)}
+				>
+					<table className="w-[80vw] text-left text-xs border-collapse">
+						<thead className="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+							<tr className="hover:bg-transparent bg-slate-100 dark:bg-slate-900">
+								<th className="font-bold text-[11px] text-foreground min-w-[150px] max-w-[180px] py-2 px-2.5 text-left">
+									Variant / Identity
+								</th>
+								<th className="font-bold text-[11px] text-left py-2 px-2">
+									Units of Measure
+								</th>
+								
+								<th className="font-bold text-[11px] text-right min-w-[95px] py-2 px-2">
+									Retail Price ($)
+								</th>
+								<th className="font-bold text-[11px] text-right min-w-[75px] py-2 px-2">
+									On Hand
+								</th>
+								<th className="font-bold text-[11px] text-right min-w-[65px] py-2 px-2">
+									Reserved
+								</th>
+								<th className="font-bold text-[11px] text-center min-w-[75px] py-2 px-2">
+									Available
+								</th>
+						
+								<th className="font-bold text-[11px] text-center min-w-[50px] py-2 px-2">
+									Actions
+								</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-							{variants.map((v: any) => {
-								const price = getVariantPrice(v, product);
-								const cost = getVariantCost(v, product);
-								const stockQty = getVariantStock(v, product);
-								const varBaseUnit = getVariantBaseUnit(v, product);
-								const varUnitLabel =
-									v.unitName ||
-									varBaseUnit?.unitName ||
-									varBaseUnit?.name ||
-									"";
-
-								return (
-									<tr
-										key={v.id || v.sku || Math.random()}
-										className="hover:bg-slate-50 dark:hover:bg-slate-900/40"
-									>
-										<td className="p-2.5 font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-											<img
-												src={safeImageUrl(
-													v.thumbnail || v.imageUrl || product.imageUrl,
-												)}
-												className="h-6 w-6 rounded object-cover border"
-												onError={(e) => {
-													e.currentTarget.onerror = null;
-													e.currentTarget.src = DEFAULT_IMAGE_URL;
-												}}
-											/>
-											<span>{v.name || v.sku}</span>
-										</td>
-										<td className="p-2.5 font-mono text-slate-600 dark:text-slate-400">
-											{v.sku || "—"}
-										</td>
-										<td className="p-2.5 font-mono text-slate-500">
-											{v.barcode || "—"}
-										</td>
-										<td className="p-2.5 font-extrabold text-emerald-600 dark:text-emerald-400">
-											${price.toFixed(2)}
-											{varUnitLabel && (
-												<span className="text-[10px] text-slate-400 font-normal block">
-													/ {varUnitLabel}
-												</span>
-											)}
-										</td>
-										<td className="p-2.5 text-slate-500">${cost.toFixed(2)}</td>
-										<td className="p-2.5 font-bold">
-											<Badge
-												variant={stockQty > 0 ? "secondary" : "destructive"}
-												className="text-[10px]"
-											>
-												{stockQty} in stock
-											</Badge>
-										</td>
-										<td className="p-2.5">{renderVariantAttributes(v)}</td>
-										<td className="p-2.5">
-											<Badge
-												variant={v.isActive !== false ? "default" : "outline"}
-												className="text-[10px]"
-											>
-												{v.isActive !== false ? "Active" : "Inactive"}
-											</Badge>
-										</td>
-									</tr>
-								);
-							})}
+							{effectiveVariants.map((v: any) => (
+								<ProductVariantTableRow
+									key={v.id || v.sku || Math.random()}
+									v={v}
+									product={product}
+									lowStockThreshold={Number(product.lowStockThreshold || 5)}
+									onOpenPriceHistory={onOpenPriceHistory}
+									onOpenDetails={onOpenDetails}
+								/>
+							))}
 						</tbody>
 					</table>
 				</div>
 			) : (
-				<div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
-					<div>
-						<span className="text-slate-400 text-[10px] block font-medium">
-							Base Barcode
-						</span>
-						<span className="font-mono font-bold text-slate-700 dark:text-slate-300">
-							{product.baseBarcode || "—"}
-						</span>
-					</div>
-					<div>
-						<span className="text-slate-400 text-[10px] block font-medium">
-							Low Stock Threshold
-						</span>
-						<span className="font-bold text-slate-700 dark:text-slate-300">
-							{product.lowStockThreshold || 5} units
-						</span>
-					</div>
-					<div>
-						<span className="text-slate-400 text-[10px] block font-medium">
-							Mapped Unit Conversions
-						</span>
-						<span className="font-bold text-purple-600 dark:text-purple-400">
-							{units.length} unit(s)
-						</span>
-					</div>
-					<div>
-						<span className="text-slate-400 text-[10px] block font-medium">
-							Discount Term
-						</span>
-						<span className="font-medium text-slate-700 dark:text-slate-300">
-							{product.discountNote || "Standard"}
-						</span>
-					</div>
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-1">
+					{effectiveVariants.map((v: any) => (
+						<ProductVariantCardItem
+							key={v.id || v.sku || Math.random()}
+							v={v}
+							product={product}
+							lowStockThreshold={Number(product.lowStockThreshold || 5)}
+							onOpenPriceHistory={onOpenPriceHistory}
+							onOpenDetails={onOpenDetails}
+						/>
+					))}
 				</div>
 			)}
+
+			
 		</div>
 	);
 }

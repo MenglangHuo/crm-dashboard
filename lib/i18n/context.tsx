@@ -1,22 +1,22 @@
 "use client";
 
-import React, {
-	createContext,
-	useContext,
-	useEffect,
-	useState,
-	useMemo,
-	useCallback,
-} from "react";
 import {
-	Locale,
 	DEFAULT_LOCALE,
+	I18nContextType,
+	Locale,
 	LOCALE_COOKIE_KEY,
 	LOCALE_STORAGE_KEY,
 	TranslationParams,
-	I18nContextType,
 } from "@/types/i18n";
-import { en, Dictionary } from "./dictionaries/en";
+import React, {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
+import { Dictionary, en } from "./dictionaries/en";
 import { km } from "./dictionaries/km";
 
 const dictionaries: Record<Locale, Dictionary> = {
@@ -106,7 +106,7 @@ export function I18nProvider({
 	children: React.ReactNode;
 }) {
 	const [locale, setLocaleState] = useState<Locale>(initialLocale);
-	const [mounted, setMounted] = useState(false);
+	// const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
 		const initial = getStoredLocale();
@@ -114,7 +114,7 @@ export function I18nProvider({
 			setLocaleState(initial);
 			persistLocale(initial);
 		}
-		setMounted(true);
+		// setMounted(true);
 	}, [initialLocale]);
 
 	const setLocale = useCallback((newLocale: Locale) => {

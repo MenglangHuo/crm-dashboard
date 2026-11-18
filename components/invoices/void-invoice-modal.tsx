@@ -18,8 +18,6 @@ import {
 	Ban,
 	RotateCcw,
 	AlertTriangle,
-	Package,
-	CheckCircle2,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 
@@ -45,7 +43,7 @@ export function VoidInvoiceModal({
 			if (!invoice) return Promise.reject(new Error("No invoice selected"));
 			return invoicesApi.voidInvoice(invoice.id, reason.trim() || undefined);
 		},
-		onSuccess: (updated) => {
+		onSuccess: (_updated) => {
 			toast.success(
 				`Invoice ${invoice?.invoiceNumber || invoice?.invoiceNo || ""} voided successfully! Sold stock returned to reserved state and sales order rolled back to POSTED.`,
 			);

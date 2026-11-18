@@ -8,10 +8,6 @@ import {
 	companiesApi,
 } from "@/lib/api/endpoints";
 import {
-	ActiveSubscription,
-	PlanPriceGroupResponse,
-	PlanDetail,
-	PlanPriceDetail,
 	SubscribeRequest,
 	SubscriptionStatus,
 	CompanySubscriptionGroup,
@@ -23,23 +19,13 @@ import {
 	Search,
 	Crown,
 	Sparkles,
-	Calendar,
-	CreditCard,
 	TrendingUp,
 	ShieldCheck,
 	Zap,
 	ArrowRight,
 	RefreshCw,
-	Clock,
-	ChevronRight,
-	Layers,
-	Users,
-	CheckCircle2,
 	AlertTriangle,
-	FileText,
-	Filter,
 	Check,
-	SlidersHorizontal,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -123,7 +109,7 @@ export function CompanyMonitorTab({
 	// Queries
 	const {
 		data: companyGroups = [],
-		isLoading: isLoadingGroups,
+		isLoading: _isLoadingGroups,
 		refetch: refetchGroups,
 	} = useQuery({
 		queryKey: ["subscriptions-grouped-by-company"],

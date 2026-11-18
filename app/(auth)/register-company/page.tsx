@@ -29,16 +29,10 @@ import {
 	Eye,
 	EyeOff,
 	Navigation,
-	Compass,
 	Check,
-	Briefcase,
-	Layers,
-	Image as ImageIcon,
 	RotateCcw,
-	Send,
 	Smartphone,
 	AlertCircle,
-	BadgeCheck,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

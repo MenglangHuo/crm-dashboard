@@ -7,10 +7,8 @@ import { useTheme } from "next-themes";
 import {
 	LayoutDashboard,
 	ArrowLeft,
-	LogIn,
 	Sun,
 	Moon,
-	Compass,
 	Users,
 	ShoppingCart,
 	Package,
@@ -83,7 +81,7 @@ export function NotFoundContent() {
 	const pathname = usePathname();
 	const router = useRouter();
 	const { t } = useTranslation();
-	const [currentPath, setCurrentPath] = React.useState<string>("");
+	const [_currentPath, setCurrentPath] = React.useState<string>("");
 
 	React.useEffect(() => {
 		if (pathname) {
@@ -101,7 +99,7 @@ export function NotFoundContent() {
 		}
 	};
 
-	const quickLinks = [
+	const _quickLinks = [
 		{
 			href: "/",
 			label: t("notFound.dashboard", "Dashboard"),

@@ -4,6 +4,11 @@
 
 import { api } from "@/lib/api/client";
 import {
+	formatUnitDiscountNote,
+	normalizeDiscountType,
+	validateProductAddUnitsInput,
+} from "@/lib/product-unit-pricing";
+import {
 	FileUploaderFactory,
 	uploadService,
 	type UploadOptions,
@@ -25,12 +30,11 @@ import type {
 	Branch,
 	Brand,
 	BulkReconcilePaymentsRequest,
-	BulkReconcilePaymentsResponse,
 	Category,
 	Commune,
 	Company,
-	CompanyStats,
 	CompanyConfiguration,
+	CompanyStats,
 	CreateAdministrativeDivisionInput,
 	CreateAttachmentInput,
 	CreateFeedbackQuestionInput,
@@ -50,10 +54,10 @@ import type {
 	CustomerVisitRequest,
 	DashboardReportData,
 	DashboardStats,
-	DeviceInfoRequest,
 	Delivery,
 	DeliveryInput,
 	Department,
+	DeviceInfoRequest,
 	District,
 	Division,
 	FeedbackQuestion,
@@ -67,9 +71,8 @@ import type {
 	InvoiceDiscountRequest,
 	Loan,
 	LoanDetails,
-	MultiInvoicePaymentItem,
-	MultiInvoicePaymentsPayload,
 	MultiInvoicePaymentRequest,
+	MultiInvoicePaymentsPayload,
 	MultiVariantProductInput,
 	NearbySearchRequest,
 	Order,
@@ -87,18 +90,18 @@ import type {
 	RegistrationTokenResponse,
 	ReportRefreshResponse,
 	Role,
+	SendRegistrationOtpPayload,
 	ServerFileResponse,
 	ShopContact,
 	SignInResponse,
 	SingleVariantProductInput,
-	SendRegistrationOtpPayload,
 	Staff,
 	Stock,
 	StockAdjustmentAudit,
 	StockAdjustmentPayload,
-	StockMovement,
 	StockCheckRequest,
 	StockCheckResponse,
+	StockMovement,
 	SubmissionFilterParams,
 	SubmitEvaluationRequest,
 	Supplier,
@@ -110,7 +113,6 @@ import type {
 	Unit,
 	UpdateAdministrativeDivisionInput,
 	UpdateAttachmentInput,
-	UpdateDeviceNameRequest,
 	UpdateInvoicePaymentTermRequest,
 	UpdateProductInput,
 	UpdateSystemAdminInput,
@@ -125,11 +127,6 @@ import type {
 	Village,
 	Warehouse
 } from "@/lib/types";
-import {
-	formatUnitDiscountNote,
-	normalizeDiscountType,
-	validateProductAddUnitsInput,
-} from "@/lib/product-unit-pricing";
 import type {
 	ActiveSubscription,
 	CancelSubscriptionRequest,
@@ -250,6 +247,8 @@ export function searchBody(
 	if (params.search && params.search.trim()) {
 		const term = params.search.trim();
 		body.filterGroup = {
+			logicalOperator: "OR",
+			operator: "OR",
 			logic: "OR",
 			criteria: searchFields.map((field) => ({
 				field,
@@ -315,7 +314,7 @@ export const authApi = {
 	signOut: () =>
 		api
 			.post("/auth/logout")
-			.catch(() => api.post("/auth/sign-out"))
+			.catch(() => api.post("/auth/logout"))
 			.then((r) => r.data),
 	forgotPassword: (body: { identifier: string }) =>
 		api.post<string>("/auth/forgot-password", body).then((r) => r.data),
@@ -1907,13 +1906,18 @@ export const usersApi = {
 import { normalizeRole } from "@/lib/role-utils";
 
 export const rolesApi = {
-	list: (params: ListParams) =>
-		fetchSearchList<Role>("/roles", params, ["name", "description"]).then(
-			(paged) => {
+	list: (params: ListParams = {}) => {
+		const body = searchBody(params, ["name", "description"]);
+		return api
+			.post<Paged<Role>>("/roles/search", body, {
+				signal: params.signal,
+			})
+			.then((res) => {
+				const paged = normalizePaged<Role>(res.data);
 				paged.items = paged.items.map(normalizeRole);
 				return paged;
-			},
-		),
+			});
+	},
 	get: (id: string | number) =>
 		api.get<any>(`/roles/${id}`).then((r) => {
 			const rawData = r.data?.data || r.data;
@@ -2560,6 +2564,10 @@ export const brandsApi = {
 		api.put<Brand>(`/brands/${id}`, body).then((r) => r.data),
 	remove: (id: string | number) =>
 		api.delete(`/brands/${id}`).then((r) => r.data),
+	deleteFromDb: (id: string | number) =>
+		api.delete(`/brands/${id}/hard-delete`).then((r) => r.data),
+	hardDelete: (id: string | number) =>
+		api.delete(`/brands/${id}/hard-delete`).then((r) => r.data),
 };
 
 // ---- Categories (tenant) -------------------------------------
@@ -2593,6 +2601,10 @@ export const categoriesApi = {
 			.then((r) => r.data),
 	remove: (id: string | number) =>
 		api.delete(`/categories/${id}`).then((r) => r.data),
+	deleteFromDb: (id: string | number) =>
+		api.delete(`/categories/${id}/hard-delete`).then((r) => r.data),
+	hardDelete: (id: string | number) =>
+		api.delete(`/categories/${id}/hard-delete`).then((r) => r.data),
 };
 
 // ---- Products (tenant) ---------------------------------------
@@ -3045,6 +3057,10 @@ export const unitsApi = {
 		api.put<Unit>(`/units/${id}`, body).then((r) => r.data),
 	remove: (id: string | number) =>
 		api.delete(`/units/${id}`).then((r) => r.data),
+	deleteFromDb: (id: string | number) =>
+		api.delete(`/units/${id}/hard-delete`).then((r) => r.data),
+	hardDelete: (id: string | number) =>
+		api.delete(`/units/${id}/hard-delete`).then((r) => r.data),
 	restore: (id: string | number) =>
 		api.patch(`/units/${id}/restore`).then((r) => r.data),
 };

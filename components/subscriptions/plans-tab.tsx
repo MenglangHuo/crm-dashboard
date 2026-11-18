@@ -170,7 +170,7 @@ export function PlansTab({ isSystemAdmin }: { isSystemAdmin: boolean }) {
 	const [editingPrice, setEditingPrice] = useState<PlanPriceDetail | null>(
 		null,
 	);
-	const [presetPlanIdForPrice, setPresetPlanIdForPrice] = useState<
+	const [_presetPlanIdForPrice, setPresetPlanIdForPrice] = useState<
 		number | string | null
 	>(null);
 

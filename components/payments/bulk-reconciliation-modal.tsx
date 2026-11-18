@@ -20,7 +20,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
 	CheckCircle2,
-	AlertTriangle,
 	Building2,
 	DollarSign,
 	Layers,
@@ -45,7 +44,7 @@ export function BulkReconciliationModal({
 	selectedPayments,
 	onSuccess,
 }: BulkReconciliationModalProps) {
-	const { t } = useTranslation();
+	const { t: _t } = useTranslation();
 	const queryClient = useQueryClient();
 
 	const [status, setStatus] = useState<string>("RECONCILED");

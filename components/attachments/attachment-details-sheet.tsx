@@ -39,7 +39,6 @@ import {
 import type { Attachment } from "@/lib/types";
 import {
 	useUpdateAttachment,
-	useAttachmentDownloadUrl,
 } from "@/hooks/use-attachments";
 import { storageApi } from "@/lib/api/endpoints";
 import {
@@ -110,7 +109,7 @@ export function AttachmentDetailsSheet({
 				setPresignedUrl(res.downloadUrl);
 				toast.success("Generated presigned S3 download link!");
 			}
-		} catch (err: any) {
+		} catch (_err: any) {
 			toast.error("Failed to generate download link");
 		} finally {
 			setGeneratingLink(false);
@@ -198,7 +197,7 @@ export function AttachmentDetailsSheet({
 					{/* Media Preview Box */}
 					<div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-inner">
 						{isImage && presignedUrl ? (
-							// eslint-disable-next-line @next/next/no-img-element
+							 
 							<img
 								src={presignedUrl}
 								alt={attachment.fileName}
