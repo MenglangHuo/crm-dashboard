@@ -232,7 +232,6 @@ export function MultiInvoicePaymentModal({
 					earlyPaymentDiscount:
 						a.discountAmount > 0 ? Number(a.discountAmount.toFixed(2)) : 0,
 					paymentMethod: paymentMethod,
-					paymentReference: referenceNumber.trim() || undefined,
 					notes: a.discountReason.trim() || notes.trim() || undefined,
 				})),
 				totalAmount: Number(totalAllocatedAmount.toFixed(2)),

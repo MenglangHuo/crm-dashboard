@@ -165,3 +165,144 @@ export function normalizeUnitPricingForApi(
 		discountType: normType,
 	};
 }
+
+export interface DecomposedUnitPart {
+	count: number;
+	unitName: string;
+	baseQuantity: number;
+}
+
+export interface UnitBreakdownResult {
+	formatted: string;
+	parts: DecomposedUnitPart[];
+	sign: "+" | "-" | "";
+	baseQty: number;
+	baseUnitName: string;
+}
+
+/**
+ * Formats any base-unit quantity into a tiered packaging unit string.
+ * Example:
+ *   qty = 290, units = [{ unitName: "កេស", baseQuantity: 24 }, { unitName: "កំប៉ុង", baseQuantity: 1 }]
+ *   => formatted: "+12 កេស 2 កំប៉ុង"
+ * Example (negative):
+ *   qty = -13, units = [{ unitName: "កេស", baseQuantity: 24 }, { unitName: "កំប៉ុង", baseQuantity: 1 }]
+ *   => formatted: "-13 កំប៉ុង"
+ * Example (with 12-pack):
+ *   qty = -26, units = [{ unitName: "កេស", baseQuantity: 24 }, { unitName: "កំប៉ុង", baseQuantity: 1 }]
+ *   => formatted: "-1 កេស 2 កំប៉ុង"
+ */
+export function formatQuantityToUnitBreakdown(
+	qty: number,
+	units?: Array<{ unitName?: string; baseQuantity?: number; isBase?: boolean }>,
+	options?: {
+		fallbackBaseUnitName?: string;
+		includePlusSign?: boolean;
+	},
+): UnitBreakdownResult {
+	const num = Number(qty) || 0;
+	const includePlus = options?.includePlusSign ?? true;
+	const sign: "+" | "-" | "" = num > 0 ? (includePlus ? "+" : "") : num < 0 ? "-" : "";
+	const absQty = Math.abs(num);
+
+	// Identify base unit name
+	const baseUnit = units?.find((u) => u.isBase || Number(u.baseQuantity) === 1);
+	const baseUnitName = baseUnit?.unitName || options?.fallbackBaseUnitName || "";
+
+	if (!units || units.length === 0) {
+		const formatted = baseUnitName
+			? `${sign}${absQty.toLocaleString()} ${baseUnitName}`
+			: `${sign}${absQty.toLocaleString()}`;
+		return {
+			formatted: num === 0 ? "0" : formatted,
+			parts: [{ count: absQty, unitName: baseUnitName || "unit", baseQuantity: 1 }],
+			sign,
+			baseQty: num,
+			baseUnitName,
+		};
+	}
+
+	// Filter and sort units with baseQuantity > 0 descending
+	const validUnits = units
+		.filter((u) => u.unitName && Number(u.baseQuantity) > 0)
+		.sort((a, b) => Number(b.baseQuantity) - Number(a.baseQuantity));
+
+	if (validUnits.length === 0) {
+		const formatted = baseUnitName
+			? `${sign}${absQty.toLocaleString()} ${baseUnitName}`
+			: `${sign}${absQty.toLocaleString()}`;
+		return {
+			formatted: num === 0 ? "0" : formatted,
+			parts: [{ count: absQty, unitName: baseUnitName || "unit", baseQuantity: 1 }],
+			sign,
+			baseQty: num,
+			baseUnitName,
+		};
+	}
+
+	const largestBaseQty = Number(validUnits[0].baseQuantity);
+	if (largestBaseQty <= 1) {
+		const uName = validUnits[0].unitName || baseUnitName;
+		const formatted = `${sign}${absQty.toLocaleString()} ${uName}`.trim();
+		return {
+			formatted: num === 0 ? `0 ${uName}`.trim() : formatted,
+			parts: [{ count: absQty, unitName: uName, baseQuantity: 1 }],
+			sign,
+			baseQty: num,
+			baseUnitName: uName,
+		};
+	}
+
+	// Cascading breakdown from largest unit down to base unit
+	let remaining = absQty;
+	const parts: DecomposedUnitPart[] = [];
+
+	for (let i = 0; i < validUnits.length; i++) {
+		const unit = validUnits[i];
+		const bQty = Number(unit.baseQuantity);
+		const isLast = i === validUnits.length - 1;
+
+		if (bQty > 1 && !isLast) {
+			const count = Math.floor(remaining / bQty);
+			if (count > 0) {
+				parts.push({
+					count,
+					unitName: unit.unitName!,
+					baseQuantity: bQty,
+				});
+				remaining = remaining % bQty;
+			}
+		} else {
+			// Base / smallest unit captures the remainder
+			if (remaining > 0 || parts.length === 0) {
+				parts.push({
+					count: remaining,
+					unitName: unit.unitName || baseUnitName || "unit",
+					baseQuantity: bQty > 0 ? bQty : 1,
+				});
+				remaining = 0;
+			}
+			break;
+		}
+	}
+
+	if (parts.length === 0) {
+		parts.push({
+			count: 0,
+			unitName: baseUnitName || "unit",
+			baseQuantity: 1,
+		});
+	}
+
+	const partsText = parts.map((p) => `${p.count.toLocaleString()} ${p.unitName}`).join(" ");
+	const formatted = num === 0 ? partsText : `${sign}${partsText}`;
+
+	return {
+		formatted,
+		parts,
+		sign,
+		baseQty: num,
+		baseUnitName,
+	};
+}
+

@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+	useQuery,
+	useInfiniteQuery,
+	useMutation,
+	useQueryClient,
+} from "@tanstack/react-query";
 import {
 	productsApi,
 	suppliersApi,
@@ -20,6 +25,8 @@ import {
 	StockAdjustmentPayload,
 } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n/context";
+import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
 	ModernModal,
 	ModernModalFooter,
@@ -61,6 +68,9 @@ import {
 	X,
 	SlidersHorizontal,
 	Scale,
+	Columns2,
+	PanelLeft,
+	PanelRight,
 } from "lucide-react";
 
 // Types
@@ -69,6 +79,8 @@ export type InventoryStudioMode =
 	| "ADJUSTMENT"
 	| "TRANSFER"
 	| "STOCK_IN";
+
+export type StudioScreenMode = "split" | "products" | "selected";
 
 export interface ManifestLineItem {
 	id: string;
@@ -96,6 +108,7 @@ export interface DynamicInventoryStudioModalProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	mode?: InventoryStudioMode;
+	defaultScreenMode?: StudioScreenMode;
 	title?: string;
 	subtitle?: string;
 	referencePrefix?: string;
@@ -153,6 +166,7 @@ export function DynamicInventoryStudioModal({
 	open,
 	onOpenChange,
 	mode = "IMPORT",
+	defaultScreenMode = "split",
 	title,
 	subtitle,
 	referencePrefix = mode === "ADJUSTMENT" ? "ADJ" : "IMP",
@@ -167,8 +181,17 @@ export function DynamicInventoryStudioModal({
 }: DynamicInventoryStudioModalProps) {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
+	const isMobile = useIsMobile(1024);
 	const categoryScrollRef = useRef<HTMLDivElement>(null);
 	const searchInputRef = useRef<HTMLInputElement>(null);
+
+	// Screen Split Layout State: "split" (both side-by-side) | "products" (full catalog) | "selected" (full manifest)
+	const [screenMode, setScreenMode] = useState<StudioScreenMode>(defaultScreenMode);
+	const effectiveScreenMode: StudioScreenMode = isMobile
+		? screenMode === "split"
+			? "products"
+			: screenMode
+		: screenMode;
 
 	// Header & Transaction Meta State
 	const [referenceNo, setReferenceNo] = useState<string>(() =>
@@ -228,16 +251,158 @@ export function DynamicInventoryStudioModal({
 	const [newSupplierName, setNewSupplierName] = useState("");
 	const [newSupplierPhone, setNewSupplierPhone] = useState("");
 
-	// Fetch Data Queries
-	const { data: productsData, isLoading: isLoadingProducts } = useQuery({
-		queryKey: ["inventory-studio-products", productSearch],
-		queryFn: () =>
-			productsApi.list({
-				limit: 300,
+	// Infinite Scroll Query for Products (Continuous Scroll-Y Data Fetching)
+	const {
+		data: infiniteProductsData,
+		fetchNextPage,
+		hasNextPage,
+		isFetchingNextPage,
+		isLoading: isLoadingProducts,
+	} = useInfiniteQuery({
+		queryKey: [
+			"inventory-studio-products-infinite",
+			productSearch,
+			selectedCategoryId,
+		],
+		queryFn: async ({ pageParam = 1 }) => {
+			return await productsApi.list({
+				page: pageParam as number,
+				limit: 30,
 				search: productSearch,
-			} as any),
+			} as any);
+		},
+		initialPageParam: 1,
+		getNextPageParam: (lastPage) => {
+			if (!lastPage) return undefined;
+			const currentPage = lastPage.page ?? 1;
+			const totalPages =
+				lastPage.totalPages ??
+				Math.ceil((lastPage.total ?? 0) / (lastPage.limit || 30));
+			if (currentPage < totalPages) {
+				return currentPage + 1;
+			}
+			return undefined;
+		},
 		enabled: open,
 	});
+
+	// Consolidated all loaded products across infinite pages
+	const allProducts = useMemo(() => {
+		if (!infiniteProductsData?.pages) return [];
+		const map = new Map<string, Product>();
+		infiniteProductsData.pages.forEach((page) => {
+			(page.items || []).forEach((prod) => {
+				if (prod && prod.id) {
+					map.set(String(prod.id), prod);
+				}
+			});
+		});
+		return Array.from(map.values());
+	}, [infiniteProductsData]);
+
+	// Maintain productsData object for backwards compatibility with existing find calls
+	const productsData = useMemo(() => ({ items: allProducts }), [allProducts]);
+
+	// Infinite scroll observers & container refs for Products Catalog
+	const productsContainerRef = useRef<HTMLDivElement>(null);
+	const productsSentinelRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const sentinel = productsSentinelRef.current;
+		const container = productsContainerRef.current;
+		if (!sentinel || !container) return;
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				const first = entries[0];
+				if (first.isIntersecting && hasNextPage && !isFetchingNextPage) {
+					fetchNextPage();
+				}
+			},
+			{
+				root: container,
+				rootMargin: "300px",
+				threshold: 0.1,
+			},
+		);
+
+		observer.observe(sentinel);
+		return () => observer.disconnect();
+	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+	const handleProductsScroll = (e: React.UIEvent<HTMLDivElement>) => {
+		const target = e.currentTarget;
+		const scrollBottom =
+			target.scrollHeight - target.scrollTop - target.clientHeight;
+		if (scrollBottom < 250 && hasNextPage && !isFetchingNextPage) {
+			fetchNextPage();
+		}
+	};
+
+	// Progressive infinite render limit & search for Selected Products
+	const [manifestRenderLimit, setManifestRenderLimit] = useState(25);
+	const [selectedSearch, setSelectedSearch] = useState("");
+
+	const selectedContainerRef = useRef<HTMLDivElement>(null);
+	const selectedSentinelRef = useRef<HTMLDivElement>(null);
+
+	// Filter manifest items if user searches within manifest
+	const filteredManifestItems = useMemo(() => {
+		if (!selectedSearch.trim()) return manifestItems;
+		const q = selectedSearch.toLowerCase().trim();
+		return manifestItems.filter(
+			(it) =>
+				it.productName?.toLowerCase().includes(q) ||
+				it.variantName?.toLowerCase().includes(q) ||
+				it.sku?.toLowerCase().includes(q) ||
+				it.unitName?.toLowerCase().includes(q),
+		);
+	}, [manifestItems, selectedSearch]);
+
+	// Visible manifest items sliced by render limit
+	const visibleManifestItems = useMemo(() => {
+		return filteredManifestItems.slice(0, manifestRenderLimit);
+	}, [filteredManifestItems, manifestRenderLimit]);
+
+	const hasMoreManifest =
+		visibleManifestItems.length < filteredManifestItems.length;
+
+	// Infinite scroll intersection observer for Selected Products
+	useEffect(() => {
+		const sentinel = selectedSentinelRef.current;
+		const container = selectedContainerRef.current;
+		if (!sentinel || !container) return;
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				const first = entries[0];
+				if (first.isIntersecting && hasMoreManifest) {
+					setManifestRenderLimit((prev) =>
+						Math.min(prev + 25, filteredManifestItems.length),
+					);
+				}
+			},
+			{
+				root: container,
+				rootMargin: "200px",
+				threshold: 0.1,
+			},
+		);
+
+		observer.observe(sentinel);
+		return () => observer.disconnect();
+	}, [hasMoreManifest, filteredManifestItems.length]);
+
+	const handleSelectedScroll = (e: React.UIEvent<HTMLDivElement>) => {
+		const target = e.currentTarget;
+		const scrollBottom =
+			target.scrollHeight - target.scrollTop - target.clientHeight;
+		if (scrollBottom < 200 && hasMoreManifest) {
+			setManifestRenderLimit((prev) =>
+				Math.min(prev + 25, filteredManifestItems.length),
+			);
+		}
+	};
 
 	const { data: categoriesData } = useQuery({
 		queryKey: ["categories-all"],
@@ -851,6 +1016,28 @@ export function DynamicInventoryStudioModal({
 		return prods;
 	}, [productsData, selectedCategoryId, categoriesData, productSearch]);
 
+	// Auto-prefetch next page if filtered products count is low when category filter is active
+	useEffect(() => {
+		if (
+			open &&
+			selectedCategoryId !== "ALL" &&
+			filteredProducts.length < 15 &&
+			hasNextPage &&
+			!isFetchingNextPage &&
+			!isLoadingProducts
+		) {
+			fetchNextPage();
+		}
+	}, [
+		open,
+		selectedCategoryId,
+		filteredProducts.length,
+		hasNextPage,
+		isFetchingNextPage,
+		isLoadingProducts,
+		fetchNextPage,
+	]);
+
 	// Open Product Configurator Popover
 	const handleProductCardClick = (product: Product) => {
 		const variants =
@@ -1388,9 +1575,11 @@ export function DynamicInventoryStudioModal({
 			}
 			size="full"
 			className="max-w-[96vw] xl:max-w-[1520px] h-[93vh] flex flex-col p-0 overflow-hidden"
+			bodyClassName="p-0 overflow-hidden flex flex-col flex-1 min-h-0"
+			footerClassName="p-0 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-900/95"
 			isLoading={submitMutation.isPending}
 			footer={
-				<div className="w-full flex items-center justify-between px-6 py-3.5 bg-slate-50/80 dark:bg-slate-900/80 border-t border-slate-200/80 dark:border-slate-800">
+				<div className="w-full flex items-center justify-between px-6 py-3.5 bg-slate-50/80 dark:bg-slate-900/80">
 					<div className="flex items-center gap-4 text-xs">
 						<div className="flex items-center gap-2">
 							<span className="text-muted-foreground font-medium">
@@ -1493,11 +1682,143 @@ export function DynamicInventoryStudioModal({
 				</div>
 			}
 		>
-			<div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden bg-slate-100/60 dark:bg-slate-950">
+			{/* ============================================================ */}
+			{/* TOP SCREEN SWITCHER & WORKSPACE NAVIGATION BAR               */}
+			{/* ============================================================ */}
+			<div className="flex items-center justify-between px-4 sm:px-6 py-2 border-b border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs shrink-0 z-10 gap-3">
+				<div className="flex items-center gap-2">
+					{/* Mobile / Tablet Segmented Tabs */}
+					<div className="flex lg:hidden items-center p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+						<button
+							type="button"
+							onClick={() => setScreenMode("products")}
+							className={cn(
+								"px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer",
+								effectiveScreenMode === "products"
+									? "bg-white text-slate-900 shadow-2xs dark:bg-slate-700 dark:text-white font-bold"
+									: "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+							)}
+						>
+							<Package className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+							<span>{t("stocks.catalogScreen", "Products")}</span>
+						</button>
+						<button
+							type="button"
+							onClick={() => setScreenMode("selected")}
+							className={cn(
+								"px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer",
+								effectiveScreenMode === "selected"
+									? "bg-white text-slate-900 shadow-2xs dark:bg-slate-700 dark:text-white font-bold"
+									: "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+							)}
+						>
+							<Boxes className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+							<span>{t("stocks.selectedScreen", "Selected")}</span>
+							{manifestItems.length > 0 && (
+								<Badge className="ml-1 px-1.5 py-0 h-4 text-[10px] bg-purple-600 text-white font-mono font-bold">
+									{manifestItems.length}
+								</Badge>
+							)}
+						</button>
+					</div>
+
+					{/* Desktop Screen Split Mode Switcher */}
+					<div className="hidden lg:flex items-center p-1 bg-slate-100/90 dark:bg-slate-800/80 rounded-xl border border-slate-200/70 dark:border-slate-700/70 shadow-2xs">
+						<button
+							type="button"
+							onClick={() => setScreenMode("split")}
+							className={cn(
+								"px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer",
+								effectiveScreenMode === "split"
+									? "bg-white text-slate-900 shadow-2xs dark:bg-slate-700 dark:text-white font-bold"
+									: "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white",
+							)}
+							title="Split View (Side-by-side catalog and selected products)"
+						>
+							<Columns2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+							<span>{t("stocks.splitScreen", "Split Screen")}</span>
+						</button>
+						<button
+							type="button"
+							onClick={() => setScreenMode("products")}
+							className={cn(
+								"px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer",
+								effectiveScreenMode === "products"
+									? "bg-white text-slate-900 shadow-2xs dark:bg-slate-700 dark:text-white font-bold"
+									: "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white",
+							)}
+							title="Full Screen Product Catalog"
+						>
+							<PanelLeft className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+							<span>{t("stocks.catalogScreen", "Display Products")}</span>
+						</button>
+						<button
+							type="button"
+							onClick={() => setScreenMode("selected")}
+							className={cn(
+								"px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer",
+								effectiveScreenMode === "selected"
+									? "bg-white text-slate-900 shadow-2xs dark:bg-slate-700 dark:text-white font-bold"
+									: "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white",
+							)}
+							title="Full Screen Selected Products"
+						>
+							<PanelRight className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+							<span>{t("stocks.selectedScreen", "Selected Products")}</span>
+							{manifestItems.length > 0 && (
+								<Badge className="ml-1 px-1.5 py-0 h-4 text-[10px] bg-purple-600 text-white font-mono font-bold">
+									{manifestItems.length}
+								</Badge>
+							)}
+						</button>
+					</div>
+				</div>
+
+				{/* Quick Actions & Navigation Pill */}
+				<div className="flex items-center gap-2">
+					{effectiveScreenMode === "products" && manifestItems.length > 0 && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setScreenMode(isMobile ? "selected" : "split")}
+							className="h-8 px-3 text-xs font-bold text-purple-600 border-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:border-purple-900/60 dark:text-purple-300 rounded-xl gap-1.5 cursor-pointer"
+						>
+							<Boxes className="h-3.5 w-3.5" />
+							<span>
+								{manifestItems.length} {t("stocks.items", "items")} ($
+								{totalInboundCost.toFixed(2)})
+							</span>
+							<ChevronRight className="h-3 w-3" />
+						</Button>
+					)}
+
+					{effectiveScreenMode === "selected" && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setScreenMode(isMobile ? "products" : "split")}
+							className="h-8 px-3 text-xs font-bold text-indigo-600 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900/60 dark:text-indigo-300 rounded-xl gap-1.5 cursor-pointer"
+						>
+							<Plus className="h-3.5 w-3.5" />
+							<span>{t("stocks.addMoreProducts", "+ Add More Products")}</span>
+						</Button>
+					)}
+				</div>
+			</div>
+
+			<div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden bg-slate-100/60 dark:bg-slate-950 relative">
 				{/* ============================================================ */}
 				{/* LEFT PANEL: PRODUCT CATALOG & INVENTORY EXPLORER             */}
 				{/* ============================================================ */}
-				<div className="w-full lg:w-7/12 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/40 overflow-hidden">
+				{(effectiveScreenMode === "split" || effectiveScreenMode === "products") && (
+					<div
+						className={cn(
+							"flex flex-col bg-white dark:bg-slate-900/40 overflow-hidden min-h-0 h-full transition-all duration-150 relative",
+							effectiveScreenMode === "split"
+								? "w-full lg:w-7/12 border-b lg:border-b-0 lg:border-r border-slate-200/80 dark:border-slate-800"
+								: "w-full flex-1",
+						)}
+					>
 					{/* Top Search & Filter Bar */}
 					<div className="p-4 border-b border-slate-200/80 dark:border-slate-800 space-y-3 shrink-0">
 						<div className="flex items-center gap-2.5">
@@ -1594,8 +1915,12 @@ export function DynamicInventoryStudioModal({
 						</div>
 					</div>
 
-					{/* Product Items Explorer List/Grid */}
-					<div className="flex-1 overflow-y-auto p-4 space-y-3">
+					{/* Product Items Explorer List/Grid with Independent Scroll-Y & Infinite Scroll */}
+					<div
+						ref={productsContainerRef}
+						onScroll={handleProductsScroll}
+						className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 hover:scrollbar-thumb-slate-400"
+					>
 						{isLoadingProducts ? (
 							<div className="h-64 flex flex-col items-center justify-center text-slate-400 gap-2">
 								<RefreshCw className="h-6 w-6 animate-spin text-purple-600" />
@@ -1614,8 +1939,15 @@ export function DynamicInventoryStudioModal({
 								</p>
 							</div>
 						) : viewMode === "grid" ? (
-							/* Grid Layout */
-							<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+							/* Grid Layout with Dynamic Columns */
+							<div
+								className={cn(
+									"grid gap-3",
+									effectiveScreenMode === "products"
+										? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+										: "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3",
+								)}
+							>
 								{filteredProducts.map((prod) => {
 									const variants = prod.variants || [];
 									const hasMultiVariants = variants.length > 1;
@@ -1766,13 +2098,60 @@ export function DynamicInventoryStudioModal({
 								})}
 							</div>
 						)}
+
+						{/* Sentinel element for infinite scroll */}
+						<div ref={productsSentinelRef} className="h-4 w-full shrink-0" />
+
+						{/* Infinite Scroll Status Indicator */}
+						{isFetchingNextPage && (
+							<div className="py-4 flex items-center justify-center gap-2 text-slate-500 text-xs font-medium animate-pulse">
+								<RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
+								<span>
+									{t("stocks.loadingMoreProducts", "Loading more products...")}
+								</span>
+							</div>
+						)}
+
+						{!hasNextPage && allProducts.length > 0 && (
+							<div className="py-3 text-center text-xs text-muted-foreground font-medium border-t border-dashed border-slate-200 dark:border-slate-800 mt-2">
+								{t("stocks.allProductsLoaded", "All products loaded")} (
+								{filteredProducts.length} {t("stocks.items", "items")})
+							</div>
+						)}
 					</div>
+
+					{/* Floating Quick Navigation Pill in Products-Only View */}
+					{effectiveScreenMode === "products" && manifestItems.length > 0 && (
+						<div className="absolute bottom-4 right-6 z-20 animate-in fade-in slide-in-from-bottom-2 duration-200">
+							<Button
+								type="button"
+								onClick={() => setScreenMode(isMobile ? "selected" : "split")}
+								className="rounded-full shadow-lg shadow-purple-600/25 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold px-4 py-2.5 h-auto flex items-center gap-2 cursor-pointer"
+							>
+								<Boxes className="h-4 w-4" />
+								<span>
+									{manifestItems.length} {t("stocks.items", "items")} ($
+									{totalInboundCost.toFixed(2)})
+								</span>
+								<ChevronRight className="h-4 w-4 ml-0.5" />
+							</Button>
+						</div>
+					)}
 				</div>
+			)}
 
 				{/* ============================================================ */}
 				{/* RIGHT SIDE: MANIFEST, INBOUND LINE ITEMS & SUMMARY           */}
 				{/* ============================================================ */}
-				<div className="w-full lg:w-5/12 flex flex-col bg-slate-50/50 dark:bg-slate-950 overflow-hidden">
+				{(effectiveScreenMode === "split" || effectiveScreenMode === "selected") && (
+					<div
+						className={cn(
+							"flex flex-col bg-slate-50/50 dark:bg-slate-950 overflow-hidden min-h-0 h-full transition-all duration-150 relative",
+							effectiveScreenMode === "split"
+								? "w-full lg:w-5/12"
+								: "w-full flex-1",
+						)}
+					>
 					{/* Header: Compact Info & Collapsible Details Bar */}
 					<div className="p-3 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 shrink-0">
 						{mode === "ADJUSTMENT" ? (
@@ -2070,9 +2449,13 @@ export function DynamicInventoryStudioModal({
 						)}
 					</div>
 
-					{/* Manifest Line Items Table List */}
-					<div className="flex-1 overflow-y-auto p-4 space-y-3">
-						<div className="flex items-center justify-between">
+					{/* Manifest Line Items Table List with Independent Scroll-Y & Progressive Infinite Scroll */}
+					<div
+						ref={selectedContainerRef}
+						onScroll={handleSelectedScroll}
+						className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 hover:scrollbar-thumb-slate-400"
+					>
+						<div className="flex items-center justify-between gap-2 flex-wrap">
 							<h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
 								<Boxes className="h-3.5 w-3.5 text-primary" />
 								<span>
@@ -2082,6 +2465,29 @@ export function DynamicInventoryStudioModal({
 									({manifestItems.length})
 								</span>
 							</h4>
+
+							{/* Quick Search within Selected Items if manifest has 3+ items */}
+							{manifestItems.length >= 3 && (
+								<div className="relative w-40 sm:w-52">
+									<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+									<input
+										type="text"
+										value={selectedSearch}
+										onChange={(e) => setSelectedSearch(e.target.value)}
+										placeholder={t("stocks.searchSelectedPlaceholder", "Search selected...")}
+										className="w-full h-7 pl-7 pr-6 rounded-lg text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+									/>
+									{selectedSearch && (
+										<button
+											type="button"
+											onClick={() => setSelectedSearch("")}
+											className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+										>
+											<X className="h-3 w-3" />
+										</button>
+									)}
+								</div>
+							)}
 
 							{mode === "ADJUSTMENT" ? (
 								<div className="flex items-center gap-2">
@@ -2142,9 +2548,24 @@ export function DynamicInventoryStudioModal({
 										: t("stocks.noItemsManifestDescImport")}
 								</p>
 							</div>
+						) : filteredManifestItems.length === 0 ? (
+							<div className="h-44 flex flex-col items-center justify-center text-center p-4 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+								<Search className="h-6 w-6 text-muted-foreground mb-2" />
+								<p className="text-xs text-muted-foreground">
+									No selected items match &quot;{selectedSearch}&quot;
+								</p>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => setSelectedSearch("")}
+									className="text-xs text-primary mt-1 h-7 cursor-pointer"
+								>
+									Clear Search
+								</Button>
+							</div>
 						) : (
 							<div className="space-y-2.5">
-								{manifestItems.map((item, idx) => {
+								{visibleManifestItems.map((item, idx) => {
 									const qty =
 										Number(item.adjustmentQuantity || item.quantity) || 1;
 									const itemType = (item.AdjustmentType ||
@@ -2595,6 +3016,30 @@ export function DynamicInventoryStudioModal({
 							</div>
 						)}
 
+						{/* Sentinel element for infinite scroll on Selected Products */}
+						<div ref={selectedSentinelRef} className="h-4 w-full shrink-0" />
+
+						{/* Infinite Scroll / Progressive Load More for Selected Items */}
+						{hasMoreManifest && (
+							<div className="py-3 flex flex-col items-center justify-center gap-1.5 border border-dashed border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 rounded-xl p-3">
+								<div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+									<RefreshCw className="h-3.5 w-3.5 animate-spin text-purple-600" />
+									<span>
+										{t("stocks.loadingMoreSelected", "Loading more selected items on scroll...")} (
+										{visibleManifestItems.length}/{filteredManifestItems.length})
+									</span>
+								</div>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setManifestRenderLimit(filteredManifestItems.length)}
+									className="h-7 px-3 text-xs rounded-lg mt-1 cursor-pointer"
+								>
+									{t("stocks.showAll", "Show all")} ({filteredManifestItems.length})
+								</Button>
+							</div>
+						)}
+
 						{/* Receiving note indicator if filled and details collapsed */}
 						{mode === "IMPORT" && generalNote && !isDetailsOpen && (
 							<div
@@ -2710,6 +3155,7 @@ export function DynamicInventoryStudioModal({
 						)}
 					</div>
 				</div>
+			)}
 			</div>
 
 			{/* ============================================================ */}

@@ -12,6 +12,7 @@ import {
 	StockVariantItem,
 	StockWarehouseBreakdown,
 	Product,
+	VariantUnit,
 } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,14 @@ import {
 	ModernTabsTrigger,
 	ModernTabsContent,
 } from "@/components/ui-custom/modern-tabs";
+import { DataTable, ColumnDef } from "@/components/ui-custom/data-table";
+import {
+	DropdownMenu,
+	DropdownMenuTrigger,
+	DropdownMenuContent,
+	DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { ProductPriceHistoryModal } from "@/components/product-price-history-modal";
 import {
 	Boxes,
 	Warehouse as WarehouseIcon,
@@ -47,6 +56,10 @@ import {
 	ChevronDown,
 	LayoutList,
 	Table as TableIcon,
+	RotateCcw,
+	TrendingUp,
+	MoreVertical,
+	Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/context";
@@ -388,6 +401,257 @@ export interface StockProductDetailModalProps {
 	) => void;
 }
 
+export function VariantUnitsAccordionSubRow({
+	variant,
+	stockData,
+	fallbackBaseUnitName,
+}: {
+	variant: any;
+	stockData?: NormalizedVariantStockData;
+	fallbackBaseUnitName?: string;
+}) {
+	const variantId = variant?.variantId || variant?.id;
+	const {
+		data: units = [],
+		isLoading,
+		isError,
+		isFetching,
+		refetch,
+	} = useQuery<VariantUnit[]>({
+		queryKey: ["variant-units", variantId],
+		queryFn: () =>
+			variantId ? productsApi.getVariantUnits(variantId) : Promise.resolve([]),
+		enabled: Boolean(variantId),
+		staleTime: 60 * 1000,
+	});
+
+	// Effective units with fallback to stockData.allUnits if API returns empty
+	const effectiveUnits: VariantUnit[] = useMemo(() => {
+		if (units && units.length > 0) return units;
+		if (stockData?.allUnits && stockData.allUnits.length > 0) {
+			const bUnit = stockData.baseUnit;
+			const bPrice = stockData.basePrice;
+			return stockData.allUnits.map((u) => {
+				const isBase = u.isBase;
+				const basePrice = isBase
+					? bPrice
+					: bPrice * (u.baseQuantity || 1);
+				const finalPrice = u.sellingPrice || basePrice;
+				const discount =
+					u.savingsPercent ??
+					(basePrice > finalPrice
+						? Math.round(((basePrice - finalPrice) / basePrice) * 100)
+						: 0);
+				return {
+					unitId: u.unitId,
+					unitName: u.unitName,
+					symbol:
+						u.symbol ||
+						(u.unitName?.length <= 6 ? u.unitName : undefined),
+					isBase: u.isBase,
+					baseUnitId: bUnit?.unitId,
+					baseUnitName: bUnit?.unitName || fallbackBaseUnitName || "Base",
+					baseQuantity: u.baseQuantity,
+					basePrice: basePrice,
+					discountPercentage: discount,
+					finalPrice: finalPrice,
+					discountNote:
+						u.discountNote || (discount > 0 ? `${discount}%` : undefined),
+					parentUnitId: u.parentUnitId ?? undefined,
+					parentUnitName: u.parentUnitName ?? undefined,
+					parentQuantity:
+						u.parentQuantity ??
+						(u.baseQuantity > 1 ? u.baseQuantity : undefined),
+				};
+			});
+		}
+		return [];
+	}, [units, stockData, fallbackBaseUnitName]);
+
+	const baseUnitName =
+		effectiveUnits.find((u) => u.isBase || u.unitId === u.baseUnitId)
+			?.unitName ||
+		stockData?.baseUnit?.unitName ||
+		fallbackBaseUnitName ||
+		"Base";
+
+	return (
+		<div className="p-3.5 bg-slate-50/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/90 dark:border-slate-800 space-y-3 shadow-inner text-xs">
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-200/70 dark:border-slate-800 pb-2.5">
+				<div className="flex items-center gap-2.5">
+					<div className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-50 text-rose-500 dark:bg-rose-950/60 dark:text-rose-400 shrink-0 border border-rose-200 dark:border-rose-900/60">
+						<Layers className="h-3.5 w-3.5" />
+					</div>
+					<div>
+						<span className="font-bold text-slate-900 dark:text-white">
+							{variant?.variantName ||
+								variant?.name ||
+								variant?.sku ||
+								`Variant #${variantId}`}{" "}
+							— Unit Prices & Tier Matrix
+						</span>
+						<span className="text-[10px] text-slate-400 block font-mono">
+							Variant ID: #{variantId} • SKU: {variant?.sku || "—"}
+						</span>
+					</div>
+				</div>
+
+				<div className="flex items-center gap-2">
+					<Badge
+						variant="outline"
+						className="text-[10px] font-bold border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300"
+					>
+						{effectiveUnits.length} Unit Tier(s)
+					</Badge>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => refetch()}
+						className="h-7 px-2 text-[11px] rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
+						title="Reload Variant Unit Prices"
+					>
+						<RotateCcw
+							className={cn(
+								"h-3 w-3 mr-1",
+								isFetching && "animate-spin text-rose-500",
+							)}
+						/>{" "}
+						Reload
+					</Button>
+				</div>
+			</div>
+
+			{isLoading ? (
+				<div className="flex items-center justify-center py-6 gap-2 text-slate-400">
+					<Loader2 className="h-4 w-4 animate-spin text-primary" />
+					<span>Loading variant unit prices...</span>
+				</div>
+			) : isError && effectiveUnits.length === 0 ? (
+				<div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 flex items-center justify-between">
+					<span>Failed to retrieve unit prices for this variant.</span>
+					<Button
+						size="sm"
+						variant="outline"
+						onClick={() => refetch()}
+						className="h-7 text-xs"
+					>
+						Retry
+					</Button>
+				</div>
+			) : effectiveUnits.length > 0 ? (
+				<div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-2xs">
+					<table className="w-full text-left text-xs min-w-[620px]">
+						<thead className="bg-slate-100/80 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+							<tr>
+								<th className="p-2.5">Unit Tier Name</th>
+								<th className="p-2.5">Classification</th>
+								<th className="p-2.5">Conversion Multiplier</th>
+								<th className="p-2.5">Base Price</th>
+								<th className="p-2.5">Discount Rate</th>
+								<th className="p-2.5">Final Selling Price</th>
+								<th className="p-2.5">Hierarchy Context</th>
+							</tr>
+						</thead>
+						<tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+							{effectiveUnits.map((u, idx) => {
+								const isBase = Boolean(
+									u.isBase ||
+										(u.unitId &&
+											u.baseUnitId &&
+											String(u.unitId) === String(u.baseUnitId)) ||
+										(u.baseQuantity === 1 && !u.parentUnitId),
+								);
+								const discount = u.discountPercentage || 0;
+								return (
+									<tr
+										key={u.unitId || idx}
+										className="hover:bg-slate-50/80 dark:hover:bg-slate-900/40 transition-colors"
+									>
+										<td className="p-2.5">
+											<div className="flex items-center gap-2">
+												<span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-[10px] border border-rose-200/60 dark:border-rose-900/60">
+													{u.symbol || u.unitName?.slice(0, 3) || "U"}
+												</span>
+												<span className="font-bold text-slate-900 dark:text-white">
+													{u.unitName}
+												</span>
+												{u.symbol && (
+													<span className="text-[10px] text-slate-400 font-mono">
+														({u.symbol})
+													</span>
+												)}
+											</div>
+										</td>
+										<td className="p-2.5">
+											<Badge
+												variant={isBase ? "default" : "secondary"}
+												className={
+													isBase
+														? "text-[10px] bg-rose-600 hover:bg-rose-600 text-white font-bold rounded-full px-2.5 py-0.5 border-transparent"
+														: "text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full px-2.5 py-0.5 border-transparent"
+												}
+											>
+												{isBase ? "Base Unit" : "Secondary Unit"}
+											</Badge>
+										</td>
+										<td className="p-2.5 font-mono text-slate-700 dark:text-slate-300">
+											{u.baseQuantity ? (
+												<span>
+													<strong>{u.baseQuantity}x</strong>{" "}
+													{u.baseUnitName || baseUnitName}
+												</span>
+											) : (
+												`1x ${baseUnitName}`
+											)}
+										</td>
+										<td className="p-2.5 font-semibold text-slate-600 dark:text-slate-400">
+											${Number(u.basePrice ?? 0).toFixed(2)}
+										</td>
+										<td className="p-2.5">
+											{discount > 0 || u.discountNote ? (
+												<Badge
+													variant="outline"
+													className="text-[10px] text-amber-700 dark:text-amber-300 border-amber-400 bg-amber-50 dark:bg-amber-950/40 font-bold rounded-full px-2 py-0.5"
+												>
+													{u.discountNote || `${discount}%`}
+												</Badge>
+											) : (
+												<span className="text-slate-400 text-[11px]">—</span>
+											)}
+										</td>
+										<td className="p-2.5">
+											<span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-xs font-mono">
+												${Number(u.finalPrice ?? u.basePrice ?? 0).toFixed(2)}
+											</span>
+										</td>
+										<td className="p-2.5 text-[11px] text-slate-500">
+											{u.parentUnitName && !isBase ? (
+												<span>
+													Parent:{" "}
+													<strong>
+														{u.parentQuantity ?? u.baseQuantity}x
+													</strong>{" "}
+													{u.parentUnitName}
+												</span>
+											) : (
+												<span className="text-slate-400">Primary Anchor</span>
+											)}
+										</td>
+									</tr>
+								);
+							})}
+						</tbody>
+					</table>
+				</div>
+			) : (
+				<div className="p-4 text-center rounded-xl bg-white dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 text-slate-400">
+					No unit prices registered for this variant.
+				</div>
+			)}
+		</div>
+	);
+}
+
 export function StockProductDetailModal({
 	isOpen,
 	onClose,
@@ -399,29 +663,20 @@ export function StockProductDetailModal({
 }: StockProductDetailModalProps) {
 	const { t } = useTranslation();
 
-	// State for toggling individual variant units tree / dropdowns
-	const [expandedVariants, setExpandedVariants] = useState<
-		Record<string | number, boolean>
-	>({});
+	// State for toggling row expansion in data table
+	const [expandedVariantIds, setExpandedVariantIds] = useState<string[]>([]);
+	const [isPriceHistoryOpen, setIsPriceHistoryOpen] = useState(false);
+	const [selectedVariantForHistory, setSelectedVariantForHistory] = useState<any>(null);
+
+	const handleOpenPriceHistory = (variant: any) => {
+		setSelectedVariantForHistory(variant);
+		setIsPriceHistoryOpen(true);
+	};
 
 	// State for Unit Hierarchy tab view mode (tree vs table)
 	const [unitHierarchyViewMode, setUnitHierarchyViewMode] = useState<
 		"tree" | "table"
 	>("table");
-
-	const toggleVariantExpanded = (variantId: number | string) => {
-		setExpandedVariants((prev) => ({
-			...prev,
-			[variantId]: prev[variantId] !== undefined ? !prev[variantId] : false,
-		}));
-	};
-
-	const isVariantTreeExpanded = (variantId: number | string) => {
-		if (expandedVariants[variantId] !== undefined) {
-			return expandedVariants[variantId];
-		}
-		return variants.length === 1;
-	};
 
 	// Resolve product identifier (numeric id or UUID)
 	const rawProdId = product?.productId ?? (product as any)?.id;
@@ -612,13 +867,431 @@ export function StockProductDetailModal({
 		);
 	}, [variants, product, variantDetailsMap]);
 
+	// Normalized variant rows with pre-calculated stockData and attributes
+	const variantTableData = useMemo(() => {
+		const rawList =
+			variants.length > 0
+				? variants
+				: [
+						{
+							variantId: Number(product?.productId ?? (product as any)?.id ?? 1),
+							variantName: resolvedTitle,
+							sku: resolvedSku,
+							barcode: resolvedBarcode || undefined,
+							stockQty: totalAvailable,
+							imageUrl: mainImageUrl,
+							isSimpleProduct: true,
+						} as StockVariantItem,
+				  ];
+
+		return rawList.map((v) => {
+			const stockData = getNormalizedVariantStockData(
+				v,
+				product || undefined,
+				variantDetailsMap,
+			);
+			const vKey = v.variantId || v.sku;
+			const matchedVariant =
+				variantDetailsMap?.get(vKey) ||
+				(v.variantId ? variantDetailsMap?.get(String(v.variantId)) : null) ||
+				(v.sku ? variantDetailsMap?.get(v.sku.toLowerCase().trim()) : null) ||
+				fullProduct?.variants?.find(
+					(fpv: any) => fpv.id === v.variantId || fpv.sku === v.sku,
+				);
+			const attributeValues =
+				(v as any).attributeValues ||
+				matchedVariant?.attributeValues ||
+				[];
+
+			return {
+				...v,
+				id: String(v.variantId || (v as any).id),
+				name: v.variantName || (v as any).name || resolvedTitle,
+				stockData,
+				attributeValues,
+				matchedVariant,
+			};
+		});
+	}, [
+		variants,
+		product,
+		variantDetailsMap,
+		fullProduct,
+		resolvedTitle,
+		resolvedSku,
+		resolvedBarcode,
+		totalAvailable,
+		mainImageUrl,
+	]);
+
+	// Auto-expand first variant if not already expanded
+	React.useEffect(() => {
+		if (variantTableData.length > 0 && expandedVariantIds.length === 0) {
+			setExpandedVariantIds([
+				String(variantTableData[0].variantId || variantTableData[0].id),
+			]);
+		}
+	}, [variantTableData]);
+
+	const variantColumns: ColumnDef<any>[] = useMemo(
+		() => [
+			{
+				id: "expand",
+				header: "",
+				width: "44px",
+				minWidth: 44,
+				cell: ({ row }: { row: any }) => {
+					const rId = String(row.variantId || row.id);
+					const isExpanded = expandedVariantIds.includes(rId);
+					return (
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-7 w-7 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
+							onClick={(e) => {
+								e.stopPropagation();
+								setExpandedVariantIds((prev) =>
+									prev.includes(rId)
+										? prev.filter((id) => id !== rId)
+										: [...prev, rId],
+								);
+							}}
+							title={
+								isExpanded
+									? "Collapse Variant Unit Prices"
+									: "Expand Variant Unit Prices & Conversion Matrix"
+							}
+						>
+							<ChevronDown
+								className={cn(
+									"h-4 w-4 transition-transform duration-200",
+									isExpanded ? "rotate-180 text-rose-600 font-bold" : "",
+								)}
+							/>
+						</Button>
+					);
+				},
+			},
+			{
+				id: "name",
+				header: t("products.variantsAndPricing", "Variants & Pricing"),
+				accessorKey: "variantName",
+				sortable: true,
+				minWidth: 180,
+				cell: ({ row }: { row: any }) => {
+					const v = row;
+					const imgUrl =
+						v.imageUrl ||
+						v.thumbnail ||
+						v.image ||
+						product?.imageUrl;
+					const attributeValues: any[] = v.attributeValues || [];
+
+					return (
+						<div className="flex items-center gap-3 py-1">
+							<div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center relative shadow-2xs">
+								{imgUrl ? (
+									<img
+										src={safeImageUrl(imgUrl)}
+										className="h-full w-full object-cover"
+										alt={v.variantName || v.name}
+										onError={(e) => {
+											e.currentTarget.onerror = null;
+											e.currentTarget.src = DEFAULT_IMAGE_URL;
+										}}
+									/>
+								) : (
+									<Package className="h-4 w-4 text-purple-500" />
+								)}
+							</div>
+
+							<div>
+								<span className="font-bold text-slate-900 dark:text-white block text-xs">
+									{v.variantName || v.name}
+								</span>
+								{attributeValues && attributeValues.length > 0 ? (
+									<div className="flex flex-wrap gap-1 mt-0.5">
+										{attributeValues.map((av: any, idx: number) => (
+											<span
+												key={idx}
+												className="text-[10px] text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded font-medium border border-purple-200/50 dark:border-purple-800/50"
+											>
+												{av.attributeName || av.name}:{" "}
+												<strong className="text-purple-600 dark:text-purple-400">
+													{av.value || av.attributeValue}
+												</strong>
+											</span>
+										))}
+									</div>
+								) : null}
+							</div>
+						</div>
+					);
+				},
+			},
+			{
+				id: "sku",
+				header: t("stocks.sku", "SKU"),
+				accessorKey: "sku",
+				sortable: true,
+				minWidth: 140,
+				cell: ({ row }: { row: any }) => (
+					<span className="font-bold font-mono text-xs text-slate-900 dark:text-white">
+						{row.sku || "—"}
+					</span>
+				),
+			},
+			{
+				id: "barcode",
+				header: t("products.barcode", "Barcode"),
+				accessorKey: "barcode",
+				sortable: true,
+				minWidth: 130,
+				cell: ({ row }: { row: any }) => (
+					<span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">
+						{row.barcode || "—"}
+					</span>
+				),
+			},
+			{
+				id: "price",
+				header: t("products.retailSellPrice", "Retail Sell Price"),
+				sortable: true,
+				minWidth: 110,
+				cell: ({ row }: { row: any }) => {
+					const stockData = row.stockData;
+					const price =
+						stockData?.basePrice ??
+						Number(row.sellingPrice ?? row.price ?? 0);
+					const unitName =
+						stockData?.baseUnit?.unitName || (row as any).unitName || "";
+					return (
+						<div>
+							<span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-xs block font-mono">
+								${price.toFixed(2)}
+							</span>
+							{unitName && (
+								<span className="text-[10px] text-slate-400 font-normal block mt-0.5">
+									/ {unitName}
+								</span>
+							)}
+						</div>
+					);
+				},
+			},
+			{
+				id: "cost",
+				header: t("products.baseUnitCost", "Base Unit Cost"),
+				sortable: true,
+				minWidth: 110,
+				cell: ({ row }: { row: any }) => {
+					const stockData = row.stockData;
+					const cost = stockData?.cost ?? Number(row.cost ?? 0);
+					const unitName =
+						stockData?.baseUnit?.unitName || (row as any).unitName || "";
+					return (
+						<div>
+							<span className="font-semibold text-slate-700 dark:text-slate-300 text-xs block font-mono">
+								${cost.toFixed(2)}
+							</span>
+							{unitName && (
+								<span className="text-[10px] text-slate-400 font-normal block mt-0.5">
+									/ {unitName}
+								</span>
+							)}
+						</div>
+					);
+				},
+			},
+			{
+				id: "inventory",
+				header: t("stocks.availableQuantity", "Available"),
+				sortable: true,
+				minWidth: 100,
+				cell: ({ row }: { row: any }) => {
+					const stockData = row.stockData;
+					const qty = stockData?.availableStock ?? row.stockQty ?? 0;
+					const reserved = stockData?.reservedStock ?? 0;
+					return (
+						<div className="space-y-0.5">
+							<span className="font-extrabold text-slate-900 dark:text-white text-xs">
+								{qty} units
+							</span>
+							{reserved > 0 && (
+								<span className="text-[10px] text-amber-600 font-semibold block">
+									({reserved} reserved)
+								</span>
+							)}
+						</div>
+					);
+				},
+			},
+			{
+				id: "status",
+				header: t("common.status", "Status"),
+				minWidth: 90,
+				cell: ({ row }: { row: any }) => {
+					const isActive =
+						row.status === "Active" ||
+						row.status === "AVAILABLE" ||
+						row.isActive !== false;
+					return (
+						<Badge
+							className={
+								isActive
+									? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 rounded-full font-medium text-[10px] px-2.5 py-0.5"
+									: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded-full font-medium text-[10px] px-2.5 py-0.5"
+							}
+						>
+							{isActive
+								? t("common.active", "Active")
+								: t("common.inactive", "Inactive")}
+						</Badge>
+					);
+				},
+			},
+			{
+				id: "actions",
+				header: t("common.actions", "Actions"),
+				align: "right",
+				minWidth: 200,
+				cell: ({ row }: { row: any }) => {
+					const v = row;
+					const stockData = row.stockData;
+					return (
+						<div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+							{onViewMovements && (
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={(e) => {
+										e.stopPropagation();
+										onClose();
+										onViewMovements(
+											v.variantId,
+											v.variantName || v.name,
+											v.sku,
+										);
+									}}
+									className="h-7 px-2.5 text-[11px] font-semibold gap-1 rounded-lg border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer shadow-2xs"
+									title={t("stocks.allMovements", "Movement Logs")}
+								>
+									<History className="size-3 text-purple-500" />
+									<span>Logs</span>
+								</Button>
+							)}
+
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={(e) => {
+									e.stopPropagation();
+									handleOpenPriceHistory(v);
+								}}
+								className="h-7 px-2.5 text-[11px] font-semibold gap-1 rounded-lg border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer shadow-2xs"
+								title={t("products.priceHistory", "Price History")}
+							>
+								<TrendingUp className="size-3 text-emerald-600 dark:text-emerald-400" />
+								<span>Price History</span>
+							</Button>
+
+							<DropdownMenu>
+								<DropdownMenuTrigger
+									render={
+										<Button
+											variant="ghost"
+											size="icon"
+											className="h-7 w-7 p-0 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg cursor-pointer"
+											title="More actions"
+										>
+											<MoreVertical className="h-4 w-4" />
+										</Button>
+									}
+								/>
+								<DropdownMenuContent
+									align="end"
+									className="w-44 shadow-lg border border-border"
+								>
+									<DropdownMenuItem
+										onClick={(e) => {
+											e.stopPropagation();
+											handleOpenPriceHistory(v);
+										}}
+										className="cursor-pointer text-xs flex items-center gap-2"
+									>
+										<TrendingUp className="h-3.5 w-3.5 text-emerald-500" />{" "}
+										Price History
+									</DropdownMenuItem>
+									{onViewMovements && (
+										<DropdownMenuItem
+											onClick={(e) => {
+												e.stopPropagation();
+												onClose();
+												onViewMovements(
+													v.variantId,
+													v.variantName || v.name,
+													v.sku,
+												);
+											}}
+											className="cursor-pointer text-xs flex items-center gap-2"
+										>
+											<History className="h-3.5 w-3.5 text-purple-500" />{" "}
+											Movement Logs
+										</DropdownMenuItem>
+									)}
+									{onAdjustStock && (
+										<DropdownMenuItem
+											onClick={(e) => {
+												e.stopPropagation();
+												onClose();
+												onAdjustStock(
+													v.variantId,
+													v.variantName || v.name,
+													v.sku,
+													{
+														productName: resolvedTitle,
+														unitId: stockData?.baseUnit?.unitId,
+														unitName:
+															stockData?.baseUnit?.unitName,
+														availableStock:
+															stockData?.availableStock,
+														imageUrl:
+															v.imageUrl || undefined,
+													},
+												);
+											}}
+											className="cursor-pointer text-xs flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium"
+										>
+											<Scale className="h-3.5 w-3.5 text-emerald-500" />{" "}
+											Adjust Stock
+										</DropdownMenuItem>
+									)}
+								</DropdownMenuContent>
+							</DropdownMenu>
+						</div>
+					);
+				},
+			},
+		],
+		[
+			expandedVariantIds,
+			t,
+			product,
+			onViewMovements,
+			onClose,
+			onAdjustStock,
+			resolvedTitle,
+		],
+	);
+
 	if (!product && !isOpen) return null;
 
 	const firstVar = variants[0];
 
 	return (
-		<ModernModal
-			isOpen={isOpen}
+		<>
+			<ModernModal
+				isOpen={isOpen}
 			onClose={onClose}
 			title={
 				<div className="flex items-center gap-2.5 flex-wrap">
@@ -949,301 +1622,34 @@ export function StockProductDetailModal({
 					{/* ------------------------------------------------------------ */}
 					{/* TAB 1: PRODUCT VARIANTS (CLEAN VARIANT ROWS & RATES TABLE) */}
 					{/* ------------------------------------------------------------ */}
-					<ModernTabsContent value="variants" className="space-y-3 mt-0">
-						{variants.map((v) => {
-							const stockData = getNormalizedVariantStockData(
-								v,
-								product || undefined,
-								variantDetailsMap,
-							);
-							const {
-								baseUnit,
-								packageUnits: _packageUnits,
-								allUnits,
-								basePrice,
-								cost,
-								physicalStock,
-								availableStock,
-								reservedStock,
-								soldStock: _soldStock,
-								isOutOfStock: vOut,
-								isLowStock: vLow,
-								smartStockDecomposition,
-							} = stockData;
-
-							const isTreeExpanded = isVariantTreeExpanded(v.variantId);
-
-							return (
-								<div
-									key={v.variantId}
-									className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 transition-all overflow-hidden"
-								>
-									{/* Top Header Row */}
-									<div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-										<div className="flex items-center gap-3 min-w-0">
-											<div className="size-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
-												{v.imageUrl ? (
-													<img
-														src={safeImageUrl(v.imageUrl)}
-														alt={v.variantName}
-														className="h-full w-full object-cover"
-														onError={(e) => {
-															e.currentTarget.onerror = null;
-															e.currentTarget.src = DEFAULT_IMAGE_URL;
-														}}
-													/>
-												) : (
-													<Package className="size-5 text-purple-500" />
-												)}
-											</div>
-
-											<div className="space-y-1 min-w-0">
-												<div className="flex items-center gap-2 flex-wrap">
-													<h5 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
-														{v.variantName}
-													</h5>
-													<Badge
-														variant="outline"
-														className="text-[10px] font-mono px-1.5 py-0 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
-													>
-														SKU: {v.sku}
-													</Badge>
-													{vOut ? (
-														<Badge
-															variant="destructive"
-															className="text-[9px] px-2 py-0.5 font-bold"
-														>
-															Out of Stock
-														</Badge>
-													) : vLow ? (
-														<Badge
-															variant="outline"
-															className="text-[9px] px-2 py-0.5 border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/40 font-bold"
-														>
-															Low Stock
-														</Badge>
-													) : (
-														<Badge
-															variant="outline"
-															className="text-[9px] px-2 py-0.5 border-emerald-400 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 font-bold"
-														>
-															In Stock
-														</Badge>
-													)}
-												</div>
-
-												{/* Quick Metrics Bar */}
-												<div className="flex items-center gap-3 text-xs font-mono text-muted-foreground flex-wrap">
-													<span>
-														On Hand:{" "}
-														<strong className="text-slate-900 dark:text-slate-100">
-															{physicalStock} {baseUnit.unitName}
-														</strong>
-													</span>
-													<span>•</span>
-													<span>
-														Available:{" "}
-														<strong className="text-emerald-600 dark:text-emerald-400">
-															{availableStock} {baseUnit.unitName}
-														</strong>
-													</span>
-													{reservedStock > 0 && (
-														<>
-															<span>•</span>
-															<span>
-																Reserved:{" "}
-																<strong className="text-amber-600">
-																	{reservedStock}
-																</strong>
-															</span>
-														</>
-													)}
-													<span>•</span>
-													<span>
-														Price:{" "}
-														<strong className="text-emerald-600 font-bold">
-															${basePrice.toFixed(2)}
-														</strong>
-													</span>
-													{cost > 0 && (
-														<>
-															<span>•</span>
-															<span>
-																Cost:{" "}
-																<strong className="text-amber-700 dark:text-amber-300">
-																	${cost.toFixed(2)}
-																</strong>
-															</span>
-														</>
-													)}
-												</div>
-											</div>
-										</div>
-
-										{/* Action buttons */}
-										<div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-											{onViewMovements && (
-												<Button
-													size="sm"
-													variant="outline"
-													onClick={() => {
-														onClose();
-														onViewMovements(v.variantId, v.variantName, v.sku);
-													}}
-													className="h-8 text-[11px] font-semibold gap-1.5 rounded-xl px-3 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-													title={t("stocks.allMovements", "Movement Logs")}
-												>
-													<History className="size-3.5 text-purple-500" />
-													<span>Logs</span>
-												</Button>
-											)}
-
-											{onAdjustStock && (
-												<Button
-													size="sm"
-													onClick={() => {
-														onClose();
-														onAdjustStock(v.variantId, v.variantName, v.sku, {
-															productName: resolvedTitle,
-															unitId: baseUnit.unitId,
-															unitName: baseUnit.unitName,
-															availableStock: availableStock,
-															imageUrl: v.imageUrl || undefined,
-														});
-													}}
-													className="h-8 text-[11px] font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-3.5 shadow-2xs cursor-pointer"
-													title={t("stocks.adjustStock", "Adjust Stock")}
-												>
-													<Scale className="size-3.5" />
-													<span>Adjust</span>
-												</Button>
-											)}
-										</div>
-									</div>
-
-									{/* Packaging Rates Strip / Toggle Button */}
-									{allUnits.length > 1 && (
-										<div className="border-t border-slate-100 dark:border-slate-800">
-											<button
-												type="button"
-												onClick={() => toggleVariantExpanded(v.variantId)}
-												className="w-full flex items-center justify-between px-3.5 py-2 bg-slate-50/70 hover:bg-slate-100/70 dark:bg-slate-850/50 dark:hover:bg-slate-800/60 transition-colors text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer"
-											>
-												<div className="flex items-center gap-2">
-													<GitFork className="size-3.5 text-purple-500" />
-													<span>
-														Packaging Units & Conversion ({allUnits.length})
-													</span>
-													{smartStockDecomposition && availableStock > 0 && (
-														<span className="text-[11px] font-mono text-purple-700 dark:text-purple-300 hidden sm:inline-flex items-center gap-1 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-md border border-purple-200/60 dark:border-purple-800">
-															<Sparkles className="size-2.5 text-purple-500" />
-															<span>≈ {smartStockDecomposition}</span>
-														</span>
-													)}
-												</div>
-
-												<div className="flex items-center gap-1 text-[11px] text-purple-600 dark:text-purple-400 font-bold">
-													<span>
-														{isTreeExpanded
-															? "Hide Details"
-															: "View Packaging Rates"}
-													</span>
-													<ChevronDown
-														className={cn(
-															"size-3.5 transition-transform duration-200",
-															isTreeExpanded && "rotate-180",
-														)}
-													/>
-												</div>
-											</button>
-
-											{isTreeExpanded && (
-												<div className="overflow-x-auto border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
-													<table className="w-full text-xs text-left min-w-[540px]">
-														<thead className="bg-slate-50/80 dark:bg-slate-850/80 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-slate-100 dark:border-slate-800">
-															<tr>
-																<th className="py-2 px-3.5">Unit</th>
-																<th className="py-2 px-3">Conversion Ratio</th>
-																<th className="py-2 px-3 text-right">Selling Price</th>
-																<th className="py-2 px-3 text-center">Incentive</th>
-																<th className="py-2 px-3.5 text-right">In-Stock Breakdown</th>
-															</tr>
-														</thead>
-														<tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-															{allUnits.map((u) => (
-																<tr
-																	key={u.unitId}
-																	className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
-																>
-																	<td className="py-2 px-3.5 font-bold text-slate-800 dark:text-slate-200">
-																		<div className="flex items-center gap-2">
-																			<div
-																				className={cn(
-																					"size-6 rounded-md flex items-center justify-center font-bold text-[10px] shrink-0",
-																					u.isBase
-																						? "bg-purple-600 text-white"
-																						: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
-																				)}
-																			>
-																				{u.symbol ||
-																					u.unitName.slice(0, 2).toUpperCase()}
-																			</div>
-																			<span>{u.unitName}</span>
-																			{u.isBase ? (
-																				<Badge
-																					variant="secondary"
-																					className="text-[9px] px-1 py-0 bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-semibold"
-																				>
-																					Base
-																				</Badge>
-																			) : (
-																				<span className="text-[10px] font-mono text-muted-foreground">
-																					×{u.baseQuantity}
-																				</span>
-																			)}
-																		</div>
-																	</td>
-
-																	<td className="py-2 px-3 font-mono text-slate-600 dark:text-slate-400">
-																		{u.formulaText}
-																	</td>
-
-																	<td className="py-2 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-																		${u.sellingPrice.toFixed(2)}
-																		{!u.isBase && (
-																			<span className="text-[10px] text-muted-foreground block font-normal">
-																				(${u.pricePerBaseUnit.toFixed(2)}/{baseUnit.unitName})
-																			</span>
-																		)}
-																	</td>
-
-																	<td className="py-2 px-3 text-center">
-																		{u.savingsPercent && u.savingsPercent > 0 ? (
-																			<Badge
-																				variant="outline"
-																				className="text-[9px] font-bold font-mono px-1.5 py-0 border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"
-																			>
-																				Save {u.savingsPercent}%
-																			</Badge>
-																		) : (
-																			<span className="text-slate-400">—</span>
-																		)}
-																	</td>
-
-																	<td className="py-2 px-3.5 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
-																		{u.availableEquivalentStr}
-																	</td>
-																</tr>
-															))}
-														</tbody>
-													</table>
-												</div>
-											)}
-										</div>
-									)}
-								</div>
-							);
-						})}
+					<ModernTabsContent value="variants" className="space-y-4 mt-0">
+						<div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-2xs">
+							<DataTable
+								data={variantTableData}
+								columns={variantColumns}
+								getRowId={(row) => String(row.variantId || row.id)}
+								expandedRowIds={expandedVariantIds}
+								onToggleExpandRow={(rowId) =>
+									setExpandedVariantIds((prev) =>
+										prev.includes(rowId)
+											? prev.filter((id) => id !== rowId)
+											: [...prev, rowId],
+									)
+								}
+								renderSubComponent={(row) => (
+									<VariantUnitsAccordionSubRow
+										variant={row}
+										stockData={row.stockData}
+										fallbackBaseUnitName={row.stockData?.baseUnit?.unitName}
+									/>
+								)}
+								hideHeader={true}
+								hideToolbar={true}
+								selectable={true}
+								pageSize={20}
+								pageSizeOptions={[5, 10, 20, 50]}
+							/>
+						</div>
 					</ModernTabsContent>
 
 					{/* ------------------------------------------------------------ */}
@@ -1743,5 +2149,22 @@ export function StockProductDetailModal({
 				</ModernTabs>
 			</div>
 		</ModernModal>
-	);
+
+		<ProductPriceHistoryModal
+			isOpen={isPriceHistoryOpen}
+			onClose={() => {
+				setIsPriceHistoryOpen(false);
+				setSelectedVariantForHistory(null);
+			}}
+			productId={prodId || null}
+			productName={resolvedTitle}
+			productVariants={variants}
+			productUnits={firstVariantStockData?.allUnits || []}
+			defaultVariantId={
+				selectedVariantForHistory?.variantId ||
+				selectedVariantForHistory?.id
+			}
+		/>
+	</>
+);
 }

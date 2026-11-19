@@ -168,6 +168,8 @@ export interface DataTableProps<T> {
 	emptyStateTitle?: string;
 	emptyStateDescription?: string;
 	className?: string;
+	/** Custom CSS classes for the inner table element */
+	tableClassName?: string;
 
 	/** Table Refresh Callback */
 	onRefresh?: () => void;

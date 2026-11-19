@@ -3088,12 +3088,12 @@ export const priceHistoryApi = {
 		size: number = 20,
 	) =>
 		api
-			.get<any>(`/price-history`, {
-				params: { variant: variantId, page, size },
+			.get<any>(`/price-history/variant/${variantId}`, {
+				params: { page, size },
 			})
 			.catch(() =>
-				api.get<any>(`/price-history/variant/${variantId}`, {
-					params: { page, size },
+				api.get<any>(`/price-history`, {
+					params: { variant: variantId, page, size },
 				}),
 			)
 			.then((r) => {
