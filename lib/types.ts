@@ -2461,6 +2461,8 @@ export interface ProductUnitItemInput {
 	isBase?: boolean;
 	discountNote?: string;
 	variantPrices?: VariantUnitPriceInput[];
+	parentUnitId?: number | string | null;
+	parentQuantity?: number | null;
 }
 
 export interface ProductAddUnitsInput {
@@ -2553,6 +2555,15 @@ export interface PreviewVariantInput {
 	price: number;
 }
 
+export interface VariantUnitPriceConfigInput {
+	unitId: number | string;
+	unitPrice?: number;
+	basePrice?: number;
+	discount?: number;
+	discountType?: DiscountType;
+	discountNote?: string;
+}
+
 export interface UpdateVariantInput {
 	sku: string;
 	barcode?: string;
@@ -2560,7 +2571,10 @@ export interface UpdateVariantInput {
 	thumbnail?: string;
 	variantAttributes?: ProductVariantAttributes;
 	price: number;
+	cost?: number;
+	stockQty?: number;
 	unitId?: number | string;
+	unitPrices?: VariantUnitPriceConfigInput[];
 }
 
 export interface AddVariantInput extends UpdateVariantInput {}

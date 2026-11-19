@@ -56,6 +56,7 @@ export interface MapProductUnitModalProps {
 	onDelete?: (unitId: string | number) => Promise<void> | void;
 	isLoading?: boolean;
 	isDeleting?: boolean;
+	defaultTab?: "configuration" | "pricingTiers";
 }
 
 const QUICK_DISCOUNT_PERCENT_PRESETS = [5, 10, 15, 20];
@@ -71,6 +72,7 @@ export function MapProductUnitModal({
 	onDelete,
 	isLoading = false,
 	isDeleting = false,
+	defaultTab: _defaultTab,
 }: MapProductUnitModalProps) {
 	const { t } = useTranslation();
 	// 1. Target Unit to map (unitId)
@@ -261,8 +263,16 @@ export function MapProductUnitModal({
 		if (initialUnit) {
 			// Edit Mode
 			const uId = String(initialUnit.unitId || initialUnit.id || "");
-			const bId =
-				initialUnit.baseUnitId !== undefined && initialUnit.baseUnitId !== null
+			const isUnitBase = Boolean(
+				initialUnit.isBase ||
+				initialUnit.is_base ||
+				(primaryBaseUnit &&
+					String(primaryBaseUnit.unitId || primaryBaseUnit.id) === uId) ||
+				(initialUnit.baseUnitId === null && initialUnit.isBase !== false),
+			);
+			const bId = isUnitBase
+				? ""
+				: initialUnit.baseUnitId !== undefined && initialUnit.baseUnitId !== null
 					? String(initialUnit.baseUnitId)
 					: primaryBaseUnit
 						? String(primaryBaseUnit.unitId || primaryBaseUnit.id || "")
@@ -271,7 +281,9 @@ export function MapProductUnitModal({
 			setUnitId(uId);
 			setBaseUnitId(bId);
 			setBaseQuantity(
-				String(initialUnit.baseQuantity || initialUnit.conversionFactor || 1),
+				isUnitBase
+					? "1"
+					: String(initialUnit.baseQuantity || initialUnit.conversionFactor || 1),
 			);
 			const initSellingPrice = parseFloat(
 				String(
@@ -297,11 +309,23 @@ export function MapProductUnitModal({
 			setSellable(
 				initialUnit.sellable !== undefined ? !!initialUnit.sellable : true,
 			);
-			setIsBase(!!initialUnit.isBase);
+			setIsBase(isUnitBase);
 
-			const hasVariantPrices =
-				initialUnit.isSamePrice === false ||
-				(initialUnit.variantPrices && initialUnit.variantPrices.length > 0);
+			const rawVariantPrices =
+				initialUnit.variantPrices || initialUnit.variant_prices;
+			const hasVariantPricesList =
+				Array.isArray(rawVariantPrices) && rawVariantPrices.length > 0;
+			const hasVariantPricesMap =
+				rawVariantPrices &&
+				typeof rawVariantPrices === "object" &&
+				!Array.isArray(rawVariantPrices) &&
+				Object.keys(rawVariantPrices).length > 0;
+			const hasConfiguredVariantPrices =
+				hasVariantPricesList || hasVariantPricesMap;
+
+			const hasVariantPrices = Boolean(
+				initialUnit.isSamePrice === false || hasConfiguredVariantPrices,
+			);
 			setIsSamePrice(!hasVariantPrices);
 
 			const initialVMap: Record<
@@ -309,22 +333,48 @@ export function MapProductUnitModal({
 				{ unitPrice: string; discount: string; discountType: DiscountType }
 			> = {};
 			if (productVariants.length > 0) {
+				const numericConversion = isUnitBase
+					? 1
+					: parseFloat(
+							String(
+								initialUnit.baseQuantity ||
+									initialUnit.conversionFactor ||
+									1,
+							),
+						) || 1;
+
 				productVariants.forEach((v: any) => {
-					const matchedVp = initialUnit.variantPrices?.find(
-						(vp: any) => Number(vp.variantId) === Number(v.id),
-					);
+					let matchedVp: any = null;
+					if (Array.isArray(rawVariantPrices)) {
+						matchedVp = rawVariantPrices.find(
+							(vp: any) =>
+								Number(vp.variantId || vp.variant_id || vp.id) ===
+								Number(v.id),
+						);
+					} else if (
+						rawVariantPrices &&
+						typeof rawVariantPrices === "object"
+					) {
+						matchedVp =
+							rawVariantPrices[v.id] ||
+							rawVariantPrices[String(v.id)];
+					}
+
 					if (matchedVp) {
 						const vpSelling = parseFloat(
 							String(
 								matchedVp.finalPrice ??
 									matchedVp.unitPrice ??
+									matchedVp.unit_price ??
 									matchedVp.price ??
 									0,
 							),
 						) || 0;
 						const vpDisc = parseFloat(String(matchedVp.discount ?? 0)) || 0;
 						const vpType = normalizeDiscountType(
-							matchedVp.discountType || initialUnit.discountType,
+							matchedVp.discountType ||
+								matchedVp.discount_type ||
+								initialUnit.discountType,
 						);
 
 						initialVMap[v.id] = {
@@ -333,8 +383,27 @@ export function MapProductUnitModal({
 							discountType: vpType,
 						};
 					} else {
+						const vBasePrice = getVariantBasePrice(v);
+						const vListPrice = calculateUnitListPrice(
+							vBasePrice,
+							numericConversion,
+						);
+						const calculatedPrice =
+							vListPrice > 0
+								? initDiscount > 0
+									? calculateUnitFinalPrice(
+											vListPrice,
+											initDiscount,
+											initDiscountType,
+										)
+									: vListPrice
+								: initSellingPrice;
+
 						initialVMap[v.id] = {
-							unitPrice: String(initSellingPrice),
+							unitPrice:
+								calculatedPrice > 0
+									? calculatedPrice.toFixed(2)
+									: String(initSellingPrice),
 							discount: String(initDiscount),
 							discountType: initDiscountType,
 						};
@@ -389,8 +458,14 @@ export function MapProductUnitModal({
 			> = {};
 			if (productVariants.length > 0) {
 				productVariants.forEach((v: any) => {
+					const vBasePrice = getVariantBasePrice(v);
+					const defaultVPrice =
+						vBasePrice > 0 ? vBasePrice : parseFloat(String(basePriceVal)) || 0;
 					initialVMap[v.id] = {
-						unitPrice: String(v.price ?? basePriceVal),
+						unitPrice:
+							defaultVPrice > 0
+								? defaultVPrice.toFixed(2)
+								: String(basePriceVal),
 						discount: "0",
 						discountType: "PERCENTAGE",
 					};
@@ -408,6 +483,30 @@ export function MapProductUnitModal({
 		existingProductUnits,
 		productVariants,
 	]);
+
+	// Resolve whether this mapped unit is primary base unit
+	const isCurrentUnitBase = useMemo(() => {
+		if (isBase) return true;
+		if (initialUnit) {
+			if (initialUnit.isBase || initialUnit.is_base) return true;
+			if (initialUnit.baseUnitId === null || initialUnit.baseUnitId === undefined) return true;
+			if (
+				primaryBaseUnit &&
+				String(primaryBaseUnit.unitId || primaryBaseUnit.id) ===
+					String(initialUnit.unitId || initialUnit.id)
+			) {
+				return true;
+			}
+		}
+		if (
+			primaryBaseUnit &&
+			unitId &&
+			String(primaryBaseUnit.unitId || primaryBaseUnit.id) === String(unitId)
+		) {
+			return true;
+		}
+		return false;
+	}, [isBase, initialUnit, primaryBaseUnit, unitId]);
 
 	// Resolve target and base unit objects
 	const targetUnitObj = useMemo(() => {
@@ -1131,11 +1230,15 @@ export function MapProductUnitModal({
 			toast.error("Please select a unit to map.");
 			return;
 		}
+		if (!isCurrentUnitBase && !baseUnitId && baseUnitOptions.length > 0) {
+			toast.error("Please select a base reference unit.");
+			return;
+		}
 		if (baseUnitId && String(unitId) === String(baseUnitId)) {
 			toast.error("Target unit and base unit cannot be the same unit.");
 			return;
 		}
-		if (numericQty <= 0) {
+		if (!isCurrentUnitBase && numericQty <= 0) {
 			toast.error("Multiplier base quantity must be greater than 0.");
 			return;
 		}
@@ -1174,15 +1277,45 @@ export function MapProductUnitModal({
 			});
 		}
 
+		const selectedParent =
+			!isCurrentUnitBase && baseUnitId
+				? existingProductUnits.find(
+						(u: any) => String(u.unitId || u.id) === String(baseUnitId),
+					)
+				: null;
+		const isParentNotPrimaryBase = Boolean(
+			selectedParent &&
+				!selectedParent.isBase &&
+				primaryBaseUnit &&
+				String(selectedParent.unitId || selectedParent.id) !==
+					String(primaryBaseUnit.unitId || primaryBaseUnit.id),
+		);
+
+		const parentUnitIdVal =
+			isCurrentUnitBase || !baseUnitId ? null : Number(baseUnitId);
+		const parentQuantityVal = isCurrentUnitBase ? null : numericQty;
+		const effectiveBaseUnitId = isCurrentUnitBase
+			? null
+			: isParentNotPrimaryBase && primaryBaseUnit
+				? Number(primaryBaseUnit.unitId || primaryBaseUnit.id)
+				: Number(baseUnitId);
+		const effectiveBaseQuantity = isCurrentUnitBase
+			? 1
+			: isParentNotPrimaryBase
+				? numericQty * (Number(selectedParent?.baseQuantity) || 1)
+				: numericQty;
+
 		const unitItem: ProductUnitItemInput = {
 			unitId: Number(unitId),
-			baseUnitId: baseUnitId ? Number(baseUnitId) : null,
-			baseQuantity: numericQty,
+			baseUnitId: effectiveBaseUnitId,
+			baseQuantity: effectiveBaseQuantity,
+			parentUnitId: parentUnitIdVal,
+			parentQuantity: parentQuantityVal,
 			unitPrice: isSamePrice ? mainNormalized.unitPrice : null,
 			discount: isSamePrice ? mainNormalized.discount : null,
 			discountType: isSamePrice ? mainNormalized.discountType : undefined,
 			sellable: sellable,
-			isBase: isBase,
+			isBase: isCurrentUnitBase,
 			variantPrices: formattedVariantPrices,
 		};
 
@@ -1235,9 +1368,41 @@ export function MapProductUnitModal({
 		});
 	}, [existingProductUnits, unitId, initialUnit, primaryBaseUnit]);
 
+	const baseUnitSelectOptions = useMemo(() => {
+		const options: Array<{
+			value: string;
+			label: string;
+			description?: string;
+			badge?: string;
+			icon?: React.ReactNode;
+		}> = [
+			{
+				value: "",
+				label: t("products.noneBaseUnit") || "None (Primary Base Unit)",
+				description: "Standard primary inventory base unit (baseUnitId is null)",
+				badge: "Base",
+				icon: <Boxes className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />,
+			},
+		];
+
+		baseUnitOptions.forEach((opt) => {
+			options.push(opt);
+		});
+
+		return options;
+	}, [baseUnitOptions, t]);
+
 	// Keep baseUnitId synchronized with valid options belonging to the existing product
 	useEffect(() => {
-		if (!isOpen || baseUnitOptions.length === 0) return;
+		if (!isOpen) return;
+		if (isCurrentUnitBase) {
+			if (baseUnitId !== "") {
+				setBaseUnitId("");
+			}
+			return;
+		}
+
+		if (baseUnitOptions.length === 0) return;
 		const exists = baseUnitOptions.some((opt) => opt.value === baseUnitId);
 		if (!exists) {
 			const primaryOpt = primaryBaseUnit
@@ -1249,7 +1414,552 @@ export function MapProductUnitModal({
 				: null;
 			setBaseUnitId(primaryOpt ? primaryOpt.value : baseUnitOptions[0].value);
 		}
-	}, [isOpen, baseUnitOptions, baseUnitId, primaryBaseUnit]);
+	}, [isOpen, baseUnitOptions, baseUnitId, primaryBaseUnit, isCurrentUnitBase]);
+
+	const unitConfigCard = (
+		<div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 space-y-4">
+			<div className="flex items-center justify-between border-b pb-2 dark:border-slate-800">
+				<div className="flex items-center gap-2">
+					<Boxes className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+					<h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+						{t("products.unitConfiguration") || "Unit & Pricing Configuration"}
+					</h4>
+				</div>
+				{baseUnitPrice > 0 && !isCurrentUnitBase && (
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onClick={handleAutoMultiplyBasePrice}
+						className="h-6 text-[10px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-bold gap-1 px-1.5 cursor-pointer"
+						title={`Multiply ${baseUnitObj?.symbol || baseUnitObj?.name || "base"} price ($${baseUnitPrice.toFixed(2)}) by conversion multiplier (${numericQty})`}
+					>
+						<Calculator className="h-3 w-3" />
+						Auto × {baseUnitObj?.symbol || baseUnitObj?.name || "Base"} (${baseUnitPrice.toFixed(2)})
+					</Button>
+				)}
+			</div>
+
+			{/* Row 1: Target Unit & Base Unit */}
+			<div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+				<ModernSelect
+					label={t("products.targetUnit")}
+					value={unitId}
+					onChange={(val) => setUnitId(val)}
+					options={targetUnitOptions}
+					searchable={targetUnitOptions.length > 4}
+					placeholder="Select target unit..."
+					required
+				/>
+
+				<ModernSelect
+					label={t("products.baseUnit")}
+					value={isCurrentUnitBase ? "" : baseUnitId}
+					onChange={(val) => {
+						if (val === "") {
+							setIsBase(true);
+							setBaseUnitId("");
+						} else {
+							setIsBase(false);
+							handleBaseUnitChange(val);
+						}
+					}}
+					options={baseUnitSelectOptions}
+					searchable={baseUnitSelectOptions.length > 4}
+					placeholder={
+						isCurrentUnitBase
+							? (t("products.noneBaseUnit") || "None (Primary Base Unit)")
+							: "Select base reference unit..."
+					}
+					required={!isCurrentUnitBase}
+					disabled={isCurrentUnitBase && Boolean(initialUnit)}
+					helperText={
+						isCurrentUnitBase
+							? "Primary inventory base unit of measure (baseUnitId is null)"
+							: undefined
+					}
+				/>
+			</div>
+
+			{/* Merged Row: Conversion Ratio, Original Price (read-only), Discount, Selling Price */}
+			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-start">
+				{/* 1. Multiplier / Conversion Ratio */}
+				<ModernInput
+					label={t("products.multiplierQty")}
+					type="number"
+					step="any"
+					min="0.0001"
+					value={isCurrentUnitBase ? "1" : baseQuantity}
+					onChange={(e) => {
+						if (!isCurrentUnitBase) {
+							handleBaseQuantityChange(e.target.value);
+						}
+					}}
+					placeholder="e.g. 1"
+					suffixAddon={
+						isCurrentUnitBase
+							? (targetUnitObj?.symbol || targetUnitObj?.name || "base")
+							: (baseUnitObj?.symbol || baseUnitObj?.name || "units")
+					}
+					disabled={isCurrentUnitBase}
+					readOnly={isCurrentUnitBase}
+					helperText={
+						isCurrentUnitBase
+							? "Base unit conversion ratio is fixed at 1:1"
+							: targetUnitObj && baseUnitObj
+								? `1 ${targetUnitObj.symbol || targetUnitObj.name} = ${baseQuantity || 1} ${baseUnitObj.symbol || baseUnitObj.name}`
+								: undefined
+					}
+					required={!isCurrentUnitBase}
+				/>
+
+				{/* 2. Original Price (Cannot edit, see only - sent to API) */}
+				<ModernInput
+					label={
+						<span className="flex items-center justify-between w-full">
+							<span>{t("products.originalPrice") || "Original Price"}</span>
+							<span className="text-[10px] text-slate-400 font-mono">
+								{t("common.readOnly") || "See only"}
+							</span>
+						</span>
+					}
+					type="text"
+					value={unitListPrice > 0 ? unitListPrice.toFixed(2) : "0.00"}
+					readOnly
+					prefixAddon="$"
+					suffixAddon={targetUnitObj?.symbol ? `/${targetUnitObj.symbol}` : undefined}
+					className="bg-slate-100 dark:bg-slate-800/80 font-mono font-bold text-slate-700 dark:text-slate-300 cursor-not-allowed select-none"
+					helperText={
+						isCurrentUnitBase
+							? "Base reference list price"
+							: `${baseUnitObj?.symbol || baseUnitObj?.name || "Base"} $${baseUnitPrice.toFixed(2)} × ${numericQty}`
+					}
+				/>
+
+				{/* 3. Discount field with compact Discount Type (% / $) at the end */}
+				<div className="space-y-1.5">
+					<label className="font-medium text-xs text-foreground flex items-center justify-between">
+						<span className="flex items-center gap-1">
+							<Percent className="size-3.5 text-purple-600 dark:text-purple-400" />
+							{t("products.discount") || "Discount"}
+						</span>
+						{parseFloat(discount) > 0 && (
+							<span className="text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400">
+								{discountType === "PERCENTAGE"
+									? `-${discount}%`
+									: `-$${parseFloat(discount).toFixed(2)}`}
+							</span>
+						)}
+					</label>
+					<div className="relative flex items-center rounded-lg border border-slate-200/80 bg-slate-50/80 hover:border-slate-300 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 dark:bg-slate-900/80 dark:border-slate-800 transition-all shadow-2xs overflow-hidden h-11">
+						<input
+							type="number"
+							step="any"
+							min="0"
+							max={discountType === "PERCENTAGE" ? "100" : undefined}
+							value={discount}
+							onChange={(e) => handleDiscountChange(e.target.value)}
+							placeholder="0"
+							className="w-full bg-transparent border-0 outline-none text-sm font-semibold text-foreground placeholder:text-muted-foreground/60 px-3 h-full"
+						/>
+						{/* Compact Discount Type Toggle at the end */}
+						<div className="pr-1.5 shrink-0">
+							<div className="flex items-center bg-slate-200/70 dark:bg-slate-800 p-0.5 rounded-md border border-slate-300/60 dark:border-slate-700/60">
+								<button
+									type="button"
+									onClick={() => handleDiscountTypeChange("PERCENTAGE")}
+									className={cn(
+										"h-7 px-2 rounded text-xs font-black transition-all cursor-pointer",
+										discountType === "PERCENTAGE"
+											? "bg-purple-600 text-white shadow-xs"
+											: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white",
+									)}
+									title="Percentage (%)"
+								>
+									%
+								</button>
+								<button
+									type="button"
+									onClick={() => handleDiscountTypeChange("FLAT")}
+									className={cn(
+										"h-7 px-2 rounded text-xs font-black transition-all cursor-pointer",
+										discountType === "FLAT"
+											? "bg-purple-600 text-white shadow-xs"
+											: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white",
+									)}
+									title="Flat Cash ($)"
+								>
+									$
+								</button>
+							</div>
+						</div>
+					</div>
+					<p className="text-[10px] text-muted-foreground truncate">
+						{parseFloat(discount) > 0
+							? discountType === "PERCENTAGE"
+								? `${discount}% off original price ($${unitListPrice.toFixed(2)})`
+								: `$${parseFloat(discount).toFixed(2)} cash discount off original ($${unitListPrice.toFixed(2)})`
+							: unitListPrice > 0
+								? `Standard original price: $${unitListPrice.toFixed(2)}`
+								: "Standard selling price (0% discount)"}
+					</p>
+				</div>
+
+				{/* 4. Selling Price (Final price after discount) */}
+				<ModernInput
+					label={
+						<span className="flex items-center justify-between w-full">
+							<span>{t("products.sellingPrice")}</span>
+							<span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-medium">
+								(Selling)
+							</span>
+						</span>
+					}
+					type="number"
+					step="any"
+					min="0"
+					value={unitPrice}
+					onChange={(e) => handleSellingPriceChange(e.target.value)}
+					placeholder="0.00"
+					prefixAddon="$"
+					suffixAddon={targetUnitObj?.symbol ? `/${targetUnitObj.symbol}` : undefined}
+					helperText={
+						isCurrentUnitBase
+							? "Primary base unit selling price"
+							: numericQty > 0
+								? `≈ $${effectivePricePerBase.toFixed(2)} / ${baseUnitObj?.symbol || baseUnitObj?.name || "base"}`
+								: undefined
+					}
+					required
+				/>
+			</div>
+		</div>
+	);
+
+	const pricingTiersCard = productVariants.length > 0 ? (
+		<div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 space-y-4">
+			<div className="flex items-center justify-between border-b pb-2 dark:border-slate-800">
+				<div className="flex items-center gap-2">
+					<Tag className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+					<h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+						{t("products.pricingTiers")}
+					</h4>
+				</div>
+				<Badge variant="secondary" className="text-[10px] font-mono">
+					{productVariants.length} Variant(s)
+				</Badge>
+			</div>
+
+			<div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl">
+				<button
+					type="button"
+					onClick={() => setIsSamePrice(true)}
+					className={cn(
+						"py-2 px-3 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+						isSamePrice
+							? "bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs"
+							: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white",
+					)}
+				>
+					<span>{t("products.samePriceAllVariants")}</span>
+				</button>
+
+				<button
+					type="button"
+					onClick={() => {
+						setIsSamePrice(false);
+						handleAutoCalculateAllVariants();
+					}}
+					className={cn(
+						"py-2 px-3 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+						!isSamePrice
+							? "bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs"
+							: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white",
+					)}
+				>
+					<span>{t("products.customPricePerVariant")}</span>
+				</button>
+			</div>
+
+			{!isSamePrice && (
+				<div className="space-y-3 pt-1 animate-in fade-in duration-200">
+					<div className="bg-purple-50/60 dark:bg-purple-950/20 p-3 rounded-xl border border-purple-100 dark:border-purple-900/40 space-y-2">
+						<div className="flex items-center justify-between">
+							<span className="text-[11px] font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1">
+								<SlidersHorizontal className="h-3 w-3" /> Bulk Variant
+								Actions:
+							</span>
+							<span className="text-[10px] text-purple-600 dark:text-purple-400">
+								Applies across all variants
+							</span>
+						</div>
+
+						<div className="flex flex-wrap items-center gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => handleAutoCalculateAllVariants(true)}
+								className="h-7 text-[10px] gap-1 bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 font-bold hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer"
+								title={`Auto-calculate all variant prices from ${baseUnitObj?.symbol || baseUnitObj?.name || "base"} price × ${numericQty}`}
+							>
+								<Calculator className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+								Auto-calculate All ({numericQty}x)
+							</Button>
+
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={handleCopyPriceToAllVariants}
+								className="h-7 text-[10px] gap-1 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-purple-200 dark:border-purple-800 font-semibold cursor-pointer"
+							>
+								<Copy className="h-3 w-3" />
+								Set All to ${parseFloat(unitPrice || "0").toFixed(2)}
+							</Button>
+
+							{parseFloat(discount) > 0 && (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={handleCopyDiscountToAllVariants}
+									className="h-7 text-[10px] gap-1 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-purple-200 dark:border-purple-800 font-semibold cursor-pointer"
+								>
+									<Percent className="h-3 w-3 text-purple-600" />
+									Set All Discount to {discount}
+									{discountType === "PERCENTAGE" ? "%" : "$"}
+								</Button>
+							)}
+
+							<div className="flex items-center gap-1">
+								{QUICK_DISCOUNT_PERCENT_PRESETS.map((pct) => (
+									<button
+										key={pct}
+										type="button"
+										onClick={() => handleApplyQuickDiscountPercent(pct)}
+										className="h-7 px-1.5 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 text-[10px] font-bold hover:bg-purple-200 transition-colors"
+									>
+										-{pct}%
+									</button>
+								))}
+
+								<div className="flex items-center gap-1 ml-0.5">
+									<input
+										type="number"
+										placeholder="%"
+										value={quickDiscountPercent}
+										onChange={(e) =>
+											setQuickDiscountPercent(e.target.value)
+										}
+										className="h-7 w-11 rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-slate-900 px-1 text-center text-xs font-mono"
+									/>
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										onClick={handleApplyCustomDiscountPercent}
+										className="h-7 text-[10px] gap-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 font-bold px-2"
+									>
+										<Percent className="h-3 w-3" />
+										{t("common.apply") || "Apply"}
+									</Button>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div className="max-h-72 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
+						{productVariants.map((v: any) => {
+							const vState = variantPrices[v.id] || {
+								unitPrice: String(unitPrice || 0),
+								discount: discount || "0",
+								discountType: discountType,
+							};
+							const vBasePrice = getVariantBasePrice(v);
+							const vListPrice = calculateUnitListPrice(vBasePrice, numericQty);
+							const vPriceNum = parseFloat(vState.unitPrice) || 0;
+							const vEffectiveBase =
+								numericQty > 0 ? vPriceNum / numericQty : 0;
+
+							return (
+								<div
+									key={v.id}
+									className="bg-slate-50/90 dark:bg-slate-950/70 p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2 transition-all hover:border-purple-300 dark:hover:border-purple-700"
+								>
+									<div className="flex items-start justify-between gap-2">
+										<div className="min-w-0">
+											<span className="font-bold text-slate-900 dark:text-slate-100 block text-xs truncate">
+												{v.name}
+											</span>
+											<div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+												<span className="text-[10px] text-slate-400 font-mono">
+													SKU: {v.sku || "—"}
+												</span>
+												{vBasePrice > 0 && (
+													<Badge
+														variant="outline"
+														className="text-[9px] py-0 px-1 text-slate-500 font-mono"
+													>
+														{baseUnitObj?.symbol || baseUnitObj?.name ? `${baseUnitObj.symbol || baseUnitObj.name}: ` : "Base: "}${vBasePrice.toFixed(2)}
+													</Badge>
+												)}
+												{vListPrice > 0 && numericQty > 1 && (
+													<Badge
+														variant="secondary"
+														className="text-[9px] py-0 px-1 font-mono text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/50"
+													>
+														List: ${vListPrice.toFixed(2)}
+													</Badge>
+												)}
+											</div>
+										</div>
+
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											onClick={() => handleResetVariant(v)}
+											className="h-6 text-[10px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 px-1.5 gap-1 shrink-0 cursor-pointer font-semibold"
+											title={`Auto-calculate ${v.name} (${baseUnitObj?.symbol || baseUnitObj?.name || "Base"} $${vBasePrice.toFixed(2)} × ${numericQty})`}
+										>
+											<Calculator className="h-2.5 w-2.5" />
+											Auto-calc
+										</Button>
+									</div>
+
+									<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-start">
+										{/* 1. Original Price (Cannot edit, see only - passed to API) */}
+										<div>
+											<label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block mb-1 flex items-center justify-between">
+												<span>{t("products.originalPrice") || "Original Price"} ($)</span>
+												<span className="text-[9px] text-slate-400 font-mono">
+													{t("common.readOnly") || "See only"}
+												</span>
+											</label>
+											<div className="relative flex items-center rounded-lg border border-slate-200/90 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80 h-9 px-2">
+												<span className="text-slate-400 text-xs mr-1 font-mono font-semibold">$</span>
+												<input
+													type="text"
+													value={vListPrice > 0 ? vListPrice.toFixed(2) : "0.00"}
+													readOnly
+													className="w-full bg-transparent border-0 outline-none text-xs font-mono font-bold text-slate-700 dark:text-slate-300 cursor-not-allowed select-none"
+												/>
+											</div>
+											<span className="text-[10px] text-slate-400 font-medium block mt-0.5 font-mono">
+												{baseUnitObj?.symbol || baseUnitObj?.name || "Base"} ${vBasePrice.toFixed(2)} × {numericQty}
+											</span>
+										</div>
+
+										{/* 2. Discount */}
+										<div>
+											<label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block mb-1 flex items-center justify-between">
+												<span>{t("products.discount") || "Discount"}</span>
+												{parseFloat(vState.discount || "0") > 0 && (
+													<span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 font-bold">
+														{vState.discountType === "PERCENTAGE"
+															? `-${vState.discount}%`
+															: `-$${parseFloat(vState.discount).toFixed(2)}`}
+													</span>
+												)}
+											</label>
+											<div className="relative flex items-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 h-9 px-2">
+												<input
+													type="number"
+													step="any"
+													min="0"
+													max={vState.discountType === "PERCENTAGE" ? "100" : undefined}
+													value={vState.discount}
+													onChange={(e) =>
+														handleVariantDiscountChange(v.id, e.target.value, v)
+													}
+													placeholder="0"
+													className="w-full bg-transparent border-0 outline-none text-xs font-mono font-bold text-foreground placeholder:text-muted-foreground/50 pr-1"
+												/>
+												{/* Compact Discount Type Toggle at end */}
+												<div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-700 shrink-0">
+													<button
+														type="button"
+														onClick={() =>
+															handleVariantDiscountTypeChange(v.id, "PERCENTAGE", v)
+														}
+														className={cn(
+															"h-5 px-1.5 rounded text-[10px] font-black transition-all cursor-pointer",
+															vState.discountType === "PERCENTAGE"
+																? "bg-purple-600 text-white shadow-2xs"
+																: "text-slate-500 hover:text-slate-900 dark:hover:text-white",
+														)}
+														title="Percentage (%)"
+													>
+														%
+													</button>
+													<button
+														type="button"
+														onClick={() =>
+															handleVariantDiscountTypeChange(v.id, "FLAT", v)
+														}
+														className={cn(
+															"h-5 px-1.5 rounded text-[10px] font-black transition-all cursor-pointer",
+															vState.discountType === "FLAT"
+																? "bg-purple-600 text-white shadow-2xs"
+																: "text-slate-500 hover:text-slate-900 dark:hover:text-white",
+														)}
+														title="Flat Cash ($)"
+													>
+														$
+													</button>
+												</div>
+											</div>
+											<span className="text-[10px] text-slate-400 font-medium block mt-0.5 font-mono truncate">
+												{parseFloat(vState.discount || "0") > 0
+													? vState.discountType === "PERCENTAGE"
+														? `${vState.discount}% off original`
+														: `-$${parseFloat(vState.discount || "0").toFixed(2)} off original`
+													: "0% discount"}
+											</span>
+										</div>
+
+										{/* 3. Selling Price */}
+										<div>
+											<label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block mb-1 flex items-center justify-between">
+												<span>{t("products.sellingPrice")} ($)</span>
+												<span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono font-medium">
+													(Selling)
+												</span>
+											</label>
+											<Input
+												type="number"
+												inputMode="decimal"
+												step="any"
+												min="0"
+												value={vState.unitPrice}
+												onChange={(e) =>
+													handleVariantPriceChange(v.id, e.target.value, v)
+												}
+												placeholder="0.00"
+												className="h-9 text-xs font-bold font-mono bg-white dark:bg-slate-900"
+											/>
+											<div className="flex items-center justify-between text-[10px] font-medium mt-0.5 font-mono">
+												<span className="text-emerald-600 dark:text-emerald-400">
+													≈ ${vEffectiveBase.toFixed(2)} /{" "}
+													{baseUnitObj?.symbol || "base"}
+												</span>
+												{vListPrice > 0 && vPriceNum < vListPrice && (
+													<span className="text-slate-400 line-through">
+														${vListPrice.toFixed(2)}
+													</span>
+												)}
+											</div>
+										</div>
+									</div>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+			)}
+		</div>
+	) : null;
 
 	return (
 		<ModernModal
@@ -1317,7 +2027,9 @@ export function MapProductUnitModal({
 							variant="outline"
 							className="bg-white/80 dark:bg-slate-900/80 text-[10px] font-mono border-purple-200 dark:border-purple-800"
 						>
-							Ratio: 1 : {numericQty}
+							{isCurrentUnitBase
+								? "Base Unit (1 : 1)"
+								: `Ratio: 1 : ${numericQty}`}
 						</Badge>
 					</div>
 
@@ -1329,7 +2041,9 @@ export function MapProductUnitModal({
 								</div>
 								<div className="min-w-0">
 									<span className="text-[10px] text-slate-400 uppercase font-semibold block truncate">
-										{t("products.targetUnit")}
+										{isCurrentUnitBase
+											? "PRIMARY BASE UNIT"
+											: t("products.targetUnit")}
 									</span>
 									<span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block truncate">
 										{targetUnitObj?.name || t("products.targetUnit")}
@@ -1337,24 +2051,28 @@ export function MapProductUnitModal({
 								</div>
 							</div>
 
-							<div className="flex items-center gap-1 text-purple-500 dark:text-purple-400 px-1">
-								<span className="font-mono font-black text-sm">=</span>
-								<ArrowRight className="h-4 w-4" />
-							</div>
+							{!isCurrentUnitBase && (
+								<>
+									<div className="flex items-center gap-1 text-purple-500 dark:text-purple-400 px-1">
+										<span className="font-mono font-black text-sm">=</span>
+										<ArrowRight className="h-4 w-4" />
+									</div>
 
-							<div className="flex items-center gap-2 min-w-0">
-								<div className="flex h-8 min-w-8 px-2 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-black text-xs border border-indigo-200 dark:border-indigo-800 shrink-0">
-									{numericQty}
-								</div>
-								<div className="min-w-0">
-									<span className="text-[10px] text-slate-400 uppercase font-semibold block truncate">
-										{t("products.baseUnit")}
-									</span>
-									<span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block truncate">
-										{baseUnitObj?.name || t("products.baseUnit")}
-									</span>
-								</div>
-							</div>
+									<div className="flex items-center gap-2 min-w-0">
+										<div className="flex h-8 min-w-8 px-2 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-black text-xs border border-indigo-200 dark:border-indigo-800 shrink-0">
+											{numericQty}
+										</div>
+										<div className="min-w-0">
+											<span className="text-[10px] text-slate-400 uppercase font-semibold block truncate">
+												{t("products.baseUnit")}
+											</span>
+											<span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block truncate">
+												{baseUnitObj?.name || t("products.baseUnit")}
+											</span>
+										</div>
+									</div>
+								</>
+							)}
 						</div>
 
 						<div className="border-t sm:border-t-0 sm:border-l pt-2 sm:pt-0 sm:pl-3 dark:border-slate-800 flex sm:flex-col justify-between sm:text-right items-center sm:items-end">
@@ -1368,7 +2086,7 @@ export function MapProductUnitModal({
 									maximumFractionDigits: 2,
 								})}{" "}
 								<span className="text-[10px] text-slate-500 font-normal">
-									/ {baseUnitObj?.symbol || baseUnitObj?.name || "unit"}
+									/ {isCurrentUnitBase ? (targetUnitObj?.symbol || targetUnitObj?.name || "base") : (baseUnitObj?.symbol || baseUnitObj?.name || "unit")}
 								</span>
 							</span>
 						</div>
@@ -1376,513 +2094,10 @@ export function MapProductUnitModal({
 				</div>
 
 				{/* Section 1: Unit & Conversion Configuration */}
-				<div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 space-y-4">
-					<div className="flex items-center justify-between border-b pb-2 dark:border-slate-800">
-						<div className="flex items-center gap-2">
-							<Boxes className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-							<h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs">
-								{t("products.unitConfiguration") || "Unit & Pricing Configuration"}
-							</h4>
-						</div>
-						{baseUnitPrice > 0 && (
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								onClick={handleAutoMultiplyBasePrice}
-								className="h-6 text-[10px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-bold gap-1 px-1.5 cursor-pointer"
-								title={`Multiply ${baseUnitObj?.symbol || baseUnitObj?.name || "base"} price ($${baseUnitPrice.toFixed(2)}) by conversion multiplier (${numericQty})`}
-							>
-								<Calculator className="h-3 w-3" />
-								Auto × {baseUnitObj?.symbol || baseUnitObj?.name || "Base"} (${baseUnitPrice.toFixed(2)})
-							</Button>
-						)}
-					</div>
-
-					{/* Row 1: Target Unit & Base Unit */}
-					<div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-						<ModernSelect
-							label={t("products.targetUnit")}
-							value={unitId}
-							onChange={(val) => setUnitId(val)}
-							options={targetUnitOptions}
-							searchable={targetUnitOptions.length > 4}
-							placeholder="Select target unit..."
-							required
-						/>
-
-						<ModernSelect
-							label={t("products.baseUnit")}
-							value={baseUnitId}
-							onChange={(val) => handleBaseUnitChange(val)}
-							options={baseUnitOptions}
-							searchable={baseUnitOptions.length > 4}
-							placeholder="Select base reference unit..."
-							required
-						/>
-					</div>
-
-					{/* Merged Row: Conversion Ratio, Original Price (read-only), Discount, Selling Price */}
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-start">
-						{/* 1. Multiplier / Conversion Ratio */}
-						<ModernInput
-							label={t("products.multiplierQty")}
-							type="number"
-							step="any"
-							min="0.0001"
-							value={baseQuantity}
-							onChange={(e) => handleBaseQuantityChange(e.target.value)}
-							placeholder="e.g. 1"
-							suffixAddon={baseUnitObj?.symbol || baseUnitObj?.name || "units"}
-							helperText={
-								targetUnitObj && baseUnitObj
-									? `1 ${targetUnitObj.symbol || targetUnitObj.name} = ${baseQuantity || 1} ${baseUnitObj.symbol || baseUnitObj.name}`
-									: undefined
-							}
-							required
-						/>
-
-						{/* 2. Original Price (Cannot edit, see only - sent to API) */}
-						<ModernInput
-							label={
-								<span className="flex items-center justify-between w-full">
-									<span>{t("products.originalPrice") || "Original Price"}</span>
-									<span className="text-[10px] text-slate-400 font-mono">
-										{t("common.readOnly") || "See only"}
-									</span>
-								</span>
-							}
-							type="text"
-							value={unitListPrice > 0 ? unitListPrice.toFixed(2) : "0.00"}
-							readOnly
-							prefixAddon="$"
-							suffixAddon={targetUnitObj?.symbol ? `/${targetUnitObj.symbol}` : undefined}
-							className="bg-slate-100 dark:bg-slate-800/80 font-mono font-bold text-slate-700 dark:text-slate-300 cursor-not-allowed select-none"
-							helperText={`${baseUnitObj?.symbol || baseUnitObj?.name || "Base"} $${baseUnitPrice.toFixed(2)} × ${numericQty}`}
-						/>
-
-						{/* 3. Discount field with compact Discount Type (% / $) at the end */}
-						<div className="space-y-1.5">
-							<label className="font-medium text-xs text-foreground flex items-center justify-between">
-								<span className="flex items-center gap-1">
-									<Percent className="size-3.5 text-purple-600 dark:text-purple-400" />
-									{t("products.discount") || "Discount"}
-								</span>
-								{parseFloat(discount) > 0 && (
-									<span className="text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400">
-										{discountType === "PERCENTAGE"
-											? `-${discount}%`
-											: `-$${parseFloat(discount).toFixed(2)}`}
-									</span>
-								)}
-							</label>
-							<div className="relative flex items-center rounded-lg border border-slate-200/80 bg-slate-50/80 hover:border-slate-300 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 dark:bg-slate-900/80 dark:border-slate-800 transition-all shadow-2xs overflow-hidden h-11">
-								<input
-									type="number"
-									step="any"
-									min="0"
-									max={discountType === "PERCENTAGE" ? "100" : undefined}
-									value={discount}
-									onChange={(e) => handleDiscountChange(e.target.value)}
-									placeholder="0"
-									className="w-full bg-transparent border-0 outline-none text-sm font-semibold text-foreground placeholder:text-muted-foreground/60 px-3 h-full"
-								/>
-								{/* Compact Discount Type Toggle at the end */}
-								<div className="pr-1.5 shrink-0">
-									<div className="flex items-center bg-slate-200/70 dark:bg-slate-800 p-0.5 rounded-md border border-slate-300/60 dark:border-slate-700/60">
-										<button
-											type="button"
-											onClick={() => handleDiscountTypeChange("PERCENTAGE")}
-											className={cn(
-												"h-7 px-2 rounded text-xs font-black transition-all cursor-pointer",
-												discountType === "PERCENTAGE"
-													? "bg-purple-600 text-white shadow-xs"
-													: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white",
-											)}
-											title="Percentage (%)"
-										>
-											%
-										</button>
-										<button
-											type="button"
-											onClick={() => handleDiscountTypeChange("FLAT")}
-											className={cn(
-												"h-7 px-2 rounded text-xs font-black transition-all cursor-pointer",
-												discountType === "FLAT"
-													? "bg-purple-600 text-white shadow-xs"
-													: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white",
-											)}
-											title="Flat Cash ($)"
-										>
-											$
-										</button>
-									</div>
-								</div>
-							</div>
-							<p className="text-[10px] text-muted-foreground truncate">
-								{parseFloat(discount) > 0
-									? discountType === "PERCENTAGE"
-										? `${discount}% off original price ($${unitListPrice.toFixed(2)})`
-										: `$${parseFloat(discount).toFixed(2)} cash discount off original ($${unitListPrice.toFixed(2)})`
-									: unitListPrice > 0
-										? `Standard original price: $${unitListPrice.toFixed(2)}`
-										: "Standard selling price (0% discount)"}
-							</p>
-						</div>
-
-						{/* 4. Selling Price (Final price after discount) */}
-						<ModernInput
-							label={
-								<span className="flex items-center justify-between w-full">
-									<span>{t("products.sellingPrice")}</span>
-									<span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-medium">
-										(Selling)
-									</span>
-								</span>
-							}
-							type="number"
-							step="any"
-							min="0"
-							value={unitPrice}
-							onChange={(e) => handleSellingPriceChange(e.target.value)}
-							placeholder="0.00"
-							prefixAddon="$"
-							suffixAddon={targetUnitObj?.symbol ? `/${targetUnitObj.symbol}` : undefined}
-							helperText={
-								numericQty > 0
-									? `≈ $${effectivePricePerBase.toFixed(2)} / ${baseUnitObj?.symbol || baseUnitObj?.name || "base"}`
-									: undefined
-							}
-							required
-						/>
-					</div>
-				</div>
+				{unitConfigCard}
 
 				{/* Section 3: Variant Pricing Strategy */}
-				{productVariants.length > 0 && (
-					<div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 space-y-4">
-						<div className="flex items-center justify-between border-b pb-2 dark:border-slate-800">
-							<div className="flex items-center gap-2">
-								<Tag className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-								<h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs">
-									{t("products.pricingTiers")}
-								</h4>
-							</div>
-							<Badge variant="secondary" className="text-[10px] font-mono">
-								{productVariants.length} Variant(s)
-							</Badge>
-						</div>
-
-						<div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl">
-							<button
-								type="button"
-								onClick={() => setIsSamePrice(true)}
-								className={cn(
-									"py-2 px-3 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-									isSamePrice
-										? "bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs"
-										: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white",
-								)}
-							>
-								<span>{t("products.samePriceAllVariants")}</span>
-							</button>
-
-							<button
-								type="button"
-								onClick={() => {
-									setIsSamePrice(false);
-									handleAutoCalculateAllVariants();
-								}}
-								className={cn(
-									"py-2 px-3 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-									!isSamePrice
-										? "bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs"
-										: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white",
-								)}
-							>
-								<span>{t("products.customPricePerVariant")}</span>
-							</button>
-						</div>
-
-						{!isSamePrice && (
-							<div className="space-y-3 pt-1 animate-in fade-in duration-200">
-								<div className="bg-purple-50/60 dark:bg-purple-950/20 p-3 rounded-xl border border-purple-100 dark:border-purple-900/40 space-y-2">
-									<div className="flex items-center justify-between">
-										<span className="text-[11px] font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1">
-											<SlidersHorizontal className="h-3 w-3" /> Bulk Variant
-											Actions:
-										</span>
-										<span className="text-[10px] text-purple-600 dark:text-purple-400">
-											Applies across all variants
-										</span>
-									</div>
-
-									<div className="flex flex-wrap items-center gap-2">
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											onClick={() => handleAutoCalculateAllVariants(true)}
-											className="h-7 text-[10px] gap-1 bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 font-bold hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer"
-											title={`Auto-calculate all variant prices from ${baseUnitObj?.symbol || baseUnitObj?.name || "base"} price × ${numericQty}`}
-										>
-											<Calculator className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-											Auto-calculate All ({numericQty}x)
-										</Button>
-
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											onClick={handleCopyPriceToAllVariants}
-											className="h-7 text-[10px] gap-1 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-purple-200 dark:border-purple-800 font-semibold cursor-pointer"
-										>
-											<Copy className="h-3 w-3" />
-											Set All to ${parseFloat(unitPrice || "0").toFixed(2)}
-										</Button>
-
-										{parseFloat(discount) > 0 && (
-											<Button
-												type="button"
-												variant="outline"
-												size="sm"
-												onClick={handleCopyDiscountToAllVariants}
-												className="h-7 text-[10px] gap-1 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-purple-200 dark:border-purple-800 font-semibold cursor-pointer"
-											>
-												<Percent className="h-3 w-3 text-purple-600" />
-												Set All Discount to {discount}
-												{discountType === "PERCENTAGE" ? "%" : "$"}
-											</Button>
-										)}
-
-										<div className="flex items-center gap-1">
-											{QUICK_DISCOUNT_PERCENT_PRESETS.map((pct) => (
-												<button
-													key={pct}
-													type="button"
-													onClick={() => handleApplyQuickDiscountPercent(pct)}
-													className="h-7 px-1.5 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 text-[10px] font-bold hover:bg-purple-200 transition-colors"
-												>
-													-{pct}%
-												</button>
-											))}
-
-											<div className="flex items-center gap-1 ml-0.5">
-												<input
-													type="number"
-													placeholder="%"
-													value={quickDiscountPercent}
-													onChange={(e) =>
-														setQuickDiscountPercent(e.target.value)
-													}
-													className="h-7 w-11 rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-slate-900 px-1 text-center text-xs font-mono"
-												/>
-												<Button
-													type="button"
-													variant="secondary"
-													size="sm"
-													onClick={handleApplyCustomDiscountPercent}
-													className="h-7 text-[10px] gap-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 font-bold px-2"
-												>
-													<Percent className="h-3 w-3" />
-													{t("common.apply") || "Apply"}
-												</Button>
-											</div>
-										</div>
-									</div>
-								</div>
-
-								<div className="max-h-72 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
-									{productVariants.map((v: any) => {
-										const vState = variantPrices[v.id] || {
-											unitPrice: String(unitPrice || 0),
-											discount: discount || "0",
-											discountType: discountType,
-										};
-										const vBasePrice = getVariantBasePrice(v);
-										const vListPrice = calculateUnitListPrice(vBasePrice, numericQty);
-										const vPriceNum = parseFloat(vState.unitPrice) || 0;
-										const vEffectiveBase =
-											numericQty > 0 ? vPriceNum / numericQty : 0;
-
-										return (
-											<div
-												key={v.id}
-												className="bg-slate-50/90 dark:bg-slate-950/70 p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2 transition-all hover:border-purple-300 dark:hover:border-purple-700"
-											>
-												<div className="flex items-start justify-between gap-2">
-													<div className="min-w-0">
-														<span className="font-bold text-slate-900 dark:text-slate-100 block text-xs truncate">
-															{v.name}
-														</span>
-														<div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-															<span className="text-[10px] text-slate-400 font-mono">
-																SKU: {v.sku || "—"}
-															</span>
-															{vBasePrice > 0 && (
-																<Badge
-																	variant="outline"
-																	className="text-[9px] py-0 px-1 text-slate-500 font-mono"
-																>
-																	{baseUnitObj?.symbol || baseUnitObj?.name ? `${baseUnitObj.symbol || baseUnitObj.name}: ` : "Base: "}${vBasePrice.toFixed(2)}
-																</Badge>
-															)}
-															{vListPrice > 0 && numericQty > 1 && (
-																<Badge
-																	variant="secondary"
-																	className="text-[9px] py-0 px-1 font-mono text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/50"
-																>
-																	List: ${vListPrice.toFixed(2)}
-																</Badge>
-															)}
-														</div>
-													</div>
-
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														onClick={() => handleResetVariant(v)}
-														className="h-6 text-[10px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 px-1.5 gap-1 shrink-0 cursor-pointer font-semibold"
-														title={`Auto-calculate ${v.name} (${baseUnitObj?.symbol || baseUnitObj?.name || "Base"} $${vBasePrice.toFixed(2)} × ${numericQty})`}
-													>
-														<Calculator className="h-2.5 w-2.5" />
-														Auto-calc
-													</Button>
-												</div>
-
-												<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-start">
-													{/* 1. Original Price (Cannot edit, see only - passed to API) */}
-													<div>
-														<label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block mb-1 flex items-center justify-between">
-															<span>{t("products.originalPrice") || "Original Price"} ($)</span>
-															<span className="text-[9px] text-slate-400 font-mono">
-																{t("common.readOnly") || "See only"}
-															</span>
-														</label>
-														<div className="relative flex items-center rounded-lg border border-slate-200/90 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80 h-9 px-2">
-															<span className="text-slate-400 text-xs mr-1 font-mono font-semibold">$</span>
-															<input
-																type="text"
-																value={vListPrice > 0 ? vListPrice.toFixed(2) : "0.00"}
-																readOnly
-																className="w-full bg-transparent border-0 outline-none text-xs font-mono font-bold text-slate-700 dark:text-slate-300 cursor-not-allowed select-none"
-															/>
-														</div>
-														<span className="text-[10px] text-slate-400 font-medium block mt-0.5 font-mono">
-															{baseUnitObj?.symbol || baseUnitObj?.name || "Base"} ${vBasePrice.toFixed(2)} × {numericQty}
-														</span>
-													</div>
-
-													{/* 2. Discount */}
-													<div>
-														<label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block mb-1 flex items-center justify-between">
-															<span>{t("products.discount") || "Discount"}</span>
-															{parseFloat(vState.discount || "0") > 0 && (
-																<span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 font-bold">
-																	{vState.discountType === "PERCENTAGE"
-																		? `-${vState.discount}%`
-																		: `-$${parseFloat(vState.discount).toFixed(2)}`}
-																</span>
-															)}
-														</label>
-														<div className="relative flex items-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 h-9 px-2">
-															<input
-																type="number"
-																step="any"
-																min="0"
-																max={vState.discountType === "PERCENTAGE" ? "100" : undefined}
-																value={vState.discount}
-																onChange={(e) =>
-																	handleVariantDiscountChange(v.id, e.target.value, v)
-																}
-																placeholder="0"
-																className="w-full bg-transparent border-0 outline-none text-xs font-mono font-bold text-foreground placeholder:text-muted-foreground/50 pr-1"
-															/>
-															{/* Compact Discount Type Toggle at end */}
-															<div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-700 shrink-0">
-																<button
-																	type="button"
-																	onClick={() =>
-																		handleVariantDiscountTypeChange(v.id, "PERCENTAGE", v)
-																	}
-																	className={cn(
-																		"h-5 px-1.5 rounded text-[10px] font-black transition-all cursor-pointer",
-																		vState.discountType === "PERCENTAGE"
-																			? "bg-purple-600 text-white shadow-2xs"
-																			: "text-slate-500 hover:text-slate-900 dark:hover:text-white",
-																	)}
-																	title="Percentage (%)"
-																>
-																	%
-																</button>
-																<button
-																	type="button"
-																	onClick={() =>
-																		handleVariantDiscountTypeChange(v.id, "FLAT", v)
-																	}
-																	className={cn(
-																		"h-5 px-1.5 rounded text-[10px] font-black transition-all cursor-pointer",
-																		vState.discountType === "FLAT"
-																			? "bg-purple-600 text-white shadow-2xs"
-																			: "text-slate-500 hover:text-slate-900 dark:hover:text-white",
-																	)}
-																	title="Flat Cash ($)"
-																>
-																	$
-																</button>
-															</div>
-														</div>
-														<span className="text-[10px] text-slate-400 font-medium block mt-0.5 font-mono truncate">
-															{parseFloat(vState.discount || "0") > 0
-																? vState.discountType === "PERCENTAGE"
-																	? `${vState.discount}% off original`
-																	: `-$${parseFloat(vState.discount || "0").toFixed(2)} off original`
-																: "0% discount"}
-														</span>
-													</div>
-
-													{/* 3. Selling Price */}
-													<div>
-														<label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block mb-1 flex items-center justify-between">
-															<span>{t("products.sellingPrice")} ($)</span>
-															<span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono font-medium">
-																(Selling)
-															</span>
-														</label>
-														<Input
-															type="number"
-															inputMode="decimal"
-															step="any"
-															min="0"
-															value={vState.unitPrice}
-															onChange={(e) =>
-																handleVariantPriceChange(v.id, e.target.value, v)
-															}
-															placeholder="0.00"
-															className="h-9 text-xs font-bold font-mono bg-white dark:bg-slate-900"
-														/>
-														<div className="flex items-center justify-between text-[10px] font-medium mt-0.5 font-mono">
-															<span className="text-emerald-600 dark:text-emerald-400">
-																≈ ${vEffectiveBase.toFixed(2)} /{" "}
-																{baseUnitObj?.symbol || "base"}
-															</span>
-															{vListPrice > 0 && vPriceNum < vListPrice && (
-																<span className="text-slate-400 line-through">
-																	${vListPrice.toFixed(2)}
-																</span>
-															)}
-														</div>
-													</div>
-												</div>
-											</div>
-										);
-									})}
-								</div>
-							</div>
-						)}
-					</div>
-				)}
+				{productVariants.length > 0 && pricingTiersCard}
 			</div>
 		</ModernModal>
 	);

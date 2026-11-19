@@ -225,7 +225,7 @@ const DataTableRow = React.memo(function DataTableRow<
 							(selectable ? 1 : 0) +
 							(hasActions ? 1 : 0)
 						}
-						className="p-3"
+						className="p-3 max-w-0"
 					>
 						{renderSubComponent(row)}
 					</TableCell>
@@ -312,6 +312,7 @@ export function DataTable<T extends Record<string, any>>({
 	emptyStateTitle,
 	emptyStateDescription,
 	className,
+	tableClassName,
 	onRowClick,
 	hideSearch = false,
 
@@ -1670,7 +1671,11 @@ export function DataTable<T extends Record<string, any>>({
 									? `${totalTableWidth}px`
 									: undefined,
 						}}
-						className={cn(!hasResizedColumns && "min-w-[1100px]", "w-full")}
+						className={cn(
+							!hasResizedColumns &&
+								(tableClassName !== undefined ? tableClassName : "min-w-[1100px]"),
+							"w-full",
+						)}
 					>
 						<TableHeader className="bg-muted/40 border-b border-border">
 							<TableRow className="hover:bg-transparent">

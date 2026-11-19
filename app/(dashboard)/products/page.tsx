@@ -38,11 +38,20 @@ import { useTranslation } from "@/lib/i18n/context";
 import {
 	Brand,
 	Category,
+	DiscountType,
 	Product,
 	Unit,
 	VariantOperations,
-	VariantUnit
+	VariantUnit,
+	VariantUnitPriceConfigInput,
 } from "@/lib/types";
+import {
+	calculateUnitListPrice,
+	calculateUnitDiscount,
+	calculateUnitFinalPrice,
+	formatUnitDiscountNote,
+	normalizeDiscountType,
+} from "@/lib/product-unit-pricing";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -53,6 +62,8 @@ import {
 	Boxes,
 	Camera,
 	ChevronDown,
+	ChevronLeft,
+	ChevronRight,
 	CornerDownRight,
 	Eye,
 	FolderOpen,
@@ -382,6 +393,13 @@ function ProductsTab() {
 	const [newVarWidth, setNewVarWidth] = useState("");
 	const [newVarDepth, setNewVarDepth] = useState("");
 	const [newVarVolume, setNewVarVolume] = useState("");
+	const [newVarPricingMode, setNewVarPricingMode] = useState<"auto" | "custom">("auto");
+	const [newVarUnitPrices, setNewVarUnitPrices] = useState<
+		Record<
+			string | number,
+			{ unitPrice: string; discount: string; discountType: DiscountType }
+		>
+	>({});
 
 	// Unit mapping selection for edit
 	const [selectedUnitForEdit, setSelectedUnitForEdit] = useState<any>(null);
@@ -1542,6 +1560,8 @@ function ProductsTab() {
 		setNewVarWidth("");
 		setNewVarDepth("");
 		setNewVarVolume("");
+		setNewVarPricingMode("auto");
+		setNewVarUnitPrices({});
 	};
 
 	const handleAddVariantSubmit = (e: React.FormEvent) => {
@@ -1558,6 +1578,40 @@ function ProductsTab() {
 		if (newVarDepth) varAttrs.depth = Number(newVarDepth);
 		if (newVarVolume) varAttrs.volume = newVarVolume;
 
+		let customUnitPricesPayload: VariantUnitPriceConfigInput[] | undefined = undefined;
+
+		if (newVarPricingMode === "custom" && productUnitsList && productUnitsList.length > 0) {
+			customUnitPricesPayload = productUnitsList.map((u: any) => {
+				const uId = u.unitId ?? u.id;
+				const current = newVarUnitPrices[uId];
+				const basePriceNum = Math.max(0, Number(newVarPrice) || 0);
+				const uList = calculateUnitListPrice(basePriceNum, u.baseQuantity || 1);
+				const rawPrice =
+					current && current.unitPrice !== ""
+						? parseFloat(current.unitPrice)
+						: u.isBase
+							? basePriceNum
+							: uList;
+				const rawDisc =
+					current && current.discount !== ""
+						? parseFloat(current.discount)
+						: parseFloat(String(u.discount ?? 0)) || 0;
+				const discType =
+					current?.discountType || normalizeDiscountType(u.discountType);
+
+				const finalPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : uList;
+				const discountVal = !isNaN(rawDisc) && rawDisc >= 0 ? rawDisc : 0;
+
+				return {
+					unitId: Number(uId),
+					unitPrice: finalPrice,
+					discount: discountVal,
+					discountType: discType,
+					discountNote: formatUnitDiscountNote(discountVal, discType),
+				};
+			});
+		}
+
 		addVariantMutation.mutate({
 			name: newVarName,
 			sku: newVarSku,
@@ -1566,7 +1620,10 @@ function ProductsTab() {
 			variantAttributes:
 				Object.keys(varAttrs).length > 0 ? varAttrs : undefined,
 			price: Number(newVarPrice),
+			cost: Number(_newVarCost) || undefined,
+			stockQty: Number(_newVarStock) || undefined,
 			unitId: Number(newVarUnitId),
+			unitPrices: customUnitPricesPayload,
 		});
 	};
 
@@ -1616,6 +1673,8 @@ function ProductsTab() {
 			id: "expand",
 			header: "",
 			width: "40px",
+			minWidth: 40,
+			maxWidth: 40,
 			cell: ({ row }: { row: any }) => {
 				const isExpanded = expandedProductIds.includes(String(row.id));
 				const _hasVariantsCount = row.variants?.length > 0;
@@ -1654,22 +1713,27 @@ function ProductsTab() {
 			accessorKey: "name",
 			sortable: true,
 			stickyLeft: true,
+			width: "180px",
+			minWidth: 140,
+			maxWidth: 200,
 			cell: ({ row }: { row: any }) => (
 				<div
-					className="cursor-pointer group flex items-center gap-2 pr-2"
+					className="cursor-pointer group flex items-center gap-2 pr-1 min-w-0"
 					onClick={() => setSelectedProductDetails(row)}
 				>
-					<UserDetailCell
-						name={row.name}
-						subtitle={
-							row.model
-								? `Model: ${row.model}`
-								: row.serialNumber
-									? `S/N: ${row.serialNumber}`
-									: undefined
-						}
-						avatarUrl={row.imageUrl}
-					/>
+					<div className="min-w-0 flex-1">
+						<UserDetailCell
+							name={row.name}
+							subtitle={
+								row.model
+									? `Model: ${row.model}`
+									: row.serialNumber
+										? `S/N: ${row.serialNumber}`
+										: undefined
+							}
+							avatarUrl={row.imageUrl}
+						/>
+					</div>
 					{row.variants && row.variants.length > 0 ? (
 						<Badge
 							variant="outline"
@@ -1700,10 +1764,13 @@ function ProductsTab() {
 					: "") ||
 				"",
 			sortable: true,
+			width: "95px",
+			minWidth: 80,
+			maxWidth: 105,
 			cell: ({ row }: { row: any }) => {
 				const sku = row.baseSku || row.sku || row.variants?.[0]?.sku || "—";
 				return (
-					<span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+					<span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 truncate block">
 						{sku}
 					</span>
 				);
@@ -1724,11 +1791,14 @@ function ProductsTab() {
 					: "") ||
 				"",
 			sortable: true,
+			width: "95px",
+			minWidth: 80,
+			maxWidth: 105,
 			cell: ({ row }: { row: any }) => {
 				const barcode =
 					row.baseBarcode || row.barcode || row.variants?.[0]?.barcode || null;
 				return barcode ? (
-					<span className="font-mono text-xs text-slate-500">{barcode}</span>
+					<span className="font-mono text-xs text-slate-500 truncate block">{barcode}</span>
 				) : (
 					<span className="text-[11px] text-slate-400">—</span>
 				);
@@ -1739,6 +1809,9 @@ function ProductsTab() {
 			header: t("products.category"),
 			accessorKey: "categoryName",
 			sortable: true,
+			width: "80px",
+			minWidth: 70,
+			maxWidth: 90,
 			cell: ({ row }: { row: any }) => {
 				const catName =
 					row.categoryName ||
@@ -1746,7 +1819,7 @@ function ProductsTab() {
 				return catName ? (
 					<Badge
 						variant="secondary"
-						className="text-[10px] bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/20 dark:text-purple-400 font-semibold"
+						className="text-[10px] bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/20 dark:text-purple-400 font-semibold truncate max-w-[85px] block"
 					>
 						{catName}
 					</Badge>
@@ -1760,6 +1833,9 @@ function ProductsTab() {
 			header: t("products.brand"),
 			accessorKey: "brandName",
 			sortable: true,
+			width: "75px",
+			minWidth: 65,
+			maxWidth: 85,
 			cell: ({ row }: { row: any }) => {
 				const brandName =
 					row.brandName ||
@@ -1767,7 +1843,7 @@ function ProductsTab() {
 				return brandName ? (
 					<Badge
 						variant="outline"
-						className="text-[10px] text-sky-600 border-sky-200 dark:text-sky-400 font-semibold"
+						className="text-[10px] text-sky-600 border-sky-200 dark:text-sky-400 font-semibold truncate max-w-[80px] block"
 					>
 						{brandName}
 					</Badge>
@@ -1779,6 +1855,9 @@ function ProductsTab() {
 		{
 			id: "pricing",
 			header: t("products.sellingPrice"),
+			width: "80px",
+			minWidth: 70,
+			maxWidth: 90,
 			cell: ({ row }: { row: any }) => {
 				const price = getProductBasePrice(row);
 				const baseUnit = getProductBaseUnit(row);
@@ -1799,7 +1878,7 @@ function ProductsTab() {
 							})}
 						</div>
 						{unitLabel && (
-							<span className="text-[10px] text-slate-400 font-medium block mt-0.5">
+							<span className="text-[10px] text-slate-400 font-medium block mt-0.5 truncate max-w-[80px]">
 								/ {unitLabel}
 							</span>
 						)}
@@ -1810,6 +1889,9 @@ function ProductsTab() {
 		{
 			id: "inventory",
 			header: t("products.stockQuantity"),
+			width: "75px",
+			minWidth: 65,
+			maxWidth: 85,
 			cell: ({ row }: { row: any }) => {
 				let stock = row.stockQty ?? row.stock;
 				if (
@@ -1839,7 +1921,7 @@ function ProductsTab() {
 						</div>
 						{isLow && stock > 0 && (
 							<div className="text-[9px] text-amber-600 dark:text-amber-400 font-medium mt-0.5 flex items-center gap-1">
-								<AlertCircle className="h-2.5 w-2.5" /> Threshold:{" "}
+								<AlertCircle className="h-2.5 w-2.5 shrink-0" /> Threshold:{" "}
 								{lowThreshold}
 							</div>
 						)}
@@ -1850,6 +1932,9 @@ function ProductsTab() {
 		{
 			id: "units",
 			header: t("products.mapUnits"),
+			width: "70px",
+			minWidth: 60,
+			maxWidth: 80,
 			cell: ({ row }: { row: any }) => {
 				const unitsCount = row.units?.length || 0;
 				return (
@@ -1866,6 +1951,9 @@ function ProductsTab() {
 			id: "isActive",
 			header: t("products.status"),
 			accessorKey: "isActive",
+			width: "55px",
+			minWidth: 50,
+			maxWidth: 65,
 			cell: ({ row }: { row: any }) => (
 				<Switch
 					checked={row.isActive !== false}
@@ -1923,6 +2011,7 @@ function ProductsTab() {
 						_isExpanded: expandedProductIds.includes(String(p.id)),
 					}))}
 					columns={columns}
+					tableClassName="w-full min-w-0"
 					getRowId={(p) => String(p.id)}
 					hideHeader={true}
 					hideImportExport={true}
@@ -2027,11 +2116,8 @@ function ProductsTab() {
 							categoryMap={categoryMap}
 							brandMap={brandMap}
 							onOpenPriceHistory={(prod, variant) => {
-								if (variant?.id) {
-									setSelectedVariantIdForHistory(variant.id);
-								} else {
-									setSelectedVariantIdForHistory(null);
-								}
+								const varId = variant?.id || variant?.variantId || null;
+								setSelectedVariantIdForHistory(varId);
 								setHistoryModalProduct(prod);
 								setIsStandaloneHistoryOpen(true);
 							}}
@@ -4446,6 +4532,11 @@ function ProductsTab() {
 				onClose={() => setIsAddVariantOpen(false)}
 				title={t("products.addVariant")}
 				subtitle={t("products.subtitle")}
+				icon={
+					<Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+				}
+				size="xl"
+				className="max-w-4xl xl:max-w-5xl w-full"
 				footer={
 					<ModernModalFooter>
 						<ModernModalCancelButton
@@ -4475,142 +4566,787 @@ function ProductsTab() {
 						onValueChange={(v: any) => setAddVarTab(v)}
 						className="w-full"
 					>
-						<ModernTabsList className="grid grid-cols-2 w-full mb-3">
+						<ModernTabsList className="grid grid-cols-2 w-full p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 mb-4">
 							<ModernTabsTrigger
 								value="general"
 								icon={<Package className="h-4 w-4" />}
-								className="flex-row items-center justify-center gap-2 text-xs font-bold py-2"
+								className="flex-row items-center justify-center gap-2 text-xs font-bold py-2.5 rounded-xl cursor-pointer"
 							>
-								{t("products.basicInfo")}
+								{t("products.basicInfo")} & {t("products.packagingPricing")}
 							</ModernTabsTrigger>
 							<ModernTabsTrigger
 								value="physical"
 								icon={<Boxes className="h-4 w-4" />}
-								className="flex-row items-center justify-center gap-2 text-xs font-bold py-2"
+								className="flex-row items-center justify-center gap-2 text-xs font-bold py-2.5 rounded-xl cursor-pointer"
 							>
-								{t("products.inventorySettings")}
+								{t("products.inventorySettings")} & Specs
 							</ModernTabsTrigger>
 						</ModernTabsList>
 
 						{/* TAB 1: GENERAL & PRICING */}
-						<ModernTabsContent value="general" className="space-y-3 mt-0">
-							<ModernInput
-								label={`${t("products.variantName")} *`}
-								value={newVarName}
-								onChange={(e) => setNewVarName(e.target.value)}
-								placeholder={t("products.variantNamePlaceholder")}
-								required
-							/>
-
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-								{/* SKU Code with Generator */}
-								<div>
-									<div className="flex items-center justify-between mb-1.5">
-										<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-											{t("stocks.sku")} *
-										</Label>
-										<button
-											type="button"
-											onClick={() => {
-												const sku = generateVariantSku(newVarName);
-												setNewVarSku(sku);
-												toast.info(`Generated SKU: ${sku}`);
-											}}
-											className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:underline cursor-pointer"
-										>
-											<Sparkles className="h-3 w-3" />
-											{t("products.generate")}
-										</button>
+						<ModernTabsContent value="general" className="space-y-4 mt-0">
+							{/* CARD 1: CORE IDENTIFICATION & BASE PRICING */}
+							<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-2xs">
+								<div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-800/60">
+									<div className="flex items-center gap-2.5">
+										<div className="h-8 w-8 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+											<Tag className="h-4 w-4" />
+										</div>
+										<div>
+											<h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+												{t("products.basicInfo")}
+											</h4>
+											<p className="text-[11px] text-slate-500 dark:text-slate-400">
+												Configure variant name, tracking codes, and base selling price
+											</p>
+										</div>
 									</div>
-									<div className="relative">
-										<Input
-											value={newVarSku}
-											onChange={(e) => setNewVarSku(e.target.value)}
-											placeholder="e.g. SKU-RED-256"
-											className="pr-8 font-mono text-xs rounded-xl bg-slate-50/50 dark:bg-slate-900/50"
-											required
-										/>
-										<button
-											type="button"
-											onClick={() => {
-												const sku = generateVariantSku(newVarName);
-												setNewVarSku(sku);
-												toast.info(`Generated SKU: ${sku}`);
-											}}
-											className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer"
-											title={t("products.generate")}
-										>
-											<Sparkles className="h-3.5 w-3.5" />
-										</button>
-									</div>
+									<Badge
+										variant="outline"
+										className="text-[10px] font-semibold bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+									>
+										Required
+									</Badge>
 								</div>
 
-								{/* Barcode with Generator */}
-								<div>
-									<div className="flex items-center justify-between mb-1.5">
-										<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-											{t("products.barcode")}
-										</Label>
-										<button
-											type="button"
-											onClick={() => {
-												const code = generateVariantBarcode();
-												setNewVarBarcode(code);
-												toast.info(`Generated Barcode: ${code}`);
-											}}
-											className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:underline cursor-pointer"
-										>
-											<Sparkles className="h-3 w-3" />
-											{t("products.generate")}
-										</button>
-									</div>
-									<div className="relative">
-										<Input
-											value={newVarBarcode}
-											onChange={(e) => setNewVarBarcode(e.target.value)}
-											placeholder="e.g. 8901234567890"
-											className="pr-8 font-mono text-xs rounded-xl bg-slate-50/50 dark:bg-slate-900/50"
-										/>
-										<button
-											type="button"
-											onClick={() => {
-												const code = generateVariantBarcode();
-												setNewVarBarcode(code);
-												toast.info(`Generated Barcode: ${code}`);
-											}}
-											className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer"
-											title={t("products.generate")}
-										>
-											<Sparkles className="h-3.5 w-3.5" />
-										</button>
-									</div>
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								{/* Variant Name */}
 								<ModernInput
-									label={`${t("products.retailSellPrice")} *`}
-									type="number"
-									step="0.01"
-									value={newVarPrice}
-									onChange={(e) => setNewVarPrice(e.target.value)}
-									placeholder="0.00"
+									label={`${t("products.variantName")} *`}
+									value={newVarName}
+									onChange={(e) => setNewVarName(e.target.value)}
+									placeholder={
+										t("products.variantNamePlaceholder") ||
+										"e.g. Red / 256GB / Size L"
+									}
+									required
+									leftIcon={<Tag className="h-3.5 w-3.5 text-slate-400" />}
+									className="rounded-xl text-xs font-medium"
 								/>
-								<ModernSelect
-									label={`${t("products.unit")} *`}
-									value={newVarUnitId}
-									onChange={(val) => setNewVarUnitId(val)}
-									options={productSpecificUnitOptions}
-								/>
+
+								{/* SKU & Barcode side by side */}
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+									{/* SKU Code with Generator */}
+									<div>
+										<div className="flex items-center justify-between mb-1.5">
+											<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+												{t("stocks.sku")} *
+											</Label>
+											<button
+												type="button"
+												onClick={() => {
+													const sku = generateVariantSku(newVarName);
+													setNewVarSku(sku);
+													toast.info(`Generated SKU: ${sku}`);
+												}}
+												className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:underline cursor-pointer"
+											>
+												<Sparkles className="h-3 w-3" />
+												{t("products.generate")}
+											</button>
+										</div>
+										<div className="relative">
+											<Input
+												value={newVarSku}
+												onChange={(e) => setNewVarSku(e.target.value)}
+												placeholder="e.g. SKU-RED-256"
+												className="pr-9 font-mono text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+												required
+											/>
+											<button
+												type="button"
+												onClick={() => {
+													const sku = generateVariantSku(newVarName);
+													setNewVarSku(sku);
+													toast.info(`Generated SKU: ${sku}`);
+												}}
+												className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
+												title={t("products.generate")}
+											>
+												<Sparkles className="h-3.5 w-3.5" />
+											</button>
+										</div>
+									</div>
+
+									{/* Barcode with Generator */}
+									<div>
+										<div className="flex items-center justify-between mb-1.5">
+											<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+												{t("products.barcode")}
+											</Label>
+											<button
+												type="button"
+												onClick={() => {
+													const code = generateVariantBarcode();
+													setNewVarBarcode(code);
+													toast.info(`Generated Barcode: ${code}`);
+												}}
+												className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:underline cursor-pointer"
+											>
+												<Sparkles className="h-3 w-3" />
+												{t("products.generate")}
+											</button>
+										</div>
+										<div className="relative">
+											<Input
+												value={newVarBarcode}
+												onChange={(e) => setNewVarBarcode(e.target.value)}
+												placeholder="e.g. 8901234567890"
+												className="pr-9 font-mono text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+											/>
+											<button
+												type="button"
+												onClick={() => {
+													const code = generateVariantBarcode();
+													setNewVarBarcode(code);
+													toast.info(`Generated Barcode: ${code}`);
+												}}
+												className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
+												title={t("products.generate")}
+											>
+												<Sparkles className="h-3.5 w-3.5" />
+											</button>
+										</div>
+									</div>
+								</div>
+
+								{/* Retail Sell Price & Base Unit */}
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+									<div>
+										<Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 block">
+											{t("products.retailSellPrice")} *
+										</Label>
+										<div className="relative">
+											<span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-slate-400">
+												$
+											</span>
+											<Input
+												type="number"
+												step="0.01"
+												value={newVarPrice}
+												onChange={(e) => setNewVarPrice(e.target.value)}
+												placeholder="0.00"
+												className="pl-7 font-mono font-bold text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+												required
+											/>
+										</div>
+										<p className="text-[10px] text-slate-400 mt-1">
+											Base selling price per single unit used for tier conversions
+										</p>
+									</div>
+									<div>
+										<ModernSelect
+											label={`${t("products.unit")} *`}
+											value={newVarUnitId}
+											onChange={(val) => setNewVarUnitId(val)}
+											options={productSpecificUnitOptions}
+										/>
+									</div>
+								</div>
 							</div>
 
-							{/* Custom Thumbnail Upload Component */}
-							<div className="space-y-1.5 pt-1">
-								<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-									{t("products.productImage")}
-								</Label>
-								<div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800">
-									<div className="relative h-16 w-16 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center group shadow-2xs">
+							{/* CARD 2: PACKAGING UNIT PRICING SECTION (OPTION 1 VS OPTION 2) */}
+							{productUnitsList && productUnitsList.length > 1 && (
+								<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-2xs">
+									<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200/60 dark:border-slate-800/60">
+										<div className="flex items-center gap-2.5">
+											<div className="h-8 w-8 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+												<Boxes className="h-4 w-4" />
+											</div>
+											<div>
+												<div className="flex items-center gap-2">
+													<h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+														{t("products.packagingPricing")}
+													</h4>
+													<Badge
+														variant="secondary"
+														className="text-[10px] font-mono px-2 py-0 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800/50"
+													>
+														{productUnitsList.length} Units
+													</Badge>
+												</div>
+												<p className="text-[11px] text-slate-500 dark:text-slate-400">
+													{newVarPricingMode === "auto"
+														? t("products.autoScalePricingDesc")
+														: t("products.customUnitPricingDesc")}
+												</p>
+											</div>
+										</div>
+
+										{/* Segmented Control / Toggle */}
+										<div className="inline-flex items-center bg-slate-200/70 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/60 shrink-0 shadow-2xs">
+											<button
+												type="button"
+												onClick={() => setNewVarPricingMode("auto")}
+												className={cn(
+													"px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
+													newVarPricingMode === "auto"
+														? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs font-bold"
+														: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+												)}
+											>
+												<Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+												<span>{t("products.autoScalePricing")}</span>
+											</button>
+											<button
+												type="button"
+												onClick={() => {
+													setNewVarPricingMode("custom");
+													// Initialize unit prices if empty
+													setNewVarUnitPrices((prev) => {
+														const updated = { ...prev };
+														const baseNum = Math.max(0, Number(newVarPrice) || 0);
+														productUnitsList.forEach((u: any) => {
+															const uId = u.unitId ?? u.id;
+															if (!updated[uId]) {
+																const uList = calculateUnitListPrice(
+																	baseNum,
+																	u.baseQuantity || 1,
+																);
+																const uDisc =
+																	parseFloat(String(u.discount ?? 0)) || 0;
+																const discType = normalizeDiscountType(
+																	u.discountType,
+																);
+																const finalP =
+																	uDisc > 0
+																		? calculateUnitFinalPrice(
+																				uList,
+																				uDisc,
+																				discType,
+																			)
+																		: u.isBase
+																			? baseNum
+																			: uList;
+																updated[uId] = {
+																	unitPrice:
+																		finalP > 0
+																			? finalP.toFixed(2)
+																			: u.isBase
+																				? baseNum.toFixed(2)
+																				: uList.toFixed(2),
+																	discount: String(uDisc),
+																	discountType: discType,
+																};
+															}
+														});
+														return updated;
+													});
+												}}
+												className={cn(
+													"px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
+													newVarPricingMode === "custom"
+														? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs font-bold"
+														: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+												)}
+											>
+												<SlidersHorizontal className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+												<span>{t("products.customUnitPricing")}</span>
+											</button>
+										</div>
+									</div>
+
+									{/* OPTION 1: AUTO-SCALE PREVIEW */}
+									{newVarPricingMode === "auto" && (
+										<div className="space-y-3">
+											<div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
+												<span className="flex items-center gap-1.5 font-medium text-purple-700 dark:text-purple-300">
+													<Sparkles className="h-3.5 w-3.5" />
+													Live calculation based on base unit price ($
+													{(Number(newVarPrice) || 0).toFixed(2)})
+												</span>
+												<span className="text-[11px]">
+													Inherits ratios & default discounts
+												</span>
+											</div>
+
+											<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+												{productUnitsList.map((u: any) => {
+													const baseNum = Math.max(0, Number(newVarPrice) || 0);
+													const qty = u.baseQuantity || 1;
+													const uList = calculateUnitListPrice(baseNum, qty);
+													const uDisc =
+														parseFloat(String(u.discount ?? 0)) || 0;
+													const discType = normalizeDiscountType(
+														u.discountType,
+													);
+													const finalP =
+														uDisc > 0
+															? calculateUnitFinalPrice(
+																	uList,
+																	uDisc,
+																	discType,
+																)
+															: u.isBase
+																? baseNum
+																: uList;
+
+													return (
+														<div
+															key={u.unitId ?? u.id}
+															className="bg-white dark:bg-slate-900 rounded-xl p-3.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between"
+														>
+															<div>
+																<div className="flex items-center justify-between gap-1 mb-1.5">
+																	<div className="flex items-center gap-1.5">
+																		<span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
+																			{u.unitName || u.name}
+																		</span>
+																		{u.symbol && (
+																			<span className="text-[11px] text-slate-400">
+																				({u.symbol})
+																			</span>
+																		)}
+																	</div>
+																	{u.isBase ? (
+																		<Badge
+																			variant="outline"
+																			className="text-[9px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold"
+																		>
+																			Base
+																		</Badge>
+																	) : (
+																		<Badge
+																			variant="secondary"
+																			className="text-[9px] px-1.5 py-0 font-mono"
+																		>
+																			{qty}x
+																		</Badge>
+																	)}
+																</div>
+																<div className="text-[11px] text-slate-400 font-mono mb-2">
+																	{u.isBase
+																		? "1 Base Unit"
+																		: `${qty}x Base Unit`}
+																	{qty > 1 && finalP > 0 && (
+																		<span className="text-purple-600 dark:text-purple-400 ml-1">
+																			(≈ ${(finalP / qty).toFixed(2)}/ea)
+																		</span>
+																	)}
+																</div>
+															</div>
+
+															<div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-baseline justify-between">
+																<div className="text-[11px] text-slate-400 font-mono">
+																	{uDisc > 0 ? (
+																		<span className="line-through mr-1">
+																			${uList.toFixed(2)}
+																		</span>
+																	) : (
+																		<span>List: ${uList.toFixed(2)}</span>
+																	)}
+																</div>
+																<div className="flex items-center gap-1">
+																	<span className="text-sm font-bold font-mono text-purple-700 dark:text-purple-300">
+																		${finalP.toFixed(2)}
+																	</span>
+																	{uDisc > 0 && (
+																		<Badge className="bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200 dark:border-rose-900/40 text-[9px] px-1 py-0 font-mono">
+																			-{uDisc}
+																			{discType === "PERCENTAGE" ? "%" : "$"}
+																		</Badge>
+																	)}
+																</div>
+															</div>
+														</div>
+													);
+												})}
+											</div>
+										</div>
+									)}
+
+									{/* OPTION 2: CUSTOM PRICING TIERS */}
+									{newVarPricingMode === "custom" && (
+										<div className="space-y-3">
+											<div className="flex items-center justify-between px-1">
+												<span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+													<SlidersHorizontal className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+													{t("products.customUnitPricing")}
+												</span>
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													onClick={() => {
+														const baseNum = Math.max(0, Number(newVarPrice) || 0);
+														const updated: Record<string | number, any> = {};
+														productUnitsList.forEach((u: any) => {
+															const uId = u.unitId ?? u.id;
+															const uList = calculateUnitListPrice(
+																baseNum,
+																u.baseQuantity || 1,
+															);
+															const uDisc =
+																parseFloat(String(u.discount ?? 0)) || 0;
+															const discType = normalizeDiscountType(
+																u.discountType,
+															);
+															const finalP =
+																uDisc > 0
+																	? calculateUnitFinalPrice(
+																			uList,
+																			uDisc,
+																			discType,
+																		)
+																	: u.isBase
+																		? baseNum
+																		: uList;
+															updated[uId] = {
+																unitPrice:
+																	finalP > 0
+																		? finalP.toFixed(2)
+																		: u.isBase
+																			? baseNum.toFixed(2)
+																			: uList.toFixed(2),
+																discount: String(uDisc),
+																discountType: discType,
+															};
+														});
+														setNewVarUnitPrices(updated);
+														toast.info("Reset all unit prices from base price ratio");
+													}}
+													className="h-7 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 px-2.5 rounded-lg cursor-pointer"
+												>
+													<RotateCcw className="h-3.5 w-3.5 mr-1" />
+													{t("products.recalculateFromBase")}
+												</Button>
+											</div>
+
+											<div className="space-y-3">
+												{productUnitsList.map((u: any) => {
+													const uId = u.unitId ?? u.id;
+													const baseNum = Math.max(0, Number(newVarPrice) || 0);
+													const qty = u.baseQuantity || 1;
+													const uList = calculateUnitListPrice(baseNum, qty);
+													const current = newVarUnitPrices[uId] || {
+														unitPrice: (u.isBase ? baseNum : uList).toFixed(2),
+														discount: String(u.discount ?? 0),
+														discountType: normalizeDiscountType(
+															u.discountType,
+														),
+													};
+
+													const currPrice =
+														parseFloat(current.unitPrice) || 0;
+													const currDisc = parseFloat(current.discount) || 0;
+													const baseUnitObj =
+														productUnitsList.find((b: any) => b.isBase) ||
+														productUnitsList[0];
+													const baseUnitName =
+														baseUnitObj?.unitName ||
+														baseUnitObj?.name ||
+														"Unit";
+
+													return (
+														<div
+															key={uId}
+															className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-3 hover:border-purple-300/60 dark:hover:border-purple-800/60 transition-colors"
+														>
+															{/* Unit Header */}
+															<div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+																<div className="flex items-center gap-2">
+																	<div className="flex items-center justify-center h-7 w-7 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold text-xs">
+																		{u.isBase ? "1x" : `${qty}x`}
+																	</div>
+																	<div className="flex items-center gap-1.5">
+																		<span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+																			{u.unitName || u.name}
+																		</span>
+																		{u.symbol && (
+																			<span className="text-[11px] text-slate-400">
+																				({u.symbol})
+																			</span>
+																		)}
+																		{u.isBase ? (
+																			<Badge
+																				variant="outline"
+																				className="text-[9px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold"
+																			>
+																				Base (1x)
+																			</Badge>
+																		) : (
+																			<Badge
+																				variant="secondary"
+																				className="text-[9px] px-1.5 py-0 font-mono"
+																			>
+																				{u.parentUnitName && u.parentQuantity
+																					? `${u.parentQuantity}x ${u.parentUnitName} (${qty}x)`
+																					: `${qty}x Base`}
+																			</Badge>
+																		)}
+																	</div>
+																</div>
+
+																{/* Economics & Reference */}
+																<div className="flex items-center gap-2.5">
+																	<div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+																		List:{" "}
+																		<span className="font-semibold text-slate-700 dark:text-slate-300">
+																			${uList.toFixed(2)}
+																		</span>
+																	</div>
+																	{qty > 1 && currPrice > 0 && (
+																		<span className="text-[10px] font-mono text-purple-600 dark:text-purple-400">
+																			(≈ ${(currPrice / qty).toFixed(2)}/
+																			{baseUnitName})
+																		</span>
+																	)}
+																	{uList > 0 && currPrice < uList && (
+																		<Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/40 text-[9px] px-1.5 py-0 font-mono">
+																			Save ${(uList - currPrice).toFixed(2)}
+																		</Badge>
+																	)}
+																</div>
+															</div>
+
+															{/* Controls Grid */}
+															<div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-end">
+																{/* Selling Price (4 cols) */}
+																<div className="sm:col-span-4">
+																	<Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5 block">
+																		{t("products.unitFinalPrice")} ($) *
+																	</Label>
+																	<div className="relative">
+																		<span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-slate-400">
+																			$
+																		</span>
+																		<Input
+																			type="number"
+																			step="0.01"
+																			value={current.unitPrice}
+																			onChange={(e) => {
+																				const val = e.target.value;
+																				const numVal = parseFloat(val);
+																				let newDisc = current.discount;
+																				if (!isNaN(numVal) && uList > 0) {
+																					const calculatedD =
+																						calculateUnitDiscount(
+																							uList,
+																							numVal,
+																							current.discountType,
+																						);
+																					newDisc =
+																						calculatedD > 0
+																							? String(calculatedD)
+																							: "0";
+																				}
+																				setNewVarUnitPrices((prev) => ({
+																					...prev,
+																					[uId]: {
+																						...current,
+																						unitPrice: val,
+																						discount: newDisc,
+																					},
+																				}));
+																			}}
+																			placeholder="0.00"
+																			className="pl-7 h-9 text-xs font-mono font-bold rounded-xl bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+																		/>
+																	</div>
+																</div>
+
+																{/* Discount Input with % / $ Toggle (4 cols) */}
+																<div className="sm:col-span-4">
+																	<div className="flex items-center justify-between mb-1.5">
+																		<Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+																			{t("products.unitDiscount")}
+																		</Label>
+																		<span className="text-[10px] text-slate-400">
+																			{current.discountType === "PERCENTAGE"
+																				? "Percentage"
+																				: "Fixed Amount"}
+																		</span>
+																	</div>
+																	<div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 focus-within:border-purple-500 focus-within:ring-2 focus-within:ring-purple-500/20 overflow-hidden h-9">
+																		<Input
+																			type="number"
+																			step="0.01"
+																			value={current.discount}
+																			onChange={(e) => {
+																				const val = e.target.value;
+																				const numVal = parseFloat(val);
+																				let newP = current.unitPrice;
+																				if (uList > 0) {
+																					if (isNaN(numVal) || numVal <= 0) {
+																						newP = uList.toFixed(2);
+																					} else {
+																						const finalP =
+																							calculateUnitFinalPrice(
+																								uList,
+																								numVal,
+																								current.discountType,
+																							);
+																						newP = finalP.toFixed(2);
+																					}
+																				}
+																				setNewVarUnitPrices((prev) => ({
+																					...prev,
+																					[uId]: {
+																						...current,
+																						discount: val,
+																						unitPrice: newP,
+																					},
+																				}));
+																			}}
+																			placeholder="0"
+																			className="border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 h-full text-xs font-mono bg-transparent flex-1 px-3"
+																		/>
+																		<div className="flex items-center border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 m-1 rounded-lg">
+																			<button
+																				type="button"
+																				onClick={() => {
+																					if (
+																						current.discountType ===
+																						"PERCENTAGE"
+																					)
+																						return;
+																					let newDisc = current.discount;
+																					if (uList > 0 && currPrice > 0) {
+																						const d = calculateUnitDiscount(
+																							uList,
+																							currPrice,
+																							"PERCENTAGE",
+																						);
+																						newDisc =
+																							d > 0 ? String(d) : "0";
+																					}
+																					setNewVarUnitPrices((prev) => ({
+																						...prev,
+																						[uId]: {
+																							...current,
+																							discountType: "PERCENTAGE",
+																							discount: newDisc,
+																						},
+																					}));
+																				}}
+																				className={cn(
+																					"px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-colors",
+																					current.discountType === "PERCENTAGE"
+																						? "bg-purple-600 text-white shadow-2xs"
+																						: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
+																				)}
+																			>
+																				%
+																			</button>
+																			<button
+																				type="button"
+																				onClick={() => {
+																					if (
+																						current.discountType === "FLAT"
+																					)
+																						return;
+																					let newDisc = current.discount;
+																					if (uList > 0 && currPrice > 0) {
+																						const d = calculateUnitDiscount(
+																							uList,
+																							currPrice,
+																							"FLAT",
+																						);
+																						newDisc =
+																							d > 0 ? String(d) : "0";
+																					}
+																					setNewVarUnitPrices((prev) => ({
+																						...prev,
+																						[uId]: {
+																							...current,
+																							discountType: "FLAT",
+																							discount: newDisc,
+																						},
+																					}));
+																				}}
+																				className={cn(
+																					"px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-colors",
+																					current.discountType === "FLAT"
+																						? "bg-purple-600 text-white shadow-2xs"
+																						: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
+																				)}
+																			>
+																				$
+																			</button>
+																		</div>
+																	</div>
+																</div>
+
+																{/* Presets (4 cols) */}
+																<div className="sm:col-span-4">
+																	<Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5 block">
+																		Quick Presets
+																	</Label>
+																	<div className="flex items-center gap-1 h-9">
+																		{[0, 2, 3, 5, 10].map((preset) => (
+																			<button
+																				key={preset}
+																				type="button"
+																				onClick={() => {
+																					const finalP =
+																						preset > 0
+																							? calculateUnitFinalPrice(
+																									uList,
+																									preset,
+																									"PERCENTAGE",
+																								)
+																							: uList;
+																					setNewVarUnitPrices((prev) => ({
+																						...prev,
+																						[uId]: {
+																							unitPrice: finalP.toFixed(2),
+																							discount: String(preset),
+																							discountType: "PERCENTAGE",
+																						},
+																					}));
+																				}}
+																				className={cn(
+																					"flex-1 h-8 px-1 text-[11px] font-mono font-semibold rounded-lg border cursor-pointer transition-all flex items-center justify-center",
+																					current.discountType ===
+																						"PERCENTAGE" &&
+																						Math.abs(currDisc - preset) <
+																							0.01
+																						? "bg-purple-600 text-white border-purple-600 shadow-2xs font-bold"
+																						: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750",
+																				)}
+																			>
+																				{preset}%
+																			</button>
+																		))}
+																	</div>
+																</div>
+															</div>
+														</div>
+													);
+												})}
+											</div>
+										</div>
+									)}
+								</div>
+							)}
+
+							{/* CARD 3: CUSTOM THUMBNAIL UPLOAD COMPONENT */}
+							<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-2xs">
+								<div className="flex items-center justify-between pb-2.5 border-b border-slate-200/60 dark:border-slate-800/60">
+									<div className="flex items-center gap-2.5">
+										<div className="h-8 w-8 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+											<Camera className="h-4 w-4" />
+										</div>
+										<div>
+											<h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+												{t("products.productImage")}
+											</h4>
+											<p className="text-[11px] text-slate-500 dark:text-slate-400">
+												Variant-specific photo or cover image
+											</p>
+										</div>
+									</div>
+									{newVarThumbnail && (
+										<Badge
+											variant="secondary"
+											className="text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+										>
+											Image Attached
+										</Badge>
+									)}
+								</div>
+
+								<div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+									<div className="relative h-20 w-20 bg-slate-50 dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center group shadow-2xs">
 										<img
 											src={safeImageUrl(newVarThumbnail)}
 											alt="Thumbnail Preview"
@@ -4632,7 +5368,7 @@ function ProductsTab() {
 										)}
 									</div>
 
-									<div className="flex-1 space-y-2">
+									<div className="flex-1 w-full space-y-2.5">
 										<div className="flex flex-wrap items-center gap-2">
 											<Button
 												type="button"
@@ -4640,7 +5376,7 @@ function ProductsTab() {
 												size="sm"
 												disabled={uploadingVariantThumbnail}
 												onClick={() => addVarThumbnailInputRef.current?.click()}
-												className="rounded-xl h-8 text-xs font-semibold cursor-pointer"
+												className="rounded-xl h-8 text-xs font-semibold cursor-pointer border-slate-200 dark:border-slate-700"
 											>
 												{uploadingVariantThumbnail ? (
 													<>
@@ -4663,20 +5399,20 @@ function ProductsTab() {
 													setMediaPickerTarget("newVariant");
 													setIsMediaPickerOpen(true);
 												}}
-												className="rounded-xl h-8 text-xs font-semibold text-sky-600 hover:text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/40 cursor-pointer"
+												className="rounded-xl h-8 text-xs font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer"
 											>
 												<FolderOpen className="h-3.5 w-3.5 mr-1.5" />
 												{t("products.chooseFromVault")}
 											</Button>
 										</div>
 
-										<div className="flex items-center gap-1.5">
+										<div className="flex items-center gap-2">
 											<Input
 												type="text"
 												value={newVarThumbnail}
 												onChange={(e) => setNewVarThumbnail(e.target.value)}
 												placeholder="Or paste direct image URL (https://...)"
-												className="h-7 text-[11px] rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+												className="h-8 text-xs rounded-xl bg-slate-50/70 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
 											/>
 											{newVarThumbnail && (
 												<Button
@@ -4684,7 +5420,7 @@ function ProductsTab() {
 													variant="ghost"
 													size="sm"
 													onClick={() => setNewVarThumbnail("")}
-													className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 cursor-pointer"
+													className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 cursor-pointer shrink-0"
 													title="Clear URL"
 												>
 													<X className="h-3.5 w-3.5" />
@@ -4697,59 +5433,73 @@ function ProductsTab() {
 						</ModernTabsContent>
 
 						{/* TAB 2: PHYSICAL DIMENSIONS & WEIGHT (OPTIONAL) */}
-						<ModernTabsContent value="physical" className="space-y-3 mt-0">
-							<div className="flex items-center gap-2 p-3 bg-purple-50/60 dark:bg-purple-950/20 rounded-xl border border-purple-100 dark:border-purple-900/40 text-purple-700 dark:text-purple-300 text-xs">
-								<Sparkles className="h-4 w-4 shrink-0" />
-								<span>{t("products.optionalPhysicalSpecs")}</span>
+						<ModernTabsContent value="physical" className="space-y-4 mt-0">
+							<div className="flex items-center gap-3 p-3.5 bg-purple-50/70 dark:bg-purple-950/30 rounded-2xl border border-purple-100 dark:border-purple-900/40 text-purple-700 dark:text-purple-300 text-xs">
+								<div className="h-8 w-8 rounded-xl bg-purple-100 dark:bg-purple-900/60 flex items-center justify-center shrink-0">
+									<Boxes className="h-4 w-4" />
+								</div>
+								<div>
+									<div className="font-bold">{t("products.optionalPhysicalSpecs")}</div>
+									<div className="text-[11px] text-purple-600/80 dark:text-purple-300/80">
+										Used for logistics calculations, shipping rates, and storage bin optimization.
+									</div>
+								</div>
 							</div>
 
-							<div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-								<ModernInput
-									label={t("products.netWeight")}
-									type="number"
-									step="0.01"
-									value={newVarNetWeight}
-									onChange={(e) => setNewVarNetWeight(e.target.value)}
-									placeholder="0.12"
-								/>
-								<ModernInput
-									label={t("products.grossWeight")}
-									type="number"
-									step="0.01"
-									value={newVarGrossWeight}
-									onChange={(e) => setNewVarGrossWeight(e.target.value)}
-									placeholder="0.15"
-								/>
-								<ModernInput
-									label={t("products.height")}
-									type="number"
-									step="0.1"
-									value={newVarHeight}
-									onChange={(e) => setNewVarHeight(e.target.value)}
-									placeholder="3.5"
-								/>
-								<ModernInput
-									label={t("products.width")}
-									type="number"
-									step="0.1"
-									value={newVarWidth}
-									onChange={(e) => setNewVarWidth(e.target.value)}
-									placeholder="6.0"
-								/>
-								<ModernInput
-									label={t("products.depth")}
-									type="number"
-									step="0.1"
-									value={newVarDepth}
-									onChange={(e) => setNewVarDepth(e.target.value)}
-									placeholder="10.5"
-								/>
-								<ModernInput
-									label={t("products.volume")}
-									value={newVarVolume}
-									onChange={(e) => setNewVarVolume(e.target.value)}
-									placeholder="750ml"
-								/>
+							<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-2xs">
+								<h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+									<Scale className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+									Weight & Dimensions
+								</h4>
+
+								<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+									<ModernInput
+										label={`${t("products.netWeight")} (kg)`}
+										type="number"
+										step="0.01"
+										value={newVarNetWeight}
+										onChange={(e) => setNewVarNetWeight(e.target.value)}
+										placeholder="0.12"
+									/>
+									<ModernInput
+										label={`${t("products.grossWeight")} (kg)`}
+										type="number"
+										step="0.01"
+										value={newVarGrossWeight}
+										onChange={(e) => setNewVarGrossWeight(e.target.value)}
+										placeholder="0.15"
+									/>
+									<ModernInput
+										label={`${t("products.volume")}`}
+										value={newVarVolume}
+										onChange={(e) => setNewVarVolume(e.target.value)}
+										placeholder="e.g. 750ml, 1.5L"
+									/>
+									<ModernInput
+										label={`${t("products.height")} (cm)`}
+										type="number"
+										step="0.1"
+										value={newVarHeight}
+										onChange={(e) => setNewVarHeight(e.target.value)}
+										placeholder="3.5"
+									/>
+									<ModernInput
+										label={`${t("products.width")} (cm)`}
+										type="number"
+										step="0.1"
+										value={newVarWidth}
+										onChange={(e) => setNewVarWidth(e.target.value)}
+										placeholder="6.0"
+									/>
+									<ModernInput
+										label={`${t("products.depth")} (cm)`}
+										type="number"
+										step="0.1"
+										value={newVarDepth}
+										onChange={(e) => setNewVarDepth(e.target.value)}
+										placeholder="10.5"
+									/>
+								</div>
 							</div>
 						</ModernTabsContent>
 					</ModernTabs>
@@ -4762,6 +5512,11 @@ function ProductsTab() {
 				onClose={() => setIsEditVariantOpen(false)}
 				title={t("products.editVariant")}
 				subtitle={t("products.subtitle")}
+				icon={
+					<Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+				}
+				size="xl"
+				className="max-w-4xl xl:max-w-5xl w-full"
 				footer={
 					<ModernModalFooter>
 						<ModernModalCancelButton
@@ -4792,172 +5547,238 @@ function ProductsTab() {
 							onValueChange={(v: any) => setEditVarTab(v)}
 							className="w-full"
 						>
-							<ModernTabsList className="grid grid-cols-2 w-full mb-3">
+							<ModernTabsList className="grid grid-cols-2 w-full p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 mb-4">
 								<ModernTabsTrigger
 									value="general"
 									icon={<Package className="h-4 w-4" />}
-									className="flex-row items-center justify-center gap-2 text-xs font-bold py-2"
+									className="flex-row items-center justify-center gap-2 text-xs font-bold py-2.5 rounded-xl cursor-pointer"
 								>
 									{t("products.basicInfo")}
 								</ModernTabsTrigger>
 								<ModernTabsTrigger
 									value="physical"
 									icon={<Boxes className="h-4 w-4" />}
-									className="flex-row items-center justify-center gap-2 text-xs font-bold py-2"
+									className="flex-row items-center justify-center gap-2 text-xs font-bold py-2.5 rounded-xl cursor-pointer"
 								>
-									{t("products.inventorySettings")}
+									{t("products.inventorySettings")} & Specs
 								</ModernTabsTrigger>
 							</ModernTabsList>
 
 							{/* TAB 1: GENERAL & PRICING */}
-							<ModernTabsContent value="general" className="space-y-3 mt-0">
-								<ModernInput
-									label={t("products.variantName")}
-									value={selectedVariant.name || ""}
-									onChange={(e) =>
-										setSelectedVariant({
-											...selectedVariant,
-											name: e.target.value,
-										})
-									}
-									placeholder="e.g. Black / 512GB"
-								/>
-
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-									{/* SKU Code with Generator */}
-									<div>
-										<div className="flex items-center justify-between mb-1.5">
-											<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-												{t("stocks.sku")}
-											</Label>
-											<button
-												type="button"
-												onClick={() => {
-													const sku = generateVariantSku(selectedVariant.name);
-													setSelectedVariant({ ...selectedVariant, sku });
-													toast.info(`Generated SKU: ${sku}`);
-												}}
-												className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:underline cursor-pointer"
-											>
-												<Sparkles className="h-3 w-3" />
-												{t("products.generate")}
-											</button>
+							<ModernTabsContent value="general" className="space-y-4 mt-0">
+								{/* CARD 1: CORE IDENTIFICATION */}
+								<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-2xs">
+									<div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-800/60">
+										<div className="flex items-center gap-2.5">
+											<div className="h-8 w-8 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+												<Tag className="h-4 w-4" />
+											</div>
+											<div>
+												<h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+													{t("products.basicInfo")}
+												</h4>
+												<p className="text-[11px] text-slate-500 dark:text-slate-400">
+													Edit variant name, SKU, barcode, and base price
+												</p>
+											</div>
 										</div>
-										<div className="relative">
-											<Input
-												value={selectedVariant.sku || ""}
-												onChange={(e) =>
-													setSelectedVariant({
-														...selectedVariant,
-														sku: e.target.value,
-													})
-												}
-												placeholder="SKU-1001"
-												className="pr-8 font-mono text-xs rounded-xl bg-slate-50/50 dark:bg-slate-900/50"
-											/>
-											<button
-												type="button"
-												onClick={() => {
-													const sku = generateVariantSku(selectedVariant.name);
-													setSelectedVariant({ ...selectedVariant, sku });
-													toast.info(`Generated SKU: ${sku}`);
-												}}
-												className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer"
-												title={t("products.generate")}
-											>
-												<Sparkles className="h-3.5 w-3.5" />
-											</button>
-										</div>
+										<Badge
+											variant="outline"
+											className="text-[10px] font-semibold bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+										>
+											ID: {selectedVariant.id}
+										</Badge>
 									</div>
 
-									{/* Barcode with Generator */}
-									<div>
-										<div className="flex items-center justify-between mb-1.5">
-											<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-												{t("products.barcode")}
-											</Label>
-											<button
-												type="button"
-												onClick={() => {
-													const code = generateVariantBarcode();
-													setSelectedVariant({
-														...selectedVariant,
-														barcode: code,
-													});
-													toast.info(`Generated Barcode: ${code}`);
-												}}
-												className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:underline cursor-pointer"
-											>
-												<Sparkles className="h-3 w-3" />
-												{t("products.generate")}
-											</button>
-										</div>
-										<div className="relative">
-											<Input
-												value={selectedVariant.barcode || ""}
-												onChange={(e) =>
-													setSelectedVariant({
-														...selectedVariant,
-														barcode: e.target.value,
-													})
-												}
-												placeholder="BAR-1001"
-												className="pr-8 font-mono text-xs rounded-xl bg-slate-50/50 dark:bg-slate-900/50"
-											/>
-											<button
-												type="button"
-												onClick={() => {
-													const code = generateVariantBarcode();
-													setSelectedVariant({
-														...selectedVariant,
-														barcode: code,
-													});
-													toast.info(`Generated Barcode: ${code}`);
-												}}
-												className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer"
-												title={t("products.generate")}
-											>
-												<Sparkles className="h-3.5 w-3.5" />
-											</button>
-										</div>
-									</div>
-								</div>
-
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+									{/* Variant Name */}
 									<ModernInput
-										label={t("products.retailSellPrice")}
-										type="number"
-										step="0.01"
-										value={selectedVariant.price || "0"}
+										label={t("products.variantName")}
+										value={selectedVariant.name || ""}
 										onChange={(e) =>
 											setSelectedVariant({
 												...selectedVariant,
-												price: e.target.value,
+												name: e.target.value,
 											})
 										}
-										placeholder="0.00"
+										placeholder="e.g. Black / 512GB"
+										leftIcon={<Tag className="h-3.5 w-3.5 text-slate-400" />}
+										className="rounded-xl text-xs font-medium"
 									/>
-									<ModernSelect
-										label={t("products.unit")}
-										value={
-											selectedVariant.unitId
-												? String(selectedVariant.unitId)
-												: ""
-										}
-										onChange={(val) =>
-											setSelectedVariant({ ...selectedVariant, unitId: val })
-										}
-										options={productSpecificUnitOptions}
-									/>
+
+									{/* SKU & Barcode */}
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+										{/* SKU Code with Generator */}
+										<div>
+											<div className="flex items-center justify-between mb-1.5">
+												<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+													{t("stocks.sku")}
+												</Label>
+												<button
+													type="button"
+													onClick={() => {
+														const sku = generateVariantSku(selectedVariant.name);
+														setSelectedVariant({ ...selectedVariant, sku });
+														toast.info(`Generated SKU: ${sku}`);
+													}}
+													className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:underline cursor-pointer"
+												>
+													<Sparkles className="h-3 w-3" />
+													{t("products.generate")}
+												</button>
+											</div>
+											<div className="relative">
+												<Input
+													value={selectedVariant.sku || ""}
+													onChange={(e) =>
+														setSelectedVariant({
+															...selectedVariant,
+															sku: e.target.value,
+														})
+													}
+													placeholder="SKU-1001"
+													className="pr-9 font-mono text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+												/>
+												<button
+													type="button"
+													onClick={() => {
+														const sku = generateVariantSku(selectedVariant.name);
+														setSelectedVariant({ ...selectedVariant, sku });
+														toast.info(`Generated SKU: ${sku}`);
+													}}
+													className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
+													title={t("products.generate")}
+												>
+													<Sparkles className="h-3.5 w-3.5" />
+												</button>
+											</div>
+										</div>
+
+										{/* Barcode with Generator */}
+										<div>
+											<div className="flex items-center justify-between mb-1.5">
+												<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+													{t("products.barcode")}
+												</Label>
+												<button
+													type="button"
+													onClick={() => {
+														const code = generateVariantBarcode();
+														setSelectedVariant({
+															...selectedVariant,
+															barcode: code,
+														});
+														toast.info(`Generated Barcode: ${code}`);
+													}}
+													className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:underline cursor-pointer"
+												>
+													<Sparkles className="h-3 w-3" />
+													{t("products.generate")}
+												</button>
+											</div>
+											<div className="relative">
+												<Input
+													value={selectedVariant.barcode || ""}
+													onChange={(e) =>
+														setSelectedVariant({
+															...selectedVariant,
+															barcode: e.target.value,
+														})
+													}
+													placeholder="BAR-1001"
+													className="pr-9 font-mono text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+												/>
+												<button
+													type="button"
+													onClick={() => {
+														const code = generateVariantBarcode();
+														setSelectedVariant({
+															...selectedVariant,
+															barcode: code,
+														});
+														toast.info(`Generated Barcode: ${code}`);
+													}}
+													className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
+													title={t("products.generate")}
+												>
+													<Sparkles className="h-3.5 w-3.5" />
+												</button>
+											</div>
+										</div>
+									</div>
+
+									{/* Retail Sell Price & Base Unit */}
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+										<div>
+											<Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 block">
+												{t("products.retailSellPrice")}
+											</Label>
+											<div className="relative">
+												<span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-slate-400">
+													$
+												</span>
+												<Input
+													type="number"
+													step="0.01"
+													value={selectedVariant.price || "0"}
+													onChange={(e) =>
+														setSelectedVariant({
+															...selectedVariant,
+															price: e.target.value,
+														})
+													}
+													placeholder="0.00"
+													className="pl-7 font-mono font-bold text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+												/>
+											</div>
+										</div>
+										<div>
+											<ModernSelect
+												label={t("products.unit")}
+												value={
+													selectedVariant.unitId
+														? String(selectedVariant.unitId)
+														: ""
+												}
+												onChange={(val) =>
+													setSelectedVariant({
+														...selectedVariant,
+														unitId: val,
+													})
+												}
+												options={productSpecificUnitOptions}
+											/>
+										</div>
+									</div>
 								</div>
 
-								{/* Custom Thumbnail Upload Component */}
-								<div className="space-y-1.5 pt-1">
-									<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-										{t("products.productImage")}
-									</Label>
-									<div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800">
-										<div className="relative h-16 w-16 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center group shadow-2xs">
+								{/* CARD 2: CUSTOM THUMBNAIL UPLOAD */}
+								<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-2xs">
+									<div className="flex items-center justify-between pb-2.5 border-b border-slate-200/60 dark:border-slate-800/60">
+										<div className="flex items-center gap-2.5">
+											<div className="h-8 w-8 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+												<Camera className="h-4 w-4" />
+											</div>
+											<div>
+												<h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+													{t("products.productImage")}
+												</h4>
+												<p className="text-[11px] text-slate-500 dark:text-slate-400">
+													Variant-specific image or thumbnail
+												</p>
+											</div>
+										</div>
+										{selectedVariant.thumbnail && (
+											<Badge
+												variant="secondary"
+												className="text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+											>
+												Image Attached
+											</Badge>
+										)}
+									</div>
+
+									<div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+										<div className="relative h-20 w-20 bg-slate-50 dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center group shadow-2xs">
 											<img
 												src={safeImageUrl(selectedVariant.thumbnail)}
 												alt="Thumbnail Preview"
@@ -4984,7 +5805,7 @@ function ProductsTab() {
 											)}
 										</div>
 
-										<div className="flex-1 space-y-2">
+										<div className="flex-1 w-full space-y-2.5">
 											<div className="flex flex-wrap items-center gap-2">
 												<Button
 													type="button"
@@ -4994,7 +5815,7 @@ function ProductsTab() {
 													onClick={() =>
 														editVarThumbnailInputRef.current?.click()
 													}
-													className="rounded-xl h-8 text-xs font-semibold cursor-pointer"
+													className="rounded-xl h-8 text-xs font-semibold cursor-pointer border-slate-200 dark:border-slate-700"
 												>
 													{uploadingVariantThumbnail ? (
 														<>
@@ -5017,14 +5838,14 @@ function ProductsTab() {
 														setMediaPickerTarget("editVariant");
 														setIsMediaPickerOpen(true);
 													}}
-													className="rounded-xl h-8 text-xs font-semibold text-sky-600 hover:text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/40 cursor-pointer"
+													className="rounded-xl h-8 text-xs font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer"
 												>
 													<FolderOpen className="h-3.5 w-3.5 mr-1.5" />
 													{t("products.chooseFromVault")}
 												</Button>
 											</div>
 
-											<div className="flex items-center gap-1.5">
+											<div className="flex items-center gap-2">
 												<Input
 													type="text"
 													value={selectedVariant.thumbnail || ""}
@@ -5035,7 +5856,7 @@ function ProductsTab() {
 														})
 													}
 													placeholder="Or paste direct image URL (https://...)"
-													className="h-7 text-[11px] rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+													className="h-8 text-xs rounded-xl bg-slate-50/70 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
 												/>
 												{selectedVariant.thumbnail && (
 													<Button
@@ -5048,7 +5869,7 @@ function ProductsTab() {
 																thumbnail: "",
 															})
 														}
-														className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 cursor-pointer"
+														className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 cursor-pointer shrink-0"
 														title="Clear URL"
 													>
 														<X className="h-3.5 w-3.5" />
@@ -5061,113 +5882,129 @@ function ProductsTab() {
 							</ModernTabsContent>
 
 							{/* TAB 2: PHYSICAL DIMENSIONS & WEIGHT (OPTIONAL) */}
-							<ModernTabsContent value="physical" className="space-y-3 mt-0">
-								<div className="flex items-center gap-2 p-3 bg-purple-50/60 dark:bg-purple-950/20 rounded-xl border border-purple-100 dark:border-purple-900/40 text-purple-700 dark:text-purple-300 text-xs">
-									<Sparkles className="h-4 w-4 shrink-0" />
-									<span>{t("products.optionalPhysicalSpecs")}</span>
+							<ModernTabsContent value="physical" className="space-y-4 mt-0">
+								<div className="flex items-center gap-3 p-3.5 bg-purple-50/70 dark:bg-purple-950/30 rounded-2xl border border-purple-100 dark:border-purple-900/40 text-purple-700 dark:text-purple-300 text-xs">
+									<div className="h-8 w-8 rounded-xl bg-purple-100 dark:bg-purple-900/60 flex items-center justify-center shrink-0">
+										<Boxes className="h-4 w-4" />
+									</div>
+									<div>
+										<div className="font-bold">
+											{t("products.optionalPhysicalSpecs")}
+										</div>
+										<div className="text-[11px] text-purple-600/80 dark:text-purple-300/80">
+											Used for logistics calculations, shipping rates, and storage bin optimization.
+										</div>
+									</div>
 								</div>
 
-								<div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-									<ModernInput
-										label={t("products.netWeight")}
-										type="number"
-										step="0.01"
-										value={
-											selectedVariant.netWeight !== undefined
-												? selectedVariant.netWeight
-												: selectedVariant.variantAttributes?.netWeight || ""
-										}
-										onChange={(e) =>
-											setSelectedVariant({
-												...selectedVariant,
-												netWeight: e.target.value,
-											})
-										}
-										placeholder="0.12"
-									/>
-									<ModernInput
-										label={t("products.grossWeight")}
-										type="number"
-										step="0.01"
-										value={
-											selectedVariant.grossWeight !== undefined
-												? selectedVariant.grossWeight
-												: selectedVariant.variantAttributes?.grossWeight || ""
-										}
-										onChange={(e) =>
-											setSelectedVariant({
-												...selectedVariant,
-												grossWeight: e.target.value,
-											})
-										}
-										placeholder="0.15"
-									/>
-									<ModernInput
-										label={t("products.height")}
-										type="number"
-										step="0.1"
-										value={
-											selectedVariant.height !== undefined
-												? selectedVariant.height
-												: selectedVariant.variantAttributes?.height || ""
-										}
-										onChange={(e) =>
-											setSelectedVariant({
-												...selectedVariant,
-												height: e.target.value,
-											})
-										}
-										placeholder="3.5"
-									/>
-									<ModernInput
-										label={t("products.width")}
-										type="number"
-										step="0.1"
-										value={
-											selectedVariant.width !== undefined
-												? selectedVariant.width
-												: selectedVariant.variantAttributes?.width || ""
-										}
-										onChange={(e) =>
-											setSelectedVariant({
-												...selectedVariant,
-												width: e.target.value,
-											})
-										}
-										placeholder="6.0"
-									/>
-									<ModernInput
-										label={t("products.depth")}
-										type="number"
-										step="0.1"
-										value={
-											selectedVariant.depth !== undefined
-												? selectedVariant.depth
-												: selectedVariant.variantAttributes?.depth || ""
-										}
-										onChange={(e) =>
-											setSelectedVariant({
-												...selectedVariant,
-												depth: e.target.value,
-											})
-										}
-										placeholder="10.5"
-									/>
-									<ModernInput
-										label={t("products.volume")}
-										value={
-											selectedVariant.volume !== undefined
-												? selectedVariant.volume
-												: selectedVariant.variantAttributes?.volume || ""
-										}
-										onChange={(e) =>
-											setSelectedVariant({
-												...selectedVariant,
-												volume: e.target.value,
-											})
-										}
-										placeholder="750ml"
-									/>
+								<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-2xs">
+									<h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+										<Scale className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+										Weight & Dimensions
+									</h4>
+
+									<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+										<ModernInput
+											label={`${t("products.netWeight")} (kg)`}
+											type="number"
+											step="0.01"
+											value={
+												selectedVariant.netWeight !== undefined
+													? selectedVariant.netWeight
+													: selectedVariant.variantAttributes?.netWeight || ""
+											}
+											onChange={(e) =>
+												setSelectedVariant({
+													...selectedVariant,
+													netWeight: e.target.value,
+												})
+											}
+											placeholder="0.12"
+										/>
+										<ModernInput
+											label={`${t("products.grossWeight")} (kg)`}
+											type="number"
+											step="0.01"
+											value={
+												selectedVariant.grossWeight !== undefined
+													? selectedVariant.grossWeight
+													: selectedVariant.variantAttributes?.grossWeight || ""
+											}
+											onChange={(e) =>
+												setSelectedVariant({
+													...selectedVariant,
+													grossWeight: e.target.value,
+												})
+											}
+											placeholder="0.15"
+										/>
+										<ModernInput
+											label={`${t("products.volume")}`}
+											value={
+												selectedVariant.volume !== undefined
+													? selectedVariant.volume
+													: selectedVariant.variantAttributes?.volume || ""
+											}
+											onChange={(e) =>
+												setSelectedVariant({
+													...selectedVariant,
+													volume: e.target.value,
+												})
+											}
+											placeholder="e.g. 750ml, 1.5L"
+										/>
+										<ModernInput
+											label={`${t("products.height")} (cm)`}
+											type="number"
+											step="0.1"
+											value={
+												selectedVariant.height !== undefined
+													? selectedVariant.height
+													: selectedVariant.variantAttributes?.height || ""
+											}
+											onChange={(e) =>
+												setSelectedVariant({
+													...selectedVariant,
+													height: e.target.value,
+												})
+											}
+											placeholder="3.5"
+										/>
+										<ModernInput
+											label={`${t("products.width")} (cm)`}
+											type="number"
+											step="0.1"
+											value={
+												selectedVariant.width !== undefined
+													? selectedVariant.width
+													: selectedVariant.variantAttributes?.width || ""
+											}
+											onChange={(e) =>
+												setSelectedVariant({
+													...selectedVariant,
+													width: e.target.value,
+												})
+											}
+											placeholder="6.0"
+										/>
+										<ModernInput
+											label={`${t("products.depth")} (cm)`}
+											type="number"
+											step="0.1"
+											value={
+												selectedVariant.depth !== undefined
+													? selectedVariant.depth
+													: selectedVariant.variantAttributes?.depth || ""
+											}
+											onChange={(e) =>
+												setSelectedVariant({
+													...selectedVariant,
+													depth: e.target.value,
+												})
+											}
+											placeholder="10.5"
+										/>
+									</div>
 								</div>
 							</ModernTabsContent>
 						</ModernTabs>
@@ -5235,11 +6072,16 @@ function ProductsTab() {
 				onClose={() => {
 					setIsStandaloneHistoryOpen(false);
 					setHistoryModalProduct(null);
+					setSelectedVariantIdForHistory(null);
 				}}
 				productId={historyModalProduct?.id}
 				productName={historyModalProduct?.name}
 				productVariants={historyModalProduct?.variants || []}
-				productUnits={historyModalProduct?.units || []}
+				productUnits={[
+					...(historyModalProduct?.units || []),
+					...(historyModalProduct?.variants?.flatMap((v: any) => v.units || []) || []),
+				]}
+				defaultVariantId={selectedVariantIdForHistory}
 			/>
 		</div>
 	);
@@ -7987,9 +8829,14 @@ interface NormalizedProductUnit {
 	unitName: string;
 	symbol?: string;
 	baseQuantity: number;
+	baseUnitName?: string | null;
 	parentQuantity: number | null;
 	parentUnitId: string | number | null;
 	parentUnitName: string | null;
+	basePrice: number;
+	discountPercentage: number;
+	discountNote?: string;
+	finalPrice: number;
 	sellingPrice: number;
 	pricePerBaseUnit: number;
 	formulaText: string;
@@ -8038,6 +8885,8 @@ function getNormalizedProductVariantData(
 				isBase: true,
 				baseQuantity: 1,
 				sellingPrice: baseUnitPrice,
+				basePrice: baseUnitPrice,
+				finalPrice: baseUnitPrice,
 			},
 		];
 	}
@@ -8109,14 +8958,54 @@ function getNormalizedProductVariantData(
 		const pricePerBaseUnit =
 			isBase || baseQty <= 1 ? unitPriceFinal : unitPriceFinal / baseQty;
 
+		const basePrice = Number(
+			u.basePrice !== undefined && u.basePrice !== null && Number(u.basePrice) > 0
+				? u.basePrice
+				: baseUnitPrice > 0
+				? baseUnitPrice * baseQty
+				: unitPriceFinal,
+		);
+
+		const finalPrice = Number(
+			u.finalPrice !== undefined && u.finalPrice !== null && Number(u.finalPrice) > 0
+				? u.finalPrice
+				: unitPriceFinal,
+		);
+
+		let discountPercentage = Number(u.discountPercentage ?? 0);
+		if (
+			discountPercentage === 0 &&
+			u.discount !== undefined &&
+			u.discount !== null &&
+			Number(u.discount) > 0
+		) {
+			discountPercentage = Number(u.discount);
+		} else if (discountPercentage === 0 && basePrice > 0 && finalPrice < basePrice) {
+			discountPercentage =
+				Math.round(((basePrice - finalPrice) / basePrice) * 10000) / 100;
+		}
+
+		const discountNote =
+			u.discountNote ||
+			(discountPercentage > 0
+				? `${discountPercentage}%`
+				: isBase
+				? ""
+				: "0%");
+
 		return {
 			unitId: u.unitId ?? u.id,
 			unitName: u.unitName || u.name || fallbackBaseName,
 			symbol: u.symbol || "",
 			baseQuantity: baseQty,
+			baseUnitName: u.baseUnitName || fallbackBaseName,
 			parentQuantity: pQty,
 			parentUnitId: u.parentUnitId ?? null,
 			parentUnitName: parentName,
+			basePrice,
+			discountPercentage,
+			discountNote,
+			finalPrice,
 			sellingPrice: unitPriceFinal,
 			pricePerBaseUnit,
 			formulaText,
@@ -8139,6 +9028,16 @@ function getNormalizedProductVariantData(
 		return a.baseQuantity - b.baseQuantity;
 	});
 
+	// Ensure baseUnitName across all units matches detected base unit name
+	const detectedBaseUnit = mappedUnits.find((u) => u.isBase) || mappedUnits[0];
+	if (detectedBaseUnit) {
+		mappedUnits.forEach((u) => {
+			if (!u.baseUnitName || u.baseUnitName === "Pcs") {
+				u.baseUnitName = detectedBaseUnit.unitName;
+			}
+		});
+	}
+
 	return mappedUnits;
 }
 
@@ -8146,7 +9045,7 @@ function ProductVariantUnitPricingPopover({
 	allUnits,
 	baseUnit,
 	packageUnits: _packageUnits,
-	stockQty,
+	stockQty: _stockQty,
 	children,
 }: {
 	allUnits: NormalizedProductUnit[];
@@ -8160,7 +9059,7 @@ function ProductVariantUnitPricingPopover({
 			<DropdownMenuTrigger render={children as React.ReactElement} />
 			<DropdownMenuContent
 				align="end"
-				className="w-80 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl space-y-2.5 z-50"
+				className="w-96 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl space-y-2.5 z-50"
 			>
 				<div className="flex items-center justify-between border-b pb-2 border-slate-100 dark:border-slate-800">
 					<div className="flex items-center gap-1.5">
@@ -8174,64 +9073,60 @@ function ProductVariantUnitPricingPopover({
 					</span>
 				</div>
 
-				<div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
-					{allUnits.map((u) => {
-						const divisor = u.baseQuantity > 0 ? u.baseQuantity : 1;
-						const whole = Math.floor(stockQty / divisor);
-						const rem = stockQty % divisor;
-						const stockEquiv = u.isBase
-							? `${stockQty} ${u.unitName}`
-							: whole > 0
-							? `${whole} ${u.unitName}${rem > 0 ? ` + ${rem} ${baseUnit.unitName}` : ""}`
-							: `${rem} ${baseUnit.unitName}`;
-
-						return (
-							<div
-								key={u.unitId}
-								className={cn(
-									"p-2 rounded-lg border text-xs flex items-center justify-between gap-2",
-									u.isBase
-										? "bg-purple-50/70 dark:bg-purple-950/40 border-purple-200/80 dark:border-purple-800/80"
-										: "bg-slate-50/60 dark:bg-slate-800/50 border-slate-200/70 dark:border-slate-700/70",
-								)}
-							>
-								<div className="space-y-0.5 min-w-0">
-									<div className="flex items-center gap-1.5">
-										<span className="font-bold text-xs text-foreground truncate">
-											{u.unitName}
+				<div className="overflow-x-auto rounded-lg border border-slate-200/80 dark:border-slate-800">
+					<table className="w-full text-left text-xs border-collapse">
+						<thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700 text-[10px]">
+							<tr>
+								<th className="p-2">Conversion Multiplier</th>
+								<th className="p-2 text-right">Base Price</th>
+								<th className="p-2 text-center">Discount Rate</th>
+								<th className="p-2 text-right">Final Selling Price</th>
+							</tr>
+						</thead>
+						<tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
+							{allUnits.map((u) => (
+								<tr
+									key={u.unitId}
+									className={cn(
+										"hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors",
+										u.isBase && "bg-purple-50/30 dark:bg-purple-950/20",
+									)}
+								>
+									<td className="p-2 font-mono">
+										<span className="font-bold text-foreground">
+											{u.baseQuantity}x
+										</span>{" "}
+										<span className="font-sans text-foreground">
+											{baseUnit.unitName}
 										</span>
-										{u.isBase ? (
-											<span className="text-[9px] font-bold px-1 py-0 rounded bg-purple-200 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-												Base
-											</span>
-										) : (
-											<span className="text-[10px] font-mono text-muted-foreground truncate">
-												{u.formulaText}
+										{u.unitName && u.unitName !== baseUnit.unitName && (
+											<span className="text-[10px] text-muted-foreground font-sans ml-1">
+												({u.unitName})
 											</span>
 										)}
-									</div>
-									<span className="text-[10px] font-mono text-muted-foreground block truncate">
-										Stock: {stockEquiv}
-									</span>
-								</div>
-
-								<div className="text-right shrink-0">
-									<div className="flex items-baseline justify-end gap-1 font-mono">
-										<span className="font-black text-xs text-emerald-600 dark:text-emerald-400">
-											${u.sellingPrice.toFixed(2)}
-										</span>
-									</div>
-									{!u.isBase && u.baseQuantity > 1 && (
-										<div className="flex items-center justify-end gap-1">
-											<span className="text-[9px] font-mono text-muted-foreground">
-												(${u.pricePerBaseUnit.toFixed(2)}/{baseUnit.unitName})
-											</span>
-										</div>
-									)}
-								</div>
-							</div>
-						);
-					})}
+									</td>
+									<td className="p-2 text-right font-mono text-slate-600 dark:text-slate-400 font-semibold">
+										${u.basePrice.toFixed(2)}
+									</td>
+									<td className="p-2 text-center">
+										{u.isBase && u.discountPercentage === 0 ? (
+											<span className="text-slate-400 text-xs">—</span>
+										) : (
+											<Badge
+												variant="outline"
+												className="text-[9px] text-amber-700 dark:text-amber-300 border-amber-300 bg-amber-50 dark:bg-amber-950/40 font-bold px-1.5 py-0.2 rounded-full"
+											>
+												{u.discountNote || `${u.discountPercentage}%`}
+											</Badge>
+										)}
+									</td>
+									<td className="p-2 text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400">
+										${u.finalPrice.toFixed(2)}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
 				</div>
 			</DropdownMenuContent>
 		</DropdownMenu>
@@ -8242,7 +9137,7 @@ function ProductVariantTableRow({
 	v,
 	product,
 	lowStockThreshold = 5,
-	onOpenPriceHistory: _onOpenPriceHistory,
+	onOpenPriceHistory,
 	onOpenDetails,
 }: {
 	v: any;
@@ -8263,8 +9158,7 @@ function ProductVariantTableRow({
 		return getNormalizedProductVariantData(v, product, fetchedVariantUnits);
 	}, [v, product, fetchedVariantUnits]);
 
-	const baseUnit = allUnits.find((u) => u.isBase) || allUnits[0];
-	const packageUnits = allUnits.filter((u) => !u.isBase);
+	const _baseUnit = allUnits.find((u) => u.isBase) || allUnits[0];
 
 	const physicalStock = Number(
 		v.totalPhysicalQty ??
@@ -8320,29 +9214,25 @@ function ProductVariantTableRow({
 		return decomposeQuantityByUnits(reservedStock, allUnits);
 	}, [reservedStock, allUnits]);
 
-	const _availableDecomp = useMemo(() => {
+	const availableDecomp = useMemo(() => {
 		return decomposeQuantityByUnits(availableStock, allUnits);
 	}, [availableStock, allUnits]);
 
-	const _soldDecomp = useMemo(() => {
+	const soldDecomp = useMemo(() => {
 		return decomposeQuantityByUnits(soldStock, allUnits);
 	}, [soldStock, allUnits]);
 
-	const _variantBarcode =
-		v.barcode ||
-		v.barCode ||
-		v.baseBarcode ||
-		(v.isSimpleProduct ? product.baseBarcode || product.barcode : null);
+
 
 	return (
 		<tr className="bg-white dark:bg-slate-950 hover:bg-purple-50/40 dark:hover:bg-purple-950/20 transition-colors border-b border-slate-100 dark:border-slate-800/60 group">
 			{/* Col 1: Variant / Identity */}
-			<td className="min-w-[150px] max-w-[200px] p-2 align-middle">
-				<div className="flex items-center gap-2 min-w-0">
+			<td className="min-w-[140px] max-w-[180px] p-2 whitespace-nowrap sticky left-0 z-10 bg-white dark:bg-slate-950 group-hover:bg-purple-50/70 dark:group-hover:bg-purple-950/40 border-r border-slate-200/80 dark:border-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
+				<div className="flex items-center justify-center gap-2 min-w-0">
 					<img
 						src={safeImageUrl(v.thumbnail || v.imageUrl || product.imageUrl)}
 						alt={v.name || v.variantName || v.sku}
-						className="size-7 rounded-lg border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 object-cover"
+						className="size-7 rounded-lg border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 object-cover transition-transform group-hover:scale-105"
 						onError={(e) => {
 							e.currentTarget.onerror = null;
 							e.currentTarget.src = DEFAULT_IMAGE_URL;
@@ -8350,21 +9240,21 @@ function ProductVariantTableRow({
 					/>
 					<div className="min-w-0 flex-1 space-y-0.5">
 						<p
-							className="font-bold text-xs text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors truncate"
+							className="font-bold text-xs text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors truncate"
 							title={v.name || v.variantName || v.sku}
 						>
 							{v.name || v.variantName || v.sku}
 						</p>
 						<div className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground flex-wrap">
 							<span>{v.sku || "—"}</span>
-							
+					
 						</div>
 					</div>
 				</div>
 			</td>
 
-			{/* Col 2: Units of Measure */}
-			<td className="min-w-[60px] p-2 align-middle whitespace-nowrap">
+			{/* Col 2: Units */}
+			<td className="min-w-[65px] p-2 align-top whitespace-nowrap">
 				<div className="flex flex-col gap-1 py-0.5">
 					{allUnits.map((u) => (
 						<div
@@ -8382,30 +9272,96 @@ function ProductVariantTableRow({
 				</div>
 			</td>
 
+			{/* Col 3: Conversion Multiplier */}
+			<td className="min-w-[90px] p-2 align-top whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5">
+					{allUnits.map((u) => (
+						<div
+							key={u.unitId}
+							className="h-6 flex items-center font-mono text-xs whitespace-nowrap gap-1"
+						>
+							<span className="font-bold text-foreground">
+								{u.parentQuantity ? u.parentQuantity.toLocaleString() : "1"}
+							</span>
+							<span className="font-normal text-muted-foreground">
+								{u.parentUnitName}
+							</span>
+						</div>
+					))}
+				</div>
+			</td>
 
-			{/* Col 4: Retail Price ($) */}
-			<td className="min-w-[95px] p-2 text-right align-middle whitespace-nowrap">
+			{/* Col 4: Base Price */}
+			<td className="min-w-[70px] p-2 text-right align-top whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5 text-right">
+					{allUnits.map((u) => (
+						<div
+							key={u.unitId}
+							className="h-6 flex items-center justify-end font-mono text-xs font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap"
+						>
+							${(u.basePrice ?? u.sellingPrice ?? 0).toFixed(2)}
+						</div>
+					))}
+				</div>
+			</td>
+
+			{/* Col 5: Discount Rate */}
+			<td className="min-w-[65px] p-2 text-center align-top whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5 items-center justify-center">
+					{allUnits.map((u) => {
+						const hasDiscount = Boolean(
+							(u.discountNote && u.discountNote !== "0%") ||
+								(u.discountPercentage && u.discountPercentage > 0),
+						);
+						const discountLabel =
+							u.discountNote && u.discountNote !== "0%"
+								? u.discountNote
+								: `${u.discountPercentage}%`;
+
+						return (
+							<div
+								key={u.unitId}
+								className="h-6 flex items-center justify-center whitespace-nowrap"
+							>
+								{hasDiscount ? (
+									<Badge
+										variant="outline"
+										className="text-[10px] text-amber-700 dark:text-amber-300 border-amber-300 bg-amber-50 dark:bg-amber-950/40 font-bold px-2 py-0.5 rounded-full"
+									>
+										{discountLabel}
+									</Badge>
+								) : (
+									<span className="text-slate-400 text-xs font-mono">—</span>
+								)}
+							</div>
+						);
+					})}
+				</div>
+			</td>
+
+			{/* Col 7: Retail Price ($) */}
+			<td className="min-w-[90px] p-2 text-right align-top whitespace-nowrap">
 				<div className="flex flex-col gap-1 py-0.5 text-right">
 					{allUnits.map((u) => (
 						<div
 							key={u.unitId}
 							className="h-6 flex items-center justify-end font-mono text-xs font-bold text-foreground whitespace-nowrap"
 						>
-							${u.sellingPrice.toFixed(2)}/{u.unitName}
+							${(u.finalPrice ?? u.sellingPrice ?? 0).toFixed(2)}/{u.unitName}
 						</div>
 					))}
 				</div>
 			</td>
 
-			{/* Col 5: On Hand */}
-			<td className="min-w-[75px] p-2 text-right align-middle whitespace-nowrap">
-				<div className="flex flex-col gap-1 py-0.5 text-right">
+			{/* Col 8: On Hand */}
+			<td className="min-w-[70px] p-2 text-left align-top whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5 text-left">
 					{allUnits.map((u) => {
 						const qty = onHandDecomp.get(u.unitId) ?? 0;
 						return (
 							<div
 								key={u.unitId}
-								className="h-6 flex items-center justify-end gap-1 font-mono text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap"
+								className="h-6 flex items-center justify-start gap-1 font-mono text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap"
 							>
 								<span>{qty.toLocaleString()}</span>
 								<span className="text-[10px] font-normal text-muted-foreground w-6 text-left shrink-0">
@@ -8417,15 +9373,15 @@ function ProductVariantTableRow({
 				</div>
 			</td>
 
-			{/* Col 6: Reserved */}
-			<td className="min-w-[65px] p-2 text-right align-middle whitespace-nowrap">
-				<div className="flex flex-col gap-1 py-0.5 text-right">
+			{/* Col 9: Reserved */}
+			<td className="min-w-[65px] p-2 text-left align-top whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5 text-left">
 					{allUnits.map((u) => {
 						const qty = reservedDecomp.get(u.unitId) ?? 0;
 						return (
 							<div
 								key={u.unitId}
-								className="h-6 flex items-center justify-end gap-1 font-mono text-xs whitespace-nowrap"
+								className="h-6 flex items-center justify-start gap-1 font-mono text-xs whitespace-nowrap"
 							>
 								<span
 									className={cn(
@@ -8445,11 +9401,62 @@ function ProductVariantTableRow({
 					})}
 				</div>
 			</td>
-{/*  */}
 
-	
-			{/* Col 9: Stock Status */}
-			<td className="min-w-[85px] p-2 text-center align-middle whitespace-nowrap">
+			{/* Col 10: Available */}
+			<td className="min-w-[70px] p-2 text-left align-top whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5 text-left">
+					{allUnits.map((u) => {
+						const qty = availableDecomp.get(u.unitId) ?? 0;
+						return (
+							<div
+								key={u.unitId}
+								className="h-6 flex items-center justify-start gap-1 font-mono text-xs whitespace-nowrap"
+							>
+								<span
+									className={cn(
+										"font-bold",
+										availableStock <= 0
+											? "text-rose-600 dark:text-rose-400"
+											: isLowStock
+												? "text-amber-600 dark:text-amber-400"
+												: "text-emerald-600 dark:text-emerald-400",
+									)}
+								>
+									{qty.toLocaleString()}
+								</span>
+								<span className="text-[10px] font-normal text-muted-foreground w-6 text-left shrink-0">
+									{u.unitName}
+								</span>
+							</div>
+						);
+					})}
+				</div>
+			</td>
+
+			{/* Col 11: Sold */}
+			<td className="min-w-[65px] p-2 text-left align-top whitespace-nowrap">
+				<div className="flex flex-col gap-1 py-0.5 text-left">
+					{allUnits.map((u) => {
+						const qty = soldDecomp.get(u.unitId) ?? 0;
+						return (
+							<div
+								key={u.unitId}
+								className="h-6 flex items-center justify-start gap-1 font-mono text-xs text-muted-foreground whitespace-nowrap"
+							>
+								<span className="font-semibold text-foreground">
+									{qty.toLocaleString()}
+								</span>
+							<span className="text-[10px] font-normal text-muted-foreground w-6 text-left shrink-0">
+									{u.unitName}
+								</span>
+							</div>
+						);
+					})}
+				</div>
+			</td>
+
+			{/* Col 12: Stock Status */}
+			<td className="min-w-[80px] p-2 text-left align-middle whitespace-nowrap">
 				{isOutOfStock ? (
 					<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 whitespace-nowrap">
 						<span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
@@ -8468,46 +9475,20 @@ function ProductVariantTableRow({
 				)}
 			</td>
 
-			{/* Col 10: Actions */}
-			<td className="p-2 text-center align-middle whitespace-nowrap min-w-[140px]">
-				<div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-					<ProductVariantUnitPricingPopover
-						allUnits={allUnits}
-						baseUnit={baseUnit}
-						packageUnits={packageUnits}
-						stockQty={physicalStock}
-					>
-						{allUnits.length > 2 ? (
-							<button
-								type="button"
-								className="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80 transition-colors cursor-pointer shrink-0"
-								title="View Unit Hierarchy & Packaging Breakdown"
-							>
-								<Package className="size-3 text-purple-500 shrink-0" />
-								<span>
-									{baseUnit.unitName} ({allUnits.length})
-								</span>
-								<ChevronDown className="size-2.5 opacity-70 shrink-0" />
-							</button>
-						) : (
-							<button
-								type="button"
-								className="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] font-mono bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80 transition-colors cursor-pointer shrink-0"
-								title="View Unit Hierarchy"
-							>
-								<Package className="size-3 text-purple-500 shrink-0" />
-								<span>
-									{allUnits.length > 1
-										? `${allUnits.length} Units`
-										: baseUnit.unitName}
-								</span>
-								<ChevronDown className="size-2.5 opacity-60 shrink-0" />
-							</button>
-						)}
-					</ProductVariantUnitPricingPopover>
-
-				
-
+			{/* Col 13: Actions */}
+			<td className="sticky right-0 z-10 bg-white dark:bg-slate-950 group-hover:bg-purple-50/70 dark:group-hover:bg-purple-950/40 border-l border-slate-200/80 dark:border-slate-800 p-2 text-left align-middle whitespace-nowrap min-w-[80px] shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)]">
+				<div className="flex items-center justify-start gap-1 whitespace-nowrap">
+					{onOpenPriceHistory && (
+						<Button
+							size="sm"
+							variant="ghost"
+							onClick={() => onOpenPriceHistory(product, v)}
+							className="h-7 w-7 p-0 text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50 rounded-lg cursor-pointer shrink-0"
+							title="Price History"
+						>
+							<History className="size-3.5" />
+						</Button>
+					)}
 					{onOpenDetails && (
 						<Button
 							size="sm"
@@ -8529,7 +9510,7 @@ function ProductVariantCardItem({
 	v,
 	product,
 	lowStockThreshold = 5,
-	onOpenPriceHistory: _onOpenPriceHistory,
+	onOpenPriceHistory,
 	onOpenDetails,
 }: {
 	v: any;
@@ -8626,8 +9607,8 @@ function ProductVariantCardItem({
 	);
 	const activeUnit =
 		allUnits.find((u) => String(u.unitId) === String(activeUnitId)) || baseUnit;
-	const activePrice = activeUnit.sellingPrice;
-	const activeCost = cost > 0 ? cost * (activeUnit.baseQuantity || 1) : 0;
+	const _activePrice = activeUnit.sellingPrice;
+	const _activeCost = cost > 0 ? cost * (activeUnit.baseQuantity || 1) : 0;
 	const activeOnHand = onHandDecomp.get(activeUnit.unitId) ?? 0;
 	const activeReserved = reservedDecomp.get(activeUnit.unitId) ?? 0;
 	const activeAvailable = availableDecomp.get(activeUnit.unitId) ?? 0;
@@ -8791,23 +9772,36 @@ function ProductVariantCardItem({
 					{/* Right: Retail Price & Cost */}
 					<div className="rounded-lg p-2.5 bg-slate-50/80 dark:bg-slate-950/50 border border-slate-200/70 dark:border-slate-800/70 flex flex-col justify-between space-y-1">
 						<div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-							<span>Price</span>
+							<span>Final Selling Price</span>
+							<span className="font-mono text-purple-600 dark:text-purple-400 font-bold">
+								{activeUnit.baseQuantity}x {baseUnit.unitName}
+							</span>
 						</div>
-						<div className="flex items-baseline gap-0.5">
-							<span className="font-mono text-lg sm:text-xl font-bold tracking-tight leading-tight text-emerald-700 dark:text-emerald-400">
-								${activePrice.toFixed(2)}
-							</span>
-							<span className="text-[10px] font-medium text-muted-foreground font-mono ml-0.5">
-								/{activeUnit.unitName}
-							</span>
+						<div className="flex items-baseline justify-between gap-1">
+							<div className="flex items-baseline gap-0.5">
+								<span className="font-mono text-lg sm:text-xl font-bold tracking-tight leading-tight text-emerald-600 dark:text-emerald-400">
+									${activeUnit.finalPrice.toFixed(2)}
+								</span>
+								<span className="text-[10px] font-medium text-muted-foreground font-mono ml-0.5">
+									/{activeUnit.unitName}
+								</span>
+							</div>
+							{activeUnit.isBase && activeUnit.discountPercentage === 0 ? null : (
+								<Badge
+									variant="outline"
+									className="text-[9px] text-amber-700 dark:text-amber-300 border-amber-300 bg-amber-50 dark:bg-amber-950/40 font-bold px-1.5 py-0.2 rounded-full"
+								>
+									{activeUnit.discountNote || `${activeUnit.discountPercentage}%`}
+								</Badge>
+							)}
 						</div>
 						<div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-1 text-xs font-mono h-[30px]">
 							<div className="flex flex-col justify-center">
 								<span className="text-[8px] uppercase font-bold text-slate-500 leading-none">
-									Cost
+									Base Price
 								</span>
 								<span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-0.5">
-									{activeCost > 0 ? `$${activeCost.toFixed(2)}` : "—"}
+									${activeUnit.basePrice.toFixed(2)}
 								</span>
 							</div>
 							<div className="flex flex-col items-end justify-center">
@@ -8861,6 +9855,18 @@ function ProductVariantCardItem({
 						<span className="text-[11px]">Adjust</span>
 					</Button>
 
+					{onOpenPriceHistory && (
+						<Button
+							size="sm"
+							variant="ghost"
+							onClick={() => onOpenPriceHistory(product, v)}
+							className="h-7 px-2 text-xs font-semibold gap-1 text-slate-600 dark:text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-lg cursor-pointer"
+							title="Price History"
+						>
+							<History className="size-3.5" />
+							<span className="text-[11px]">History</span>
+						</Button>
+					)}
 					{onOpenDetails && (
 						<Button
 							size="sm"
@@ -8915,6 +9921,16 @@ function ProductVariantsAccordionSubRow({
 			  ];
 
 	const [variantViewMode, _setVariantViewMode] = useState<"table" | "cards">("table");
+	const scrollerRef = useRef<HTMLDivElement>(null);
+
+	const prodId = product.id || product.productId || (product as any).productUuid;
+	const handleScroll = (direction: "left" | "right") => {
+		const delta = direction === "left" ? -300 : 300;
+		const scroller = scrollerRef.current || (prodId ? document.getElementById(`variant-scroller-${prodId}`) : null);
+		if (scroller) {
+			scroller.scrollBy({ left: delta, behavior: "smooth" });
+		}
+	};
 
 	const _totalPhysical = effectiveVariants.reduce(
 		(acc: number, v: any) =>
@@ -8945,59 +9961,104 @@ function ProductVariantsAccordionSubRow({
 	);
 
 	return (
-		<div className="p-3 bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-inner text-xs">
+		<div className="w-full max-w-full min-w-0 p-3 bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-inner text-xs overflow-hidden">
 			{/* Sub-row Header Toolbar */}
 			<div className="flex items-center justify-between border-b pb-2 dark:border-slate-800 flex-wrap gap-2">
 				<div className="flex items-center gap-2">
-					<Layers className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+					<Layers className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
 					<span className="font-bold text-slate-800 dark:text-slate-200">
 						{product.name} —{" "}
 						{effectiveVariants.length > 0
 							? `${effectiveVariants.length} Variant${effectiveVariants.length === 1 ? "" : "s"} List`
 							: "Product Units & Inventory"}
 					</span>
-				
 				</div>
 
-		
+				<div className="flex items-center gap-2">
+					{/* Scroll Controls (only when in table mode) */}
+					{variantViewMode === "table" && (
+						<div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-2xs">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={() => handleScroll("left")}
+								className="h-7 px-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 hover:text-purple-600 rounded-md gap-1 cursor-pointer transition-colors"
+								title="Scroll Variants Table Left"
+							>
+								<ChevronLeft className="h-3.5 w-3.5" />
+								<span className="text-[11px] hidden sm:inline">Left</span>
+							</Button>
+							<div className="h-3.5 w-[1px] bg-slate-200 dark:bg-slate-700" />
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={() => handleScroll("right")}
+								className="h-7 px-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 hover:text-purple-600 rounded-md gap-1 cursor-pointer transition-colors"
+								title="Scroll Variants Table Right"
+							>
+								<span className="text-[11px] hidden sm:inline">Right</span>
+								<ChevronRight className="h-3.5 w-3.5" />
+							</Button>
+						</div>
+					)}
+
+					
+				</div>
 			</div>
 
 			{/* Main Content: Table or Cards */}
 			{variantViewMode === "table" ? (
 				<div
-					id={`prod-variants-scroller-${product.id}`}
+					id={`variant-scroller-${prodId}`}
+					ref={scrollerRef}
 					className={cn(
-						"w-full max-w-full overflow-x-auto rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-950",
-						"[scrollbar-width:thin] [scrollbar-color:theme(colors.purple.400)_theme(colors.slate.100)] dark:[scrollbar-color:theme(colors.purple.600)_theme(colors.slate.900)]",
-						"[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2",
-						"[&::-webkit-scrollbar-track]:bg-slate-100/90 dark:[&::-webkit-scrollbar-track]:bg-slate-900/90",
-						"[&::-webkit-scrollbar-thumb]:bg-purple-300 dark:[&::-webkit-scrollbar-thumb]:bg-purple-700 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-purple-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-purple-600",
+						"w-full max-w-full min-w-0 overflow-x-auto rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-950 overscroll-x-contain",
+						"[scrollbar-width:thin] [scrollbar-color:theme(colors.purple.500)_theme(colors.slate.100)] dark:[scrollbar-color:theme(colors.purple.500)_theme(colors.slate.900)]",
+						"[&::-webkit-scrollbar]:h-2.5",
+						"[&::-webkit-scrollbar-track]:bg-slate-100 dark:[&::-webkit-scrollbar-track]:bg-slate-900 [&::-webkit-scrollbar-track]:rounded-b-lg",
+						"[&::-webkit-scrollbar-thumb]:bg-purple-400 hover:[&::-webkit-scrollbar-thumb]:bg-purple-500 dark:[&::-webkit-scrollbar-thumb]:bg-purple-600 dark:hover:[&::-webkit-scrollbar-thumb]:bg-purple-500 [&::-webkit-scrollbar-thumb]:rounded-full",
 					)}
 				>
-					<table className="w-[80vw] text-left text-xs border-collapse">
+					<table className="w-full min-w-[1280px] text-left text-xs border-collapse">
 						<thead className="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
 							<tr className="hover:bg-transparent bg-slate-100 dark:bg-slate-900">
-								<th className="font-bold text-[11px] text-foreground min-w-[150px] max-w-[180px] py-2 px-2.5 text-left">
+								<th className="font-bold text-[11px] text-foreground min-w-[140px] max-w-[180px] py-2 px-2.5 text-left whitespace-nowrap sticky left-0 z-20 bg-slate-100 dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
 									Variant / Identity
 								</th>
-								<th className="font-bold text-[11px] text-left py-2 px-2">
-									Units of Measure
+								<th className="font-bold text-[11px] text-left py-2 px-2 whitespace-nowrap min-w-[65px]">
+									Units
 								</th>
-								
-								<th className="font-bold text-[11px] text-right min-w-[95px] py-2 px-2">
+								<th className="font-bold text-[11px] text-left py-2 px-2 whitespace-nowrap min-w-[90px]">
+									Conversion
+								</th>
+								<th className="font-bold text-[11px] text-right py-2 px-2 whitespace-nowrap min-w-[70px]">
+									Base Price
+								</th>
+								<th className="font-bold text-[11px] text-center py-2 px-2 whitespace-nowrap min-w-[65px]">
+									Discount
+								</th>
+							
+								<th className="font-bold text-[11px] text-right py-2 px-2 whitespace-nowrap min-w-[90px]">
 									Retail Price ($)
 								</th>
-								<th className="font-bold text-[11px] text-right min-w-[75px] py-2 px-2">
+								<th className="font-bold text-[11px] text-left min-w-[70px] py-2 px-2 whitespace-nowrap">
 									On Hand
 								</th>
-								<th className="font-bold text-[11px] text-right min-w-[65px] py-2 px-2">
+								<th className="font-bold text-[11px] text-left min-w-[65px] py-2 px-2 whitespace-nowrap">
 									Reserved
 								</th>
-								<th className="font-bold text-[11px] text-center min-w-[75px] py-2 px-2">
+								<th className="font-bold text-[11px] text-left min-w-[70px] py-2 px-2 whitespace-nowrap">
 									Available
 								</th>
-						
-								<th className="font-bold text-[11px] text-center min-w-[50px] py-2 px-2">
+								<th className="font-bold text-[11px] text-left min-w-[65px] py-2 px-2 whitespace-nowrap">
+									Sold
+								</th>
+								<th className="font-bold text-[11px] text-left min-w-[80px] py-2 px-2 whitespace-nowrap">
+									Status
+								</th>
+								<th className="sticky right-0 z-20 bg-slate-100 dark:bg-slate-900 border-l border-slate-200/80 dark:border-slate-800 font-bold text-[11px] text-left min-w-[80px] py-2 px-2 whitespace-nowrap shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)]">
 									Actions
 								</th>
 							</tr>
@@ -9110,7 +10171,7 @@ function VariantUnitsAccordionSubRow({ variant }: { variant: any }) {
 							<tr>
 								<th className="p-2.5">Unit Tier Name</th>
 								<th className="p-2.5">Classification</th>
-								<th className="p-2.5">Conversion Multiplier</th>
+								<th className="p-2.5">Conversion </th>
 								<th className="p-2.5">Base Price</th>
 								<th className="p-2.5">Discount Rate</th>
 								<th className="p-2.5">Final Selling Price</th>
