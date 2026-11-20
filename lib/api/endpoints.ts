@@ -235,13 +235,16 @@ export function normalizePaged<T>(data: any): Paged<T> {
 export function searchBody(
 	params: ListParams = {},
 	searchFields: string[] = ["name"],
+	defaultSort: { field: string; direction: "ASC" | "DESC" }[] = [
+		{ field: "createdAt", direction: "DESC" },
+	],
 ) {
 	const pageZeroBased = Math.max(0, (params.page ?? 1) - 1);
 	const size = params.limit ?? 10;
 	const body: any = {
 		page: pageZeroBased,
 		size: size,
-		sort: [{ field: "createdAt", direction: "DESC" }],
+		sort: defaultSort,
 	};
 
 	if (params.search && params.search.trim()) {
@@ -265,8 +268,9 @@ export async function fetchSearchList<T>(
 	endpoint: string,
 	params: ListParams = {},
 	searchFields: string[] = ["name"],
+	defaultSort?: { field: string; direction: "ASC" | "DESC" }[],
 ): Promise<Paged<T>> {
-	const body = searchBody(params, searchFields);
+	const body = searchBody(params, searchFields, defaultSort);
 	const signal = params.signal;
 	try {
 		const res = await api.post<Paged<T>>(`${endpoint}/search`, body, {
@@ -2555,13 +2559,33 @@ export const locationsApi = {
 // ---- Brands (tenant) -----------------------------------------
 export const brandsApi = {
 	list: (params: ListParams) =>
-		fetchSearchList<Brand>("/brands", params, ["name", "description"]),
+		fetchSearchList<Brand>("/brands", params, ["name", "description"], [
+			{ field: "sortOrder", direction: "ASC" },
+			{ field: "id", direction: "ASC" },
+		]),
 	get: (id: string | number) =>
 		api.get<Brand>(`/brands/${id}`).then((r) => r.data),
 	create: (body: Partial<Brand>) =>
 		api.post<Brand>("/brands", body).then((r) => r.data),
 	update: (id: string | number, body: Partial<Brand>) =>
 		api.put<Brand>(`/brands/${id}`, body).then((r) => r.data),
+	/**
+	 * Batch-updates sortOrder for reordered brands in a single atomic request.
+	 */
+	reorder: async (items: Array<{ item: Brand; sortOrder: number }>) => {
+		const changed = items.filter(
+			({ item, sortOrder }) => (item.sortOrder ?? 0) !== sortOrder,
+		);
+		if (changed.length === 0) return 0;
+		return api
+			.patch<number>("/brands/sort-order", {
+				items: changed.map(({ item, sortOrder }) => ({
+					id: Number(item.id),
+					sortOrder,
+				})),
+			})
+			.then((r) => r.data);
+	},
 	remove: (id: string | number) =>
 		api.delete(`/brands/${id}`).then((r) => r.data),
 	deleteFromDb: (id: string | number) =>
@@ -2588,7 +2612,10 @@ function mapCategoryToBackend(c: Partial<Category>): any {
 
 export const categoriesApi = {
 	list: (params: ListParams) =>
-		fetchSearchList<Category>("/categories", params, ["name", "description"]),
+		fetchSearchList<Category>("/categories", params, ["name", "description"], [
+			{ field: "sortOrder", direction: "ASC" },
+			{ field: "id", direction: "ASC" },
+		]),
 	get: (id: string | number) =>
 		api.get<Category>(`/categories/${id}`).then((r) => r.data),
 	create: (body: Partial<Category>) =>
@@ -2599,6 +2626,29 @@ export const categoriesApi = {
 		api
 			.put<Category>(`/categories/${id}`, mapCategoryToBackend(body))
 			.then((r) => r.data),
+	/**
+	 * Batch-updates sortOrder for reordered categories (parent or subcategories) in a single atomic request.
+	 */
+	reorder: async (
+		items: Array<{
+			item: Category;
+			sortOrder: number;
+			parentIdOverride?: string | number | null;
+		}>,
+	) => {
+		const changed = items.filter(
+			({ item, sortOrder }) => (item.sortOrder ?? 0) !== sortOrder,
+		);
+		if (changed.length === 0) return 0;
+		return api
+			.patch<number>("/categories/sort-order", {
+				items: changed.map(({ item, sortOrder }) => ({
+					id: Number(item.id),
+					sortOrder,
+				})),
+			})
+			.then((r) => r.data);
+	},
 	remove: (id: string | number) =>
 		api.delete(`/categories/${id}`).then((r) => r.data),
 	deleteFromDb: (id: string | number) =>

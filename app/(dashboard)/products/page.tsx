@@ -5,11 +5,14 @@ import { PermissionGate } from "@/components/auth/permission-gate";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import { MapProductUnitModal } from "@/components/map-product-unit-modal";
 import { ProductPriceHistoryModal } from "@/components/product-price-history-modal";
+import { BrandGridView } from "@/components/products/brand-grid-view";
+import { CategoryGridView } from "@/components/products/category-grid-view";
 import { useCompanyContext } from "@/components/providers/company-context";
 import { useQuickActionDispatch } from "@/components/quick-action-modal-context";
 import {
 	ColumnDef,
 	DataTable,
+	DataTableSortOption,
 	FilterCriterion,
 	PRODUCT_DOMAIN_FILTERS,
 	RowAction,
@@ -36,6 +39,12 @@ import {
 } from "@/lib/api/endpoints";
 import { useTranslation } from "@/lib/i18n/context";
 import {
+	calculateUnitFinalPrice,
+	calculateUnitListPrice,
+	formatUnitDiscountNote,
+	normalizeDiscountType
+} from "@/lib/product-unit-pricing";
+import {
 	Brand,
 	Category,
 	DiscountType,
@@ -45,29 +54,27 @@ import {
 	VariantUnit,
 	VariantUnitPriceConfigInput,
 } from "@/lib/types";
-import {
-	calculateUnitListPrice,
-	calculateUnitDiscount,
-	calculateUnitFinalPrice,
-	formatUnitDiscountNote,
-	normalizeDiscountType,
-} from "@/lib/product-unit-pricing";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	AlertCircle,
 	AlertTriangle,
+	ArrowDown,
+	ArrowUp,
+	ArrowUpDown,
 	Bookmark,
 	Boxes,
 	Camera,
 	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
+	Clock,
 	CornerDownRight,
+	DollarSign,
 	Eye,
+	Flame,
 	FolderOpen,
-	FolderPlus,
 	History,
 	Layers,
 	LayoutGrid,
@@ -97,6 +104,7 @@ import { toast } from "sonner";
 import * as z from "zod";
 
 
+import { ModernButton } from "@/components/ui-custom/button";
 import {
 	CategoryTreeSelect,
 	ModernInput,
@@ -122,6 +130,9 @@ import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -192,6 +203,7 @@ const brandSchema = z.object({
 	name: z.string().min(1, "Brand name is required"),
 	description: z.string().optional(),
 	logoUrl: z.string().optional(),
+	sortOrder: z.coerce.number().int().min(0).default(0),
 	isActive: z.boolean().default(true),
 });
 
@@ -381,9 +393,9 @@ function ProductsTab() {
 	const [newVarName, setNewVarName] = useState("");
 	const [newVarSku, setNewVarSku] = useState("");
 	const [newVarBarcode, setNewVarBarcode] = useState("");
-	const [newVarPrice, setNewVarPrice] = useState("0");
+	const [_newVarPrice, setNewVarPrice] = useState("0");
 	const [_newVarCost, setNewVarCost] = useState("0");
-	const [_newVarStock, setNewVarStock] = useState("10");
+	const [_newVarStock, setNewVarStock] = useState("0");
 	const [_newVarColor, setNewVarColor] = useState("");
 	const [newVarUnitId, setNewVarUnitId] = useState("");
 	const [newVarThumbnail, setNewVarThumbnail] = useState("");
@@ -393,8 +405,13 @@ function ProductsTab() {
 	const [newVarWidth, setNewVarWidth] = useState("");
 	const [newVarDepth, setNewVarDepth] = useState("");
 	const [newVarVolume, setNewVarVolume] = useState("");
-	const [newVarPricingMode, setNewVarPricingMode] = useState<"auto" | "custom">("auto");
 	const [newVarUnitPrices, setNewVarUnitPrices] = useState<
+		Record<
+			string | number,
+			{ unitPrice: string; discount: string; discountType: DiscountType }
+		>
+	>({});
+	const [editVarUnitPrices, setEditVarUnitPrices] = useState<
 		Record<
 			string | number,
 			{ unitPrice: string; discount: string; discountType: DiscountType }
@@ -572,7 +589,7 @@ function ProductsTab() {
 			condition: "NEW",
 		},
 	]);
-	const [_batchImportResult, setBatchImportResult] = useState<any>(null);
+	const [_batchImportResult, _] = useState<any>(null);
 
 	// Active Domain Filters State for Advanced Search
 	const [activeDomainFilters, setActiveDomainFilters] = useState<
@@ -606,6 +623,7 @@ function ProductsTab() {
 				sortDirection,
 			},
 		],
+		staleTime: 0,
 		queryFn: async () => {
 			try {
 				const payload = buildSearchFilterPayload({
@@ -839,6 +857,83 @@ function ProductsTab() {
 		productUnitsList,
 		unitsData?.items,
 	]);
+
+	// Effective product units for Add Variant Packaging Unit Pricing (always custom per unit)
+	const effectiveProductUnits = useMemo(() => {
+		if (productUnitsList && productUnitsList.length > 0) {
+			return productUnitsList;
+		}
+		const fallbackUnitId =
+			fullProduct?.unitId ??
+			selectedProductDetails?.unitId ??
+			productSpecificUnitOptions[0]?.value;
+		if (fallbackUnitId) {
+			const fallbackName =
+				(fullProduct as any)?.unitName ||
+				(selectedProductDetails as any)?.unitName ||
+				productSpecificUnitOptions[0]?.label?.replace(" • [Base Unit]", "") ||
+				"Base Unit";
+			return [
+				{
+					unitId: Number(fallbackUnitId),
+					unitName: fallbackName,
+					name: fallbackName,
+					isBase: true,
+					baseQuantity: 1,
+					basePrice: 0,
+					discount: 0,
+					discountType: "PERCENTAGE",
+				},
+			];
+		}
+		return [];
+	}, [
+		productUnitsList,
+		fullProduct,
+		selectedProductDetails,
+		productSpecificUnitOptions,
+	]);
+
+	// Fetch existing unit prices for the variant being edited
+	const { data: fetchedEditVariantUnits = [] } = useQuery<VariantUnit[]>({
+		queryKey: ["variant-units", selectedVariant?.id],
+		queryFn: () => productsApi.getVariantUnits(selectedVariant.id),
+		enabled: Boolean(isEditVariantOpen && selectedVariant?.id),
+		staleTime: 0,
+	});
+
+	useEffect(() => {
+		if (
+			!isEditVariantOpen ||
+			!selectedVariant?.id ||
+			!fetchedEditVariantUnits ||
+			fetchedEditVariantUnits.length === 0
+		) {
+			return;
+		}
+		setEditVarUnitPrices((prev) => {
+			const updated = { ...prev };
+			fetchedEditVariantUnits.forEach((vu: any) => {
+				const uId = vu.unitId ?? vu.id;
+				if (uId === undefined || uId === null) return;
+				const rawBase =
+					vu.basePrice ?? vu.price ?? vu.unitPrice ?? vu.finalPrice ?? 0;
+				const rawDisc = parseFloat(String(vu.discount ?? 0)) || 0;
+				const discType = normalizeDiscountType(vu.discountType);
+				updated[uId] = {
+					unitPrice:
+						rawBase !== undefined &&
+						rawBase !== null &&
+						Number(rawBase) > 0
+							? String(Number(rawBase))
+							: "",
+					discount: String(rawDisc),
+					discountType: discType,
+				};
+			});
+			return updated;
+		});
+	}, [isEditVariantOpen, selectedVariant?.id, fetchedEditVariantUnits]);
 
 	// Variant SKU & Barcode Generator Helpers
 	const generateVariantSku = (varName?: string) => {
@@ -1145,22 +1240,6 @@ function ProductsTab() {
 		onError: (error) => toast.error(getErrorMessage(error)),
 	});
 
-	const _batchImportMutation = useMutation({
-		mutationFn: productsApi.importBatch,
-		onSuccess: (res) => {
-			setBatchImportResult(res);
-			if (res.successCount > 0) {
-				toast.success(
-					`Batch import completed: ${res.successCount} items created`,
-				);
-				queryClient.invalidateQueries({ queryKey: ["products"] });
-				queryClient.invalidateQueries({ queryKey: ["products-search"] });
-			} else {
-				toast.error(`Batch import failed. ${res.failedCount} items failed.`);
-			}
-		},
-		onError: (error) => toast.error(getErrorMessage(error)),
-	});
 
 	// Dialog operations
 	const openCreate = () => {
@@ -1497,6 +1576,10 @@ function ProductsTab() {
 		onSuccess: () => {
 			toast.success("Variant added successfully!");
 			queryClient.invalidateQueries({ queryKey: ["product-details"] });
+			queryClient.invalidateQueries({ queryKey: ["product-units-list"] });
+			queryClient.invalidateQueries({ queryKey: ["variant-units"] });
+			queryClient.invalidateQueries({ queryKey: ["products"] });
+			queryClient.invalidateQueries({ queryKey: ["products-search"] });
 			setIsAddVariantOpen(false);
 			resetAddVariantForm();
 		},
@@ -1509,8 +1592,13 @@ function ProductsTab() {
 		onSuccess: () => {
 			toast.success("Variant updated successfully!");
 			queryClient.invalidateQueries({ queryKey: ["product-details"] });
+			queryClient.invalidateQueries({ queryKey: ["product-units-list"] });
+			queryClient.invalidateQueries({ queryKey: ["variant-units"] });
+			queryClient.invalidateQueries({ queryKey: ["products"] });
+			queryClient.invalidateQueries({ queryKey: ["products-search"] });
 			setIsEditVariantOpen(false);
 			setSelectedVariant(null);
+			setEditVarUnitPrices({});
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
 	});
@@ -1546,10 +1634,11 @@ function ProductsTab() {
 		setNewVarBarcode("");
 		setNewVarPrice("0");
 		setNewVarCost("0");
-		setNewVarStock("10");
+		setNewVarStock("0");
 		setNewVarColor("");
 		const baseUnit =
-			productUnitsList.find((u: any) => u.isBase) || productUnitsList[0];
+			effectiveProductUnits.find((u: any) => u.isBase) ||
+			effectiveProductUnits[0];
 		setNewVarUnitId(
 			baseUnit ? String(baseUnit.unitId ?? baseUnit.id ?? "") : "",
 		);
@@ -1560,16 +1649,40 @@ function ProductsTab() {
 		setNewVarWidth("");
 		setNewVarDepth("");
 		setNewVarVolume("");
-		setNewVarPricingMode("auto");
-		setNewVarUnitPrices({});
+		const initialUnitPrices: Record<
+			string | number,
+			{ unitPrice: string; discount: string; discountType: DiscountType }
+		> = {};
+		effectiveProductUnits.forEach((u: any) => {
+			const uId = u.unitId ?? u.id;
+			if (uId !== undefined && uId !== null) {
+				const defaultDisc = parseFloat(String(u.discount ?? 0)) || 0;
+				const discType = normalizeDiscountType(u.discountType);
+				initialUnitPrices[uId] = {
+					unitPrice: "",
+					discount: String(defaultDisc),
+					discountType: discType,
+				};
+			}
+		});
+		setNewVarUnitPrices(initialUnitPrices);
 	};
 
 	const handleAddVariantSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!newVarName || !newVarSku || !newVarUnitId) {
-			toast.error("Please fill in Name, SKU, and Unit for the variant.");
+		if (!newVarName.trim() || !newVarSku.trim()) {
+			toast.error("Please fill in Variant Name and SKU.");
 			return;
 		}
+
+		const baseUnit =
+			effectiveProductUnits.find((u: any) => u.isBase) ||
+			effectiveProductUnits[0];
+		const resolvedUnitId =
+			(baseUnit ? String(baseUnit.unitId ?? baseUnit.id ?? "") : "") ||
+			newVarUnitId ||
+			String(fullProduct?.unitId ?? selectedProductDetails?.unitId ?? "1");
+
 		const varAttrs: Record<string, any> = {};
 		if (newVarNetWeight) varAttrs.netWeight = Number(newVarNetWeight);
 		if (newVarGrossWeight) varAttrs.grossWeight = Number(newVarGrossWeight);
@@ -1578,20 +1691,17 @@ function ProductsTab() {
 		if (newVarDepth) varAttrs.depth = Number(newVarDepth);
 		if (newVarVolume) varAttrs.volume = newVarVolume;
 
-		let customUnitPricesPayload: VariantUnitPriceConfigInput[] | undefined = undefined;
+		let customUnitPricesPayload: VariantUnitPriceConfigInput[] | undefined =
+			undefined;
 
-		if (newVarPricingMode === "custom" && productUnitsList && productUnitsList.length > 0) {
-			customUnitPricesPayload = productUnitsList.map((u: any) => {
+		if (effectiveProductUnits.length > 0) {
+			for (const u of effectiveProductUnits) {
 				const uId = u.unitId ?? u.id;
 				const current = newVarUnitPrices[uId];
-				const basePriceNum = Math.max(0, Number(newVarPrice) || 0);
-				const uList = calculateUnitListPrice(basePriceNum, u.baseQuantity || 1);
-				const rawPrice =
+				const rawBasePrice =
 					current && current.unitPrice !== ""
 						? parseFloat(current.unitPrice)
-						: u.isBase
-							? basePriceNum
-							: uList;
+						: 0;
 				const rawDisc =
 					current && current.discount !== ""
 						? parseFloat(current.discount)
@@ -1599,12 +1709,41 @@ function ProductsTab() {
 				const discType =
 					current?.discountType || normalizeDiscountType(u.discountType);
 
-				const finalPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : uList;
+				if (discType === "PERCENTAGE" && rawDisc >= 100) {
+					toast.error(
+						`Percentage discount for ${u.unitName || u.name || "unit"} must be less than 100%.`,
+					);
+					return;
+				}
+				if (discType === "FLAT" && rawBasePrice > 0 && rawDisc > rawBasePrice) {
+					toast.error(
+						`Flat discount for ${u.unitName || u.name || "unit"} cannot exceed Base Price.`,
+					);
+					return;
+				}
+			}
+
+			customUnitPricesPayload = effectiveProductUnits.map((u: any) => {
+				const uId = u.unitId ?? u.id;
+				const current = newVarUnitPrices[uId];
+				const rawBasePrice =
+					current && current.unitPrice !== ""
+						? parseFloat(current.unitPrice)
+						: 0;
+				const rawDisc =
+					current && current.discount !== ""
+						? parseFloat(current.discount)
+						: parseFloat(String(u.discount ?? 0)) || 0;
+				const discType =
+					current?.discountType || normalizeDiscountType(u.discountType);
+
+				const basePriceVal =
+					!isNaN(rawBasePrice) && rawBasePrice >= 0 ? rawBasePrice : 0;
 				const discountVal = !isNaN(rawDisc) && rawDisc >= 0 ? rawDisc : 0;
 
 				return {
 					unitId: Number(uId),
-					unitPrice: finalPrice,
+					unitPrice: basePriceVal,
 					discount: discountVal,
 					discountType: discType,
 					discountNote: formatUnitDiscountNote(discountVal, discType),
@@ -1613,16 +1752,15 @@ function ProductsTab() {
 		}
 
 		addVariantMutation.mutate({
-			name: newVarName,
-			sku: newVarSku,
-			barcode: newVarBarcode || newVarSku,
+			name: newVarName.trim(),
+			sku: newVarSku.trim(),
+			barcode: (newVarBarcode || newVarSku).trim(),
 			thumbnail: newVarThumbnail || undefined,
 			variantAttributes:
 				Object.keys(varAttrs).length > 0 ? varAttrs : undefined,
-			price: Number(newVarPrice),
-			cost: Number(_newVarCost) || undefined,
-			stockQty: Number(_newVarStock) || undefined,
-			unitId: Number(newVarUnitId),
+			price: 0,
+			stockQty: 0,
+			unitId: Number(resolvedUnitId),
 			unitPrices: customUnitPricesPayload,
 		});
 	};
@@ -1631,42 +1769,121 @@ function ProductsTab() {
 		e.preventDefault();
 		if (!selectedVariant) return;
 
-		const varAttrs: Record<string, any> =
-			selectedVariant.variantAttributes || {};
-		if (selectedVariant.netWeight !== undefined)
+		if (
+			!(selectedVariant.name || "").trim() ||
+			!(selectedVariant.sku || "").trim()
+		) {
+			toast.error("Please fill in Variant Name and SKU.");
+			return;
+		}
+
+		const baseUnit =
+			effectiveProductUnits.find((u: any) => u.isBase) ||
+			effectiveProductUnits[0];
+		const resolvedUnitId =
+			(baseUnit ? String(baseUnit.unitId ?? baseUnit.id ?? "") : "") ||
+			(selectedVariant.unitId ? String(selectedVariant.unitId) : "") ||
+			String(fullProduct?.unitId ?? selectedProductDetails?.unitId ?? "1");
+
+		const varAttrs: Record<string, any> = {
+			...(selectedVariant.variantAttributes || {}),
+		};
+		if (
+			selectedVariant.netWeight !== undefined &&
+			selectedVariant.netWeight !== ""
+		)
 			varAttrs.netWeight = Number(selectedVariant.netWeight);
-		if (selectedVariant.grossWeight !== undefined)
+		if (
+			selectedVariant.grossWeight !== undefined &&
+			selectedVariant.grossWeight !== ""
+		)
 			varAttrs.grossWeight = Number(selectedVariant.grossWeight);
-		if (selectedVariant.height !== undefined)
+		if (
+			selectedVariant.height !== undefined &&
+			selectedVariant.height !== ""
+		)
 			varAttrs.height = Number(selectedVariant.height);
-		if (selectedVariant.width !== undefined)
+		if (selectedVariant.width !== undefined && selectedVariant.width !== "")
 			varAttrs.width = Number(selectedVariant.width);
-		if (selectedVariant.depth !== undefined)
+		if (selectedVariant.depth !== undefined && selectedVariant.depth !== "")
 			varAttrs.depth = Number(selectedVariant.depth);
-		if (selectedVariant.volume !== undefined)
+		if (selectedVariant.volume !== undefined && selectedVariant.volume !== "")
 			varAttrs.volume = selectedVariant.volume;
 
+		let customUnitPricesPayload: VariantUnitPriceConfigInput[] | undefined =
+			undefined;
+
+		if (effectiveProductUnits.length > 0) {
+			for (const u of effectiveProductUnits) {
+				const uId = u.unitId ?? u.id;
+				const current = editVarUnitPrices[uId];
+				const rawBasePrice =
+					current && current.unitPrice !== ""
+						? parseFloat(current.unitPrice)
+						: 0;
+				const rawDisc =
+					current && current.discount !== ""
+						? parseFloat(current.discount)
+						: parseFloat(String(u.discount ?? 0)) || 0;
+				const discType =
+					current?.discountType || normalizeDiscountType(u.discountType);
+
+				if (discType === "PERCENTAGE" && rawDisc >= 100) {
+					toast.error(
+						`Percentage discount for ${u.unitName || u.name || "unit"} must be less than 100%.`,
+					);
+					return;
+				}
+				if (discType === "FLAT" && rawBasePrice > 0 && rawDisc > rawBasePrice) {
+					toast.error(
+						`Flat discount for ${u.unitName || u.name || "unit"} cannot exceed Base Price.`,
+					);
+					return;
+				}
+			}
+
+			customUnitPricesPayload = effectiveProductUnits.map((u: any) => {
+				const uId = u.unitId ?? u.id;
+				const current = editVarUnitPrices[uId];
+				const rawBasePrice =
+					current && current.unitPrice !== ""
+						? parseFloat(current.unitPrice)
+						: 0;
+				const rawDisc =
+					current && current.discount !== ""
+						? parseFloat(current.discount)
+						: parseFloat(String(u.discount ?? 0)) || 0;
+				const discType =
+					current?.discountType || normalizeDiscountType(u.discountType);
+
+				const basePriceVal =
+					!isNaN(rawBasePrice) && rawBasePrice >= 0 ? rawBasePrice : 0;
+				const discountVal = !isNaN(rawDisc) && rawDisc >= 0 ? rawDisc : 0;
+
+				return {
+					unitId: Number(uId),
+					unitPrice: basePriceVal,
+					discount: discountVal,
+					discountType: discType,
+					discountNote: formatUnitDiscountNote(discountVal, discType),
+				};
+			});
+		}
+
 		updateVariantMutation.mutate({
-			name: selectedVariant.name,
-			sku: selectedVariant.sku,
-			barcode: selectedVariant.barcode || selectedVariant.sku,
+			name: (selectedVariant.name || "").trim(),
+			sku: (selectedVariant.sku || "").trim(),
+			barcode: (selectedVariant.barcode || selectedVariant.sku || "").trim(),
 			thumbnail: selectedVariant.thumbnail || undefined,
 			variantAttributes:
 				Object.keys(varAttrs).length > 0 ? varAttrs : undefined,
-			price: Number(selectedVariant.price),
-			unitId: Number(selectedVariant.unitId || 1),
+			price: 0,
+			stockQty: 0,
+			unitId: Number(resolvedUnitId),
+			unitPrices: customUnitPricesPayload,
 		});
 	};
 
-	const _toggleActive = (product: Product) => {
-		updateMutation.mutate({
-			id: product.id,
-			body: {
-				...product,
-				isActive: !product.isActive,
-			},
-		});
-	};
 
 	const columns: ColumnDef<Product>[] = [
 		{
@@ -1675,6 +1892,7 @@ function ProductsTab() {
 			width: "40px",
 			minWidth: 40,
 			maxWidth: 40,
+			resizable: false,
 			cell: ({ row }: { row: any }) => {
 				const isExpanded = expandedProductIds.includes(String(row.id));
 				const _hasVariantsCount = row.variants?.length > 0;
@@ -1712,10 +1930,9 @@ function ProductsTab() {
 			header: t("products.productName"),
 			accessorKey: "name",
 			sortable: true,
-			stickyLeft: true,
-			width: "180px",
-			minWidth: 140,
-			maxWidth: 200,
+			resizable: true,
+			width: "150px",
+			minWidth: 150,
 			cell: ({ row }: { row: any }) => (
 				<div
 					className="cursor-pointer group flex items-center gap-2 pr-1 min-w-0"
@@ -1734,7 +1951,7 @@ function ProductsTab() {
 							avatarUrl={row.imageUrl}
 						/>
 					</div>
-					{row.variants && row.variants.length > 0 ? (
+					{/* {row.variants && row.variants.length > 0 ? (
 						<Badge
 							variant="outline"
 							className="text-[9px] bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/20 dark:text-purple-400 font-bold shrink-0"
@@ -1748,7 +1965,7 @@ function ProductsTab() {
 						>
 							Simple
 						</Badge>
-					)}
+					)} */}
 				</div>
 			),
 		},
@@ -1763,14 +1980,14 @@ function ProductsTab() {
 					? row.variants.map((v: any) => v.sku).filter(Boolean).join(" ")
 					: "") ||
 				"",
-			sortable: true,
+			sortable: false,
 			width: "95px",
-			minWidth: 80,
-			maxWidth: 105,
+			minWidth: 100,
+			maxWidth: 115,
 			cell: ({ row }: { row: any }) => {
 				const sku = row.baseSku || row.sku || row.variants?.[0]?.sku || "—";
 				return (
-					<span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 truncate block">
+					<span className="font-mono text-[9px] font-bold text-slate-800 dark:text-slate-200 truncate block">
 						{sku}
 					</span>
 				);
@@ -1790,7 +2007,7 @@ function ProductsTab() {
 							.join(" ")
 					: "") ||
 				"",
-			sortable: true,
+			sortable: false,
 			width: "95px",
 			minWidth: 80,
 			maxWidth: 105,
@@ -1798,7 +2015,7 @@ function ProductsTab() {
 				const barcode =
 					row.baseBarcode || row.barcode || row.variants?.[0]?.barcode || null;
 				return barcode ? (
-					<span className="font-mono text-xs text-slate-500 truncate block">{barcode}</span>
+					<span className="font-mono text-[10px] text-slate-500 truncate block">{barcode}</span>
 				) : (
 					<span className="text-[11px] text-slate-400">—</span>
 				);
@@ -1852,43 +2069,47 @@ function ProductsTab() {
 				);
 			},
 		},
+		// {
+		// 	id: "price",
+		// 	header: t("products.sellingPrice"),
+		// 	accessorKey: "price",
+		// 	sortable: true,
+		// 	width: "80px",
+		// 	minWidth: 70,
+		// 	maxWidth: 90,
+		// 	cell: ({ row }: { row: any }) => {
+		// 		const price = getProductBasePrice(row);
+		// 		const baseUnit = getProductBaseUnit(row);
+		// 		const unitLabel =
+		// 			row.unitName ||
+		// 			row.baseUnitName ||
+		// 			baseUnit?.unitName ||
+		// 			baseUnit?.name ||
+		// 			(baseUnit?.symbol ? `(${baseUnit.symbol})` : "") ||
+		// 			"";
+		// 		return (
+		// 			<div>
+		// 				<div className="font-extrabold text-xs text-emerald-600 dark:text-emerald-400">
+		// 					$
+		// 					{Number(price || 0).toLocaleString(undefined, {
+		// 						minimumFractionDigits: 2,
+		// 						maximumFractionDigits: 2,
+		// 					})}
+		// 				</div>
+		// 				{unitLabel && (
+		// 					<span className="text-[10px] text-slate-400 font-medium block mt-0.5 truncate max-w-[80px]">
+		// 						/ {unitLabel}
+		// 					</span>
+		// 				)}
+		// 			</div>
+		// 		);
+		// 	},
+		// },
 		{
-			id: "pricing",
-			header: t("products.sellingPrice"),
-			width: "80px",
-			minWidth: 70,
-			maxWidth: 90,
-			cell: ({ row }: { row: any }) => {
-				const price = getProductBasePrice(row);
-				const baseUnit = getProductBaseUnit(row);
-				const unitLabel =
-					row.unitName ||
-					row.baseUnitName ||
-					baseUnit?.unitName ||
-					baseUnit?.name ||
-					(baseUnit?.symbol ? `(${baseUnit.symbol})` : "") ||
-					"";
-				return (
-					<div>
-						<div className="font-extrabold text-xs text-emerald-600 dark:text-emerald-400">
-							$
-							{Number(price || 0).toLocaleString(undefined, {
-								minimumFractionDigits: 2,
-								maximumFractionDigits: 2,
-							})}
-						</div>
-						{unitLabel && (
-							<span className="text-[10px] text-slate-400 font-medium block mt-0.5 truncate max-w-[80px]">
-								/ {unitLabel}
-							</span>
-						)}
-					</div>
-				);
-			},
-		},
-		{
-			id: "inventory",
+			id: "stock",
 			header: t("products.stockQuantity"),
+			accessorKey: "stock",
+			sortable: true,
 			width: "75px",
 			minWidth: 65,
 			maxWidth: 85,
@@ -1929,28 +2150,12 @@ function ProductsTab() {
 				);
 			},
 		},
-		{
-			id: "units",
-			header: t("products.mapUnits"),
-			width: "70px",
-			minWidth: 60,
-			maxWidth: 80,
-			cell: ({ row }: { row: any }) => {
-				const unitsCount = row.units?.length || 0;
-				return (
-					<Badge
-						variant="outline"
-						className="text-[10px] bg-slate-50 font-semibold dark:bg-slate-900"
-					>
-						{unitsCount} Unit(s)
-					</Badge>
-				);
-			},
-		},
+	
 		{
 			id: "isActive",
 			header: t("products.status"),
 			accessorKey: "isActive",
+			sortable: false,
 			width: "55px",
 			minWidth: 50,
 			maxWidth: 65,
@@ -1990,6 +2195,62 @@ function ProductsTab() {
 		},
 		
 	];
+
+	const productSortOptions: DataTableSortOption[] = useMemo(
+		() => [
+			{
+				id: "createdAt",
+				label: "Created Date (Newest)",
+				icon: <Clock className="h-3.5 w-3.5 text-slate-500" />,
+			},
+			{
+				id: "totalSales",
+				label: "Best Selling (Sales Volume)",
+				icon: <Flame className="h-3.5 w-3.5 text-amber-500" />,
+			},
+			{
+				id: "popularityScore",
+				label: "Most Popular (Score)",
+				icon: <Sparkles className="h-3.5 w-3.5 text-purple-500" />,
+			},
+			{
+				id: "maxDiscountPct",
+				label: "Biggest Discount %",
+				icon: <Tag className="h-3.5 w-3.5 text-emerald-500" />,
+			},
+			// {
+			// 	id: "viewCount",
+			// 	label: "Most Viewed",
+			// 	icon: <Eye className="h-3.5 w-3.5 text-sky-500" />,
+			// },
+			{
+				id: "name",
+				label: "Product Name (A-Z)",
+				icon: <Package className="h-3.5 w-3.5 text-slate-500" />,
+			},
+			{
+				id: "price",
+				label: "Selling Price",
+				icon: <DollarSign className="h-3.5 w-3.5 text-emerald-600" />,
+			},
+			{
+				id: "stock",
+				label: "Stock Quantity",
+				icon: <Boxes className="h-3.5 w-3.5 text-blue-500" />,
+			},
+			{
+				id: "category",
+				label: "Category",
+				icon: <Layers className="h-3.5 w-3.5 text-purple-500" />,
+			},
+			{
+				id: "brand",
+				label: "Brand",
+				icon: <Tag className="h-3.5 w-3.5 text-sky-500" />,
+			},
+		],
+		[],
+	);
 
 	return (
 		<div className="space-y-4">
@@ -2062,6 +2323,7 @@ function ProductsTab() {
 					manualPagination={true}
 					manualFiltering={true}
 					manualSorting={true}
+					sortOptions={productSortOptions}
 					sortState={
 						sortField
 							? {
@@ -2197,6 +2459,150 @@ function ProductsTab() {
 										</Badge>
 									)}
 								</Button>
+
+								{/* Grid View Quick Sort Dropdown */}
+								<div className="flex items-center gap-1">
+									<DropdownMenu>
+										<DropdownMenuTrigger
+											render={
+												<Button
+													variant={sortField ? "secondary" : "outline"}
+													size="sm"
+													className="h-9 px-3 gap-1.5 text-xs font-semibold rounded-lg border cursor-pointer"
+												>
+													<ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+													<span>{t("common.sort", "Sort")}</span>
+													{sortField && (
+														<span className="font-semibold text-primary ml-0.5 truncate max-w-[100px]">
+															{productSortOptions.find((o) => o.id === sortField)?.label.split("(")[0].trim() || sortField}
+														</span>
+													)}
+												</Button>
+											}
+										/>
+										<DropdownMenuContent align="end" className="w-64 shadow-lg p-1.5 max-h-96 overflow-y-auto">
+											<DropdownMenuLabel className="text-xs text-muted-foreground font-semibold flex items-center justify-between px-2 py-1">
+												<span>Sort Options</span>
+												{sortField !== "createdAt" && (
+													<button
+														onClick={() => {
+															setSortField("createdAt");
+															setSortDirection("DESC");
+															setPage(1);
+														}}
+														className="text-primary hover:underline text-[10px]"
+													>
+														Reset
+													</button>
+												)}
+											</DropdownMenuLabel>
+											{sortField && (
+												<div className="flex items-center justify-between px-2 py-1.5 mb-1 bg-muted/60 rounded-md">
+													<span className="text-[11px] font-medium text-muted-foreground">Direction</span>
+													<div className="flex items-center gap-1">
+														<Button
+															type="button"
+															size="sm"
+															variant={sortDirection === "ASC" ? "default" : "outline"}
+															onClick={() => {
+																setSortDirection("ASC");
+																setPage(1);
+															}}
+															className={cn(
+																"h-6 px-2 text-[10px] font-bold rounded cursor-pointer",
+																sortDirection === "ASC" ? "bg-primary text-primary-foreground" : "bg-background"
+															)}
+														>
+															↑ ASC
+														</Button>
+														<Button
+															type="button"
+															size="sm"
+															variant={sortDirection === "DESC" ? "default" : "outline"}
+															onClick={() => {
+																setSortDirection("DESC");
+																setPage(1);
+															}}
+															className={cn(
+																"h-6 px-2 text-[10px] font-bold rounded cursor-pointer",
+																sortDirection === "DESC" ? "bg-primary text-primary-foreground" : "bg-background"
+															)}
+														>
+															↓ DESC
+														</Button>
+													</div>
+												</div>
+											)}
+											<DropdownMenuSeparator />
+											{productSortOptions.map((opt) => {
+												const isSorted = sortField === opt.id;
+												return (
+													<DropdownMenuItem
+														key={opt.id}
+														onClick={() => {
+															if (sortField === opt.id) {
+																setSortDirection(sortDirection === "DESC" ? "ASC" : "DESC");
+															} else {
+																const prefersDesc = [
+																	"createdat",
+																	"totalsales",
+																	"popularityscore",
+																	"maxdiscountpct",
+																	"viewcount",
+																	"stock",
+																].includes(opt.id.toLowerCase());
+																setSortField(opt.id);
+																setSortDirection(prefersDesc ? "DESC" : "ASC");
+															}
+															setPage(1);
+														}}
+														className={cn(
+															"flex items-center justify-between cursor-pointer text-xs px-2.5 py-1.5 rounded-md",
+															isSorted && "bg-primary/10 text-primary font-semibold",
+														)}
+													>
+														<span className="flex items-center gap-2 min-w-0 truncate">
+															{opt.icon}
+															<span className="truncate">{opt.label}</span>
+														</span>
+														{isSorted && (
+															<span className="text-primary font-bold text-[11px] shrink-0 ml-2">
+																{sortDirection === "ASC" ? "↑ ASC" : "↓ DESC"}
+															</span>
+														)}
+													</DropdownMenuItem>
+												);
+											})}
+										</DropdownMenuContent>
+									</DropdownMenu>
+
+									{/* Quick Direction Toggle Pill */}
+									{sortField && (
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onClick={() => {
+												setSortDirection((prev) => (prev === "ASC" ? "DESC" : "ASC"));
+												setPage(1);
+											}}
+											className="h-9 px-2 gap-1 text-xs font-bold rounded-lg border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer transition-colors shadow-2xs"
+											title={`Currently sorted ${sortDirection}. Click to switch to ${sortDirection === "ASC" ? "DESC" : "ASC"}`}
+										>
+											{sortDirection === "ASC" ? (
+												<>
+													<ArrowUp className="h-3.5 w-3.5 text-primary" />
+													<span>ASC</span>
+												</>
+											) : (
+												<>
+													<ArrowDown className="h-3.5 w-3.5 text-primary" />
+													<span>DESC</span>
+												</>
+											)}
+										</Button>
+									)}
+								</div>
 								<PermissionGate resource="PRODUCT" action="CREATE">
 									<Button
 										onClick={openCreate}
@@ -2274,10 +2680,12 @@ function ProductsTab() {
 										setPage(1);
 									}}
 									options={[
-										{ value: "ALL", label: "All Types" },
-										{ value: "NORMAL", label: "Standard" },
+										{ value: "ALL", label: "All Merchandising Types" },
+										{ value: "NORMAL", label: "Standard / Normal" },
+										{ value: "POPULAR", label: "Popular" },
+										{ value: "BESTSELLER", label: "Best Seller" },
 										{ value: "NEW_ARRIVAL", label: "New Arrival" },
-										{ value: "FEATURED", label: "Featured" },
+										{ value: "TRENDING", label: "Trending" },
 									]}
 								/>
 
@@ -2290,6 +2698,10 @@ function ProductsTab() {
 										{ value: "price", label: "Selling Price" },
 										{ value: "stock", label: "Stock Quantity" },
 										{ value: "name", label: "Product Name" },
+										{ value: "totalSales", label: "Best Selling (Sales Volume)" },
+										{ value: "popularityScore", label: "Most Popular (Score)" },
+										{ value: "maxDiscountPct", label: "Biggest Discount %" },
+										{ value: "viewCount", label: "Most Viewed" },
 									]}
 								/>
 
@@ -2329,7 +2741,10 @@ function ProductsTab() {
 								<ModernSelect
 									label="Sort Direction"
 									value={sortDirection}
-									onChange={(val) => setSortDirection(val as "ASC" | "DESC")}
+									onChange={(val) => {
+										setSortDirection(val as "ASC" | "DESC");
+										setPage(1);
+									}}
 									options={[
 										{ value: "DESC", label: "Descending (Z-A / High-Low)" },
 										{ value: "ASC", label: "Ascending (A-Z / Low-High)" },
@@ -3994,6 +4409,53 @@ function ProductsTab() {
 										);
 										const resolvedUnitId =
 											row.unitId || unitPriceObj?.unitId || "";
+										const initialEditPrices: Record<
+											string | number,
+											{
+												unitPrice: string;
+												discount: string;
+												discountType: DiscountType;
+											}
+										> = {};
+										const rowUnitPrices = Array.isArray(row.unitPrices)
+											? row.unitPrices
+											: Array.isArray(row.units)
+												? row.units
+												: [];
+										effectiveProductUnits.forEach((u: any) => {
+											const uId = u.unitId ?? u.id;
+											if (uId === undefined || uId === null) return;
+											const matched = rowUnitPrices.find(
+												(up: any) =>
+													String(up.unitId ?? up.unit?.id ?? up.id) ===
+													String(uId),
+											);
+											const rawBase =
+												matched?.basePrice ??
+												matched?.price ??
+												matched?.unitPrice ??
+												(u.isBase
+													? getVariantPrice(row, fullProduct, productUnitsList)
+													: u.basePrice ?? u.price ?? 0);
+											const rawDisc =
+												parseFloat(
+													String(matched?.discount ?? u.discount ?? 0),
+												) || 0;
+											const discType = normalizeDiscountType(
+												matched?.discountType ?? u.discountType,
+											);
+											initialEditPrices[uId] = {
+												unitPrice:
+													rawBase !== undefined &&
+													rawBase !== null &&
+													Number(rawBase) > 0
+														? String(Number(rawBase))
+														: "",
+												discount: String(rawDisc),
+												discountType: discType,
+											};
+										});
+										setEditVarUnitPrices(initialEditPrices);
 										setSelectedVariant({
 											id: row.id,
 											name: row.name || "",
@@ -4585,7 +5047,7 @@ function ProductsTab() {
 
 						{/* TAB 1: GENERAL & PRICING */}
 						<ModernTabsContent value="general" className="space-y-4 mt-0">
-							{/* CARD 1: CORE IDENTIFICATION & BASE PRICING */}
+							{/* CARD 1: CORE IDENTIFICATION */}
 							<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-2xs">
 								<div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-800/60">
 									<div className="flex items-center gap-2.5">
@@ -4597,7 +5059,7 @@ function ProductsTab() {
 												{t("products.basicInfo")}
 											</h4>
 											<p className="text-[11px] text-slate-500 dark:text-slate-400">
-												Configure variant name, tracking codes, and base selling price
+												Configure variant name and tracking codes (SKU & Barcode)
 											</p>
 										</div>
 									</div>
@@ -4611,7 +5073,8 @@ function ProductsTab() {
 
 								{/* Variant Name */}
 								<ModernInput
-									label={`${t("products.variantName")} *`}
+									inputSize="sm"
+									label={t("products.variantName")}
 									value={newVarName}
 									onChange={(e) => setNewVarName(e.target.value)}
 									placeholder={
@@ -4620,17 +5083,21 @@ function ProductsTab() {
 									}
 									required
 									leftIcon={<Tag className="h-3.5 w-3.5 text-slate-400" />}
-									className="rounded-xl text-xs font-medium"
+									className="text-xs font-medium"
 								/>
 
-								{/* SKU & Barcode side by side */}
+								{/* SKU & Barcode side by side using ModernInput */}
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 									{/* SKU Code with Generator */}
-									<div>
-										<div className="flex items-center justify-between mb-1.5">
-											<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-												{t("stocks.sku")} *
-											</Label>
+									<ModernInput
+										inputSize="sm"
+										label={t("stocks.sku")}
+										required
+										value={newVarSku}
+										onChange={(e) => setNewVarSku(e.target.value)}
+										placeholder="e.g. SKU-RED-256"
+										className="font-mono text-xs"
+										labelAction={
 											<button
 												type="button"
 												onClick={() => {
@@ -4643,15 +5110,8 @@ function ProductsTab() {
 												<Sparkles className="h-3 w-3" />
 												{t("products.generate")}
 											</button>
-										</div>
-										<div className="relative">
-											<Input
-												value={newVarSku}
-												onChange={(e) => setNewVarSku(e.target.value)}
-												placeholder="e.g. SKU-RED-256"
-												className="pr-9 font-mono text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-												required
-											/>
+										}
+										rightIcon={
 											<button
 												type="button"
 												onClick={() => {
@@ -4659,20 +5119,23 @@ function ProductsTab() {
 													setNewVarSku(sku);
 													toast.info(`Generated SKU: ${sku}`);
 												}}
-												className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
+												className="text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
 												title={t("products.generate")}
 											>
 												<Sparkles className="h-3.5 w-3.5" />
 											</button>
-										</div>
-									</div>
+										}
+									/>
 
 									{/* Barcode with Generator */}
-									<div>
-										<div className="flex items-center justify-between mb-1.5">
-											<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-												{t("products.barcode")}
-											</Label>
+									<ModernInput
+										inputSize="sm"
+										label={t("products.barcode")}
+										value={newVarBarcode}
+										onChange={(e) => setNewVarBarcode(e.target.value)}
+										placeholder="e.g. 8901234567890"
+										className="font-mono text-xs"
+										labelAction={
 											<button
 												type="button"
 												onClick={() => {
@@ -4685,14 +5148,8 @@ function ProductsTab() {
 												<Sparkles className="h-3 w-3" />
 												{t("products.generate")}
 											</button>
-										</div>
-										<div className="relative">
-											<Input
-												value={newVarBarcode}
-												onChange={(e) => setNewVarBarcode(e.target.value)}
-												placeholder="e.g. 8901234567890"
-												className="pr-9 font-mono text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-											/>
+										}
+										rightIcon={
 											<button
 												type="button"
 												onClick={() => {
@@ -4700,52 +5157,18 @@ function ProductsTab() {
 													setNewVarBarcode(code);
 													toast.info(`Generated Barcode: ${code}`);
 												}}
-												className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
+												className="text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
 												title={t("products.generate")}
 											>
 												<Sparkles className="h-3.5 w-3.5" />
 											</button>
-										</div>
-									</div>
-								</div>
-
-								{/* Retail Sell Price & Base Unit */}
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-									<div>
-										<Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 block">
-											{t("products.retailSellPrice")} *
-										</Label>
-										<div className="relative">
-											<span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-slate-400">
-												$
-											</span>
-											<Input
-												type="number"
-												step="0.01"
-												value={newVarPrice}
-												onChange={(e) => setNewVarPrice(e.target.value)}
-												placeholder="0.00"
-												className="pl-7 font-mono font-bold text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-												required
-											/>
-										</div>
-										<p className="text-[10px] text-slate-400 mt-1">
-											Base selling price per single unit used for tier conversions
-										</p>
-									</div>
-									<div>
-										<ModernSelect
-											label={`${t("products.unit")} *`}
-											value={newVarUnitId}
-											onChange={(val) => setNewVarUnitId(val)}
-											options={productSpecificUnitOptions}
-										/>
-									</div>
+										}
+									/>
 								</div>
 							</div>
 
-							{/* CARD 2: PACKAGING UNIT PRICING SECTION (OPTION 1 VS OPTION 2) */}
-							{productUnitsList && productUnitsList.length > 1 && (
+							{/* CARD 2: PACKAGING UNIT PRICING SECTION (ALWAYS CUSTOM PRICE PER UNIT) */}
+							{effectiveProductUnits.length > 0 && (
 								<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-2xs">
 									<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200/60 dark:border-slate-800/60">
 										<div className="flex items-center gap-2.5">
@@ -4761,561 +5184,330 @@ function ProductsTab() {
 														variant="secondary"
 														className="text-[10px] font-mono px-2 py-0 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800/50"
 													>
-														{productUnitsList.length} Units
+														{effectiveProductUnits.length}{" "}
+														{effectiveProductUnits.length === 1
+															? "Unit"
+															: "Units"}
 													</Badge>
 												</div>
 												<p className="text-[11px] text-slate-500 dark:text-slate-400">
-													{newVarPricingMode === "auto"
-														? t("products.autoScalePricingDesc")
-														: t("products.customUnitPricingDesc")}
+													{t("products.customUnitPricingDesc")}
 												</p>
 											</div>
 										</div>
 
-										{/* Segmented Control / Toggle */}
-										<div className="inline-flex items-center bg-slate-200/70 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/60 shrink-0 shadow-2xs">
-											<button
+										{effectiveProductUnits.length > 1 && (
+											<ModernButton
 												type="button"
-												onClick={() => setNewVarPricingMode("auto")}
-												className={cn(
-													"px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
-													newVarPricingMode === "auto"
-														? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs font-bold"
-														: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
-												)}
-											>
-												<Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-												<span>{t("products.autoScalePricing")}</span>
-											</button>
-											<button
-												type="button"
+												variant="ghost"
+												size="xs"
+												leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
 												onClick={() => {
-													setNewVarPricingMode("custom");
-													// Initialize unit prices if empty
-													setNewVarUnitPrices((prev) => {
-														const updated = { ...prev };
-														const baseNum = Math.max(0, Number(newVarPrice) || 0);
-														productUnitsList.forEach((u: any) => {
-															const uId = u.unitId ?? u.id;
-															if (!updated[uId]) {
-																const uList = calculateUnitListPrice(
-																	baseNum,
-																	u.baseQuantity || 1,
-																);
-																const uDisc =
-																	parseFloat(String(u.discount ?? 0)) || 0;
-																const discType = normalizeDiscountType(
-																	u.discountType,
-																);
-																const finalP =
-																	uDisc > 0
-																		? calculateUnitFinalPrice(
-																				uList,
-																				uDisc,
-																				discType,
-																			)
-																		: u.isBase
-																			? baseNum
-																			: uList;
-																updated[uId] = {
-																	unitPrice:
-																		finalP > 0
-																			? finalP.toFixed(2)
-																			: u.isBase
-																				? baseNum.toFixed(2)
-																				: uList.toFixed(2),
-																	discount: String(uDisc),
-																	discountType: discType,
-																};
-															}
-														});
-														return updated;
+													const baseUnitObj =
+														effectiveProductUnits.find((b: any) => b.isBase) ||
+														effectiveProductUnits[0];
+													const baseUId =
+														baseUnitObj?.unitId ?? baseUnitObj?.id;
+													const baseEntry =
+														baseUId !== undefined
+															? newVarUnitPrices[baseUId]
+															: undefined;
+													const baseNum = Math.max(
+														0,
+														parseFloat(baseEntry?.unitPrice || "0") || 0,
+													);
+													if (baseNum <= 0) {
+														toast.info(
+															"Enter a Base Price for the Base Unit (1x) first to scale child units.",
+														);
+														return;
+													}
+													const updated: Record<string | number, any> = {
+														...newVarUnitPrices,
+													};
+													effectiveProductUnits.forEach((u: any) => {
+														const uId = u.unitId ?? u.id;
+														const qty = u.baseQuantity || 1;
+														const scaledBase = calculateUnitListPrice(
+															baseNum,
+															qty,
+														);
+														const existing = updated[uId];
+														const uDisc =
+															existing?.discount !== undefined
+																? existing.discount
+																: String(
+																		parseFloat(String(u.discount ?? 0)) || 0,
+																	);
+														const discType =
+															existing?.discountType ||
+															normalizeDiscountType(u.discountType);
+														updated[uId] = {
+															unitPrice: String(
+																u.isBase ? baseNum : scaledBase,
+															),
+															discount: uDisc,
+															discountType: discType,
+														};
 													});
+													setNewVarUnitPrices(updated);
+													toast.info(
+														"Scaled packaging unit base prices from 1x Base Unit",
+													);
 												}}
-												className={cn(
-													"px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
-													newVarPricingMode === "custom"
-														? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs font-bold"
-														: "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
-												)}
+												className="text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40"
 											>
-												<SlidersHorizontal className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-												<span>{t("products.customUnitPricing")}</span>
-											</button>
-										</div>
+												{t("products.recalculateFromBase")}
+											</ModernButton>
+										)}
 									</div>
 
-									{/* OPTION 1: AUTO-SCALE PREVIEW */}
-									{newVarPricingMode === "auto" && (
-										<div className="space-y-3">
-											<div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
-												<span className="flex items-center gap-1.5 font-medium text-purple-700 dark:text-purple-300">
-													<Sparkles className="h-3.5 w-3.5" />
-													Live calculation based on base unit price ($
-													{(Number(newVarPrice) || 0).toFixed(2)})
-												</span>
-												<span className="text-[11px]">
-													Inherits ratios & default discounts
-												</span>
-											</div>
+									<div className="space-y-3">
+										{effectiveProductUnits.map((u: any) => {
+											const uId = u.unitId ?? u.id;
+											const qty = u.baseQuantity || 1;
+											const defaultDisc =
+												parseFloat(String(u.discount ?? 0)) || 0;
+											const current = newVarUnitPrices[uId] || {
+												unitPrice: "",
+												discount: String(defaultDisc),
+												discountType: normalizeDiscountType(u.discountType),
+											};
 
-											<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-												{productUnitsList.map((u: any) => {
-													const baseNum = Math.max(0, Number(newVarPrice) || 0);
-													const qty = u.baseQuantity || 1;
-													const uList = calculateUnitListPrice(baseNum, qty);
-													const uDisc =
-														parseFloat(String(u.discount ?? 0)) || 0;
-													const discType = normalizeDiscountType(
-														u.discountType,
-													);
-													const finalP =
-														uDisc > 0
-															? calculateUnitFinalPrice(
-																	uList,
-																	uDisc,
-																	discType,
-																)
-															: u.isBase
-																? baseNum
-																: uList;
+											const basePriceVal = Math.max(
+												0,
+												parseFloat(current.unitPrice) || 0,
+											);
+											const currDisc = Math.max(
+												0,
+												parseFloat(current.discount) || 0,
+											);
+											const sellPriceVal =
+												currDisc > 0
+													? calculateUnitFinalPrice(
+															basePriceVal,
+															currDisc,
+															current.discountType,
+														)
+													: basePriceVal;
 
-													return (
-														<div
-															key={u.unitId ?? u.id}
-															className="bg-white dark:bg-slate-900 rounded-xl p-3.5 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between"
-														>
-															<div>
-																<div className="flex items-center justify-between gap-1 mb-1.5">
-																	<div className="flex items-center gap-1.5">
-																		<span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
-																			{u.unitName || u.name}
-																		</span>
-																		{u.symbol && (
-																			<span className="text-[11px] text-slate-400">
-																				({u.symbol})
-																			</span>
-																		)}
-																	</div>
-																	{u.isBase ? (
-																		<Badge
-																			variant="outline"
-																			className="text-[9px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold"
-																		>
-																			Base
-																		</Badge>
-																	) : (
-																		<Badge
-																			variant="secondary"
-																			className="text-[9px] px-1.5 py-0 font-mono"
-																		>
-																			{qty}x
-																		</Badge>
-																	)}
-																</div>
-																<div className="text-[11px] text-slate-400 font-mono mb-2">
-																	{u.isBase
-																		? "1 Base Unit"
-																		: `${qty}x Base Unit`}
-																	{qty > 1 && finalP > 0 && (
-																		<span className="text-purple-600 dark:text-purple-400 ml-1">
-																			(≈ ${(finalP / qty).toFixed(2)}/ea)
-																		</span>
-																	)}
-																</div>
-															</div>
+											const baseUnitObj =
+												effectiveProductUnits.find((b: any) => b.isBase) ||
+												effectiveProductUnits[0];
+											const baseUnitName =
+												baseUnitObj?.unitName || baseUnitObj?.name || "Unit";
+											const unitLabel =
+												u.symbol || u.unitName || u.name || "unit";
 
-															<div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-baseline justify-between">
-																<div className="text-[11px] text-slate-400 font-mono">
-																	{uDisc > 0 ? (
-																		<span className="line-through mr-1">
-																			${uList.toFixed(2)}
-																		</span>
-																	) : (
-																		<span>List: ${uList.toFixed(2)}</span>
-																	)}
-																</div>
-																<div className="flex items-center gap-1">
-																	<span className="text-sm font-bold font-mono text-purple-700 dark:text-purple-300">
-																		${finalP.toFixed(2)}
-																	</span>
-																	{uDisc > 0 && (
-																		<Badge className="bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200 dark:border-rose-900/40 text-[9px] px-1 py-0 font-mono">
-																			-{uDisc}
-																			{discType === "PERCENTAGE" ? "%" : "$"}
-																		</Badge>
-																	)}
-																</div>
-															</div>
-														</div>
-													);
-												})}
-											</div>
-										</div>
-									)}
-
-									{/* OPTION 2: CUSTOM PRICING TIERS */}
-									{newVarPricingMode === "custom" && (
-										<div className="space-y-3">
-											<div className="flex items-center justify-between px-1">
-												<span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-													<SlidersHorizontal className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-													{t("products.customUnitPricing")}
-												</span>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={() => {
-														const baseNum = Math.max(0, Number(newVarPrice) || 0);
-														const updated: Record<string | number, any> = {};
-														productUnitsList.forEach((u: any) => {
-															const uId = u.unitId ?? u.id;
-															const uList = calculateUnitListPrice(
-																baseNum,
-																u.baseQuantity || 1,
-															);
-															const uDisc =
-																parseFloat(String(u.discount ?? 0)) || 0;
-															const discType = normalizeDiscountType(
-																u.discountType,
-															);
-															const finalP =
-																uDisc > 0
-																	? calculateUnitFinalPrice(
-																			uList,
-																			uDisc,
-																			discType,
-																		)
-																	: u.isBase
-																		? baseNum
-																		: uList;
-															updated[uId] = {
-																unitPrice:
-																	finalP > 0
-																		? finalP.toFixed(2)
-																		: u.isBase
-																			? baseNum.toFixed(2)
-																			: uList.toFixed(2),
-																discount: String(uDisc),
-																discountType: discType,
-															};
-														});
-														setNewVarUnitPrices(updated);
-														toast.info("Reset all unit prices from base price ratio");
-													}}
-													className="h-7 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 px-2.5 rounded-lg cursor-pointer"
+											return (
+												<div
+													key={uId}
+													className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-3 hover:border-purple-300/60 dark:hover:border-purple-800/60 transition-colors"
 												>
-													<RotateCcw className="h-3.5 w-3.5 mr-1" />
-													{t("products.recalculateFromBase")}
-												</Button>
-											</div>
-
-											<div className="space-y-3">
-												{productUnitsList.map((u: any) => {
-													const uId = u.unitId ?? u.id;
-													const baseNum = Math.max(0, Number(newVarPrice) || 0);
-													const qty = u.baseQuantity || 1;
-													const uList = calculateUnitListPrice(baseNum, qty);
-													const current = newVarUnitPrices[uId] || {
-														unitPrice: (u.isBase ? baseNum : uList).toFixed(2),
-														discount: String(u.discount ?? 0),
-														discountType: normalizeDiscountType(
-															u.discountType,
-														),
-													};
-
-													const currPrice =
-														parseFloat(current.unitPrice) || 0;
-													const currDisc = parseFloat(current.discount) || 0;
-													const baseUnitObj =
-														productUnitsList.find((b: any) => b.isBase) ||
-														productUnitsList[0];
-													const baseUnitName =
-														baseUnitObj?.unitName ||
-														baseUnitObj?.name ||
-														"Unit";
-
-													return (
-														<div
-															key={uId}
-															className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-3 hover:border-purple-300/60 dark:hover:border-purple-800/60 transition-colors"
-														>
-															{/* Unit Header */}
-															<div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
-																<div className="flex items-center gap-2">
-																	<div className="flex items-center justify-center h-7 w-7 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold text-xs">
-																		{u.isBase ? "1x" : `${qty}x`}
-																	</div>
-																	<div className="flex items-center gap-1.5">
-																		<span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-																			{u.unitName || u.name}
-																		</span>
-																		{u.symbol && (
-																			<span className="text-[11px] text-slate-400">
-																				({u.symbol})
-																			</span>
-																		)}
-																		{u.isBase ? (
-																			<Badge
-																				variant="outline"
-																				className="text-[9px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold"
-																			>
-																				Base (1x)
-																			</Badge>
-																		) : (
-																			<Badge
-																				variant="secondary"
-																				className="text-[9px] px-1.5 py-0 font-mono"
-																			>
-																				{u.parentUnitName && u.parentQuantity
-																					? `${u.parentQuantity}x ${u.parentUnitName} (${qty}x)`
-																					: `${qty}x Base`}
-																			</Badge>
-																		)}
-																	</div>
-																</div>
-
-																{/* Economics & Reference */}
-																<div className="flex items-center gap-2.5">
-																	<div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-																		List:{" "}
-																		<span className="font-semibold text-slate-700 dark:text-slate-300">
-																			${uList.toFixed(2)}
-																		</span>
-																	</div>
-																	{qty > 1 && currPrice > 0 && (
-																		<span className="text-[10px] font-mono text-purple-600 dark:text-purple-400">
-																			(≈ ${(currPrice / qty).toFixed(2)}/
-																			{baseUnitName})
-																		</span>
-																	)}
-																	{uList > 0 && currPrice < uList && (
-																		<Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/40 text-[9px] px-1.5 py-0 font-mono">
-																			Save ${(uList - currPrice).toFixed(2)}
-																		</Badge>
-																	)}
-																</div>
+													{/* Unit Header */}
+													<div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+														<div className="flex items-center gap-2">
+															<div className="flex items-center justify-center h-7 w-7 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold text-xs">
+																{u.isBase ? "1x" : `${qty}x`}
 															</div>
-
-															{/* Controls Grid */}
-															<div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-end">
-																{/* Selling Price (4 cols) */}
-																<div className="sm:col-span-4">
-																	<Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5 block">
-																		{t("products.unitFinalPrice")} ($) *
-																	</Label>
-																	<div className="relative">
-																		<span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-slate-400">
-																			$
-																		</span>
-																		<Input
-																			type="number"
-																			step="0.01"
-																			value={current.unitPrice}
-																			onChange={(e) => {
-																				const val = e.target.value;
-																				const numVal = parseFloat(val);
-																				let newDisc = current.discount;
-																				if (!isNaN(numVal) && uList > 0) {
-																					const calculatedD =
-																						calculateUnitDiscount(
-																							uList,
-																							numVal,
-																							current.discountType,
-																						);
-																					newDisc =
-																						calculatedD > 0
-																							? String(calculatedD)
-																							: "0";
-																				}
-																				setNewVarUnitPrices((prev) => ({
-																					...prev,
-																					[uId]: {
-																						...current,
-																						unitPrice: val,
-																						discount: newDisc,
-																					},
-																				}));
-																			}}
-																			placeholder="0.00"
-																			className="pl-7 h-9 text-xs font-mono font-bold rounded-xl bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
-																		/>
-																	</div>
-																</div>
-
-																{/* Discount Input with % / $ Toggle (4 cols) */}
-																<div className="sm:col-span-4">
-																	<div className="flex items-center justify-between mb-1.5">
-																		<Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-																			{t("products.unitDiscount")}
-																		</Label>
-																		<span className="text-[10px] text-slate-400">
-																			{current.discountType === "PERCENTAGE"
-																				? "Percentage"
-																				: "Fixed Amount"}
-																		</span>
-																	</div>
-																	<div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 focus-within:border-purple-500 focus-within:ring-2 focus-within:ring-purple-500/20 overflow-hidden h-9">
-																		<Input
-																			type="number"
-																			step="0.01"
-																			value={current.discount}
-																			onChange={(e) => {
-																				const val = e.target.value;
-																				const numVal = parseFloat(val);
-																				let newP = current.unitPrice;
-																				if (uList > 0) {
-																					if (isNaN(numVal) || numVal <= 0) {
-																						newP = uList.toFixed(2);
-																					} else {
-																						const finalP =
-																							calculateUnitFinalPrice(
-																								uList,
-																								numVal,
-																								current.discountType,
-																							);
-																						newP = finalP.toFixed(2);
-																					}
-																				}
-																				setNewVarUnitPrices((prev) => ({
-																					...prev,
-																					[uId]: {
-																						...current,
-																						discount: val,
-																						unitPrice: newP,
-																					},
-																				}));
-																			}}
-																			placeholder="0"
-																			className="border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 h-full text-xs font-mono bg-transparent flex-1 px-3"
-																		/>
-																		<div className="flex items-center border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 m-1 rounded-lg">
-																			<button
-																				type="button"
-																				onClick={() => {
-																					if (
-																						current.discountType ===
-																						"PERCENTAGE"
-																					)
-																						return;
-																					let newDisc = current.discount;
-																					if (uList > 0 && currPrice > 0) {
-																						const d = calculateUnitDiscount(
-																							uList,
-																							currPrice,
-																							"PERCENTAGE",
-																						);
-																						newDisc =
-																							d > 0 ? String(d) : "0";
-																					}
-																					setNewVarUnitPrices((prev) => ({
-																						...prev,
-																						[uId]: {
-																							...current,
-																							discountType: "PERCENTAGE",
-																							discount: newDisc,
-																						},
-																					}));
-																				}}
-																				className={cn(
-																					"px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-colors",
-																					current.discountType === "PERCENTAGE"
-																						? "bg-purple-600 text-white shadow-2xs"
-																						: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
-																				)}
-																			>
-																				%
-																			</button>
-																			<button
-																				type="button"
-																				onClick={() => {
-																					if (
-																						current.discountType === "FLAT"
-																					)
-																						return;
-																					let newDisc = current.discount;
-																					if (uList > 0 && currPrice > 0) {
-																						const d = calculateUnitDiscount(
-																							uList,
-																							currPrice,
-																							"FLAT",
-																						);
-																						newDisc =
-																							d > 0 ? String(d) : "0";
-																					}
-																					setNewVarUnitPrices((prev) => ({
-																						...prev,
-																						[uId]: {
-																							...current,
-																							discountType: "FLAT",
-																							discount: newDisc,
-																						},
-																					}));
-																				}}
-																				className={cn(
-																					"px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-colors",
-																					current.discountType === "FLAT"
-																						? "bg-purple-600 text-white shadow-2xs"
-																						: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
-																				)}
-																			>
-																				$
-																			</button>
-																		</div>
-																	</div>
-																</div>
-
-																{/* Presets (4 cols) */}
-																<div className="sm:col-span-4">
-																	<Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5 block">
-																		Quick Presets
-																	</Label>
-																	<div className="flex items-center gap-1 h-9">
-																		{[0, 2, 3, 5, 10].map((preset) => (
-																			<button
-																				key={preset}
-																				type="button"
-																				onClick={() => {
-																					const finalP =
-																						preset > 0
-																							? calculateUnitFinalPrice(
-																									uList,
-																									preset,
-																									"PERCENTAGE",
-																								)
-																							: uList;
-																					setNewVarUnitPrices((prev) => ({
-																						...prev,
-																						[uId]: {
-																							unitPrice: finalP.toFixed(2),
-																							discount: String(preset),
-																							discountType: "PERCENTAGE",
-																						},
-																					}));
-																				}}
-																				className={cn(
-																					"flex-1 h-8 px-1 text-[11px] font-mono font-semibold rounded-lg border cursor-pointer transition-all flex items-center justify-center",
-																					current.discountType ===
-																						"PERCENTAGE" &&
-																						Math.abs(currDisc - preset) <
-																							0.01
-																						? "bg-purple-600 text-white border-purple-600 shadow-2xs font-bold"
-																						: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750",
-																				)}
-																			>
-																				{preset}%
-																			</button>
-																		))}
-																	</div>
-																</div>
+															<div className="flex items-center gap-1.5">
+																<span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+																	{u.unitName || u.name}
+																</span>
+																{u.symbol && (
+																	<span className="text-[11px] text-slate-400">
+																		({u.symbol})
+																	</span>
+																)}
+																{u.isBase ? (
+																	<Badge
+																		variant="outline"
+																		className="text-[9px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold"
+																	>
+																		Base (1x)
+																	</Badge>
+																) : (
+																	<Badge
+																		variant="secondary"
+																		className="text-[9px] px-1.5 py-0 font-mono"
+																	>
+																		{u.parentUnitName && u.parentQuantity
+																			? `${u.parentQuantity}x ${u.parentUnitName} (${qty}x)`
+																			: `${qty}x Base`}
+																	</Badge>
+																)}
 															</div>
 														</div>
-													);
-												})}
-											</div>
-										</div>
-									)}
+
+														{/* Economics & Reference */}
+														<div className="flex items-center gap-2">
+															{qty > 1 && sellPriceVal > 0 && (
+																<span className="text-[10px] font-mono text-purple-600 dark:text-purple-400">
+																	≈ ${(sellPriceVal / qty).toFixed(2)}/
+																	{baseUnitName}
+																</span>
+															)}
+															{basePriceVal > 0 &&
+																sellPriceVal < basePriceVal && (
+																	<Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/40 text-[9px] px-1.5 py-0 font-mono">
+																		Save $
+																		{(basePriceVal - sellPriceVal).toFixed(2)}
+																	</Badge>
+																)}
+														</div>
+													</div>
+
+													{/* 3-Column Pricing Grid: Base Price, Discount, Sell Price (Read-Only) */}
+													<div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 items-start">
+														{/* 1. Base Price (stored as unitPrice in DB) */}
+														<ModernInput
+															inputSize="sm"
+															label={t("products.unitBasePrice", "Base Price")}
+															required
+															type="number"
+															step="0.01"
+															min="0"
+															prefixAddon="$"
+															suffixAddon={`/${unitLabel}`}
+															value={current.unitPrice}
+															onFocus={(e) => e.currentTarget.select()}
+															onChange={(e) => {
+																const val = e.target.value;
+																setNewVarUnitPrices((prev) => ({
+																	...prev,
+																	[uId]: {
+																		...current,
+																		unitPrice: val,
+																	},
+																}));
+															}}
+															placeholder="0.00"
+															className="font-mono font-bold text-xs"
+														/>
+
+														{/* 2. Discount with % / $ Toggle */}
+														<ModernInput
+															inputSize="sm"
+															label={t("products.unitDiscount", "Discount")}
+															labelAction={
+																<span className="text-[10px] text-slate-400 font-mono">
+																	{current.discountType === "PERCENTAGE"
+																		? "Percentage (%)"
+																		: "Fixed ($)"}
+																</span>
+															}
+															type="number"
+															step="0.01"
+															min="0"
+															max={
+																current.discountType === "PERCENTAGE"
+																	? "99.99"
+																	: undefined
+															}
+															value={current.discount}
+															onFocus={(e) => e.currentTarget.select()}
+															onChange={(e) => {
+																const val = e.target.value;
+																setNewVarUnitPrices((prev) => ({
+																	...prev,
+																	[uId]: {
+																		...current,
+																		discount: val,
+																	},
+																}));
+															}}
+															placeholder="0"
+															className="font-mono text-xs"
+															suffixAddonClassName="p-1 bg-slate-100/80 dark:bg-slate-800/80"
+															suffixAddon={
+																<div className="flex items-center bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200/80 dark:border-slate-700/80">
+																	<button
+																		type="button"
+																		onClick={() => {
+																			if (
+																				current.discountType === "PERCENTAGE"
+																			)
+																				return;
+																			setNewVarUnitPrices((prev) => ({
+																				...prev,
+																				[uId]: {
+																					...current,
+																					discountType: "PERCENTAGE",
+																				},
+																			}));
+																		}}
+																		className={cn(
+																			"px-2 py-0.5 text-[10px] font-bold rounded-md cursor-pointer transition-colors",
+																			current.discountType === "PERCENTAGE"
+																				? "bg-purple-600 text-white shadow-2xs"
+																				: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
+																		)}
+																		title="Percentage Discount (%)"
+																	>
+																		%
+																	</button>
+																	<button
+																		type="button"
+																		onClick={() => {
+																			if (current.discountType === "FLAT")
+																				return;
+																			setNewVarUnitPrices((prev) => ({
+																				...prev,
+																				[uId]: {
+																					...current,
+																					discountType: "FLAT",
+																				},
+																			}));
+																		}}
+																		className={cn(
+																			"px-2 py-0.5 text-[10px] font-bold rounded-md cursor-pointer transition-colors",
+																			current.discountType === "FLAT"
+																				? "bg-purple-600 text-white shadow-2xs"
+																				: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
+																		)}
+																		title="Fixed Amount Discount ($)"
+																	>
+																		$
+																	</button>
+																</div>
+															}
+														/>
+
+														{/* 3. Sell Price (Read-only, calculated from Base Price & Discount) */}
+														<ModernInput
+															inputSize="sm"
+															label={t("products.unitSellPrice", "Sell Price")}
+															labelAction={
+																<span className="text-[10px] font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+																	Auto-calculated
+																</span>
+															}
+															type="text"
+															readOnly
+															tabIndex={-1}
+															prefixAddon="$"
+															suffixAddon={
+																currDisc > 0 ? (
+																	<span className="text-[10px] font-mono font-bold text-rose-600 dark:text-rose-400">
+																		-
+																		{formatUnitDiscountNote(
+																			currDisc,
+																			current.discountType,
+																		)}
+																	</span>
+																) : (
+																	`/${unitLabel}`
+																)
+															}
+															value={sellPriceVal.toFixed(2)}
+															wrapperClassName="bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200/80 dark:border-emerald-900/50"
+															className="font-mono font-bold text-xs text-emerald-700 dark:text-emerald-300 cursor-not-allowed select-none"
+														/>
+													</div>
+												</div>
+											);
+										})}
+									</div>
 								</div>
 							)}
 
@@ -5370,63 +5562,43 @@ function ProductsTab() {
 
 									<div className="flex-1 w-full space-y-2.5">
 										<div className="flex flex-wrap items-center gap-2">
-											<Button
+											<ModernButton
 												type="button"
 												variant="outline"
 												size="sm"
-												disabled={uploadingVariantThumbnail}
+												isLoading={uploadingVariantThumbnail}
+												loadingText={t("common.loading")}
+												leftIcon={<Upload className="h-3.5 w-3.5 text-purple-600" />}
 												onClick={() => addVarThumbnailInputRef.current?.click()}
-												className="rounded-xl h-8 text-xs font-semibold cursor-pointer border-slate-200 dark:border-slate-700"
 											>
-												{uploadingVariantThumbnail ? (
-													<>
-														<Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin text-purple-600" />
-														{t("common.loading")}
-													</>
-												) : (
-													<>
-														<Upload className="h-3.5 w-3.5 mr-1.5 text-purple-600" />
-														{t("products.uploadFromComputer")}
-													</>
-												)}
-											</Button>
+												{t("products.uploadFromComputer")}
+											</ModernButton>
 
-											<Button
+											<ModernButton
 												type="button"
 												variant="ghost"
 												size="sm"
+												leftIcon={<FolderOpen className="h-3.5 w-3.5" />}
 												onClick={() => {
 													setMediaPickerTarget("newVariant");
 													setIsMediaPickerOpen(true);
 												}}
-												className="rounded-xl h-8 text-xs font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer"
+												className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40"
 											>
-												<FolderOpen className="h-3.5 w-3.5 mr-1.5" />
 												{t("products.chooseFromVault")}
-											</Button>
+											</ModernButton>
 										</div>
 
-										<div className="flex items-center gap-2">
-											<Input
-												type="text"
-												value={newVarThumbnail}
-												onChange={(e) => setNewVarThumbnail(e.target.value)}
-												placeholder="Or paste direct image URL (https://...)"
-												className="h-8 text-xs rounded-xl bg-slate-50/70 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-											/>
-											{newVarThumbnail && (
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={() => setNewVarThumbnail("")}
-													className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 cursor-pointer shrink-0"
-													title="Clear URL"
-												>
-													<X className="h-3.5 w-3.5" />
-												</Button>
-											)}
-										</div>
+										<ModernInput
+											inputSize="sm"
+											type="text"
+											value={newVarThumbnail}
+											onChange={(e) => setNewVarThumbnail(e.target.value)}
+											clearable
+											onClear={() => setNewVarThumbnail("")}
+											placeholder="Or paste direct image URL (https://...)"
+											className="text-xs"
+										/>
 									</div>
 								</div>
 							</div>
@@ -5454,47 +5626,58 @@ function ProductsTab() {
 
 								<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 									<ModernInput
-										label={`${t("products.netWeight")} (kg)`}
+										inputSize="sm"
+										label={t("products.netWeight")}
 										type="number"
 										step="0.01"
+										suffixAddon="kg"
 										value={newVarNetWeight}
 										onChange={(e) => setNewVarNetWeight(e.target.value)}
 										placeholder="0.12"
 									/>
 									<ModernInput
-										label={`${t("products.grossWeight")} (kg)`}
+										inputSize="sm"
+										label={t("products.grossWeight")}
 										type="number"
 										step="0.01"
+										suffixAddon="kg"
 										value={newVarGrossWeight}
 										onChange={(e) => setNewVarGrossWeight(e.target.value)}
 										placeholder="0.15"
 									/>
 									<ModernInput
-										label={`${t("products.volume")}`}
+										inputSize="sm"
+										label={t("products.volume")}
 										value={newVarVolume}
 										onChange={(e) => setNewVarVolume(e.target.value)}
 										placeholder="e.g. 750ml, 1.5L"
 									/>
 									<ModernInput
-										label={`${t("products.height")} (cm)`}
+										inputSize="sm"
+										label={t("products.height")}
 										type="number"
 										step="0.1"
+										suffixAddon="cm"
 										value={newVarHeight}
 										onChange={(e) => setNewVarHeight(e.target.value)}
 										placeholder="3.5"
 									/>
 									<ModernInput
-										label={`${t("products.width")} (cm)`}
+										inputSize="sm"
+										label={t("products.width")}
 										type="number"
 										step="0.1"
+										suffixAddon="cm"
 										value={newVarWidth}
 										onChange={(e) => setNewVarWidth(e.target.value)}
 										placeholder="6.0"
 									/>
 									<ModernInput
-										label={`${t("products.depth")} (cm)`}
+										inputSize="sm"
+										label={t("products.depth")}
 										type="number"
 										step="0.1"
+										suffixAddon="cm"
 										value={newVarDepth}
 										onChange={(e) => setNewVarDepth(e.target.value)}
 										placeholder="10.5"
@@ -5553,7 +5736,7 @@ function ProductsTab() {
 									icon={<Package className="h-4 w-4" />}
 									className="flex-row items-center justify-center gap-2 text-xs font-bold py-2.5 rounded-xl cursor-pointer"
 								>
-									{t("products.basicInfo")}
+									{t("products.basicInfo")} & {t("products.packagingPricing")}
 								</ModernTabsTrigger>
 								<ModernTabsTrigger
 									value="physical"
@@ -5578,7 +5761,7 @@ function ProductsTab() {
 													{t("products.basicInfo")}
 												</h4>
 												<p className="text-[11px] text-slate-500 dark:text-slate-400">
-													Edit variant name, SKU, barcode, and base price
+													Configure variant name and tracking codes (SKU & Barcode)
 												</p>
 											</div>
 										</div>
@@ -5592,7 +5775,9 @@ function ProductsTab() {
 
 									{/* Variant Name */}
 									<ModernInput
+										inputSize="sm"
 										label={t("products.variantName")}
+										required
 										value={selectedVariant.name || ""}
 										onChange={(e) =>
 											setSelectedVariant({
@@ -5602,21 +5787,32 @@ function ProductsTab() {
 										}
 										placeholder="e.g. Black / 512GB"
 										leftIcon={<Tag className="h-3.5 w-3.5 text-slate-400" />}
-										className="rounded-xl text-xs font-medium"
+										className="text-xs font-medium"
 									/>
 
-									{/* SKU & Barcode */}
+									{/* SKU & Barcode side by side using ModernInput */}
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 										{/* SKU Code with Generator */}
-										<div>
-											<div className="flex items-center justify-between mb-1.5">
-												<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-													{t("stocks.sku")}
-												</Label>
+										<ModernInput
+											inputSize="sm"
+											label={t("stocks.sku")}
+											required
+											value={selectedVariant.sku || ""}
+											onChange={(e) =>
+												setSelectedVariant({
+													...selectedVariant,
+													sku: e.target.value,
+												})
+											}
+											placeholder="e.g. SKU-RED-256"
+											className="font-mono text-xs"
+											labelAction={
 												<button
 													type="button"
 													onClick={() => {
-														const sku = generateVariantSku(selectedVariant.name);
+														const sku = generateVariantSku(
+															selectedVariant.name,
+														);
 														setSelectedVariant({ ...selectedVariant, sku });
 														toast.info(`Generated SKU: ${sku}`);
 													}}
@@ -5625,40 +5821,39 @@ function ProductsTab() {
 													<Sparkles className="h-3 w-3" />
 													{t("products.generate")}
 												</button>
-											</div>
-											<div className="relative">
-												<Input
-													value={selectedVariant.sku || ""}
-													onChange={(e) =>
-														setSelectedVariant({
-															...selectedVariant,
-															sku: e.target.value,
-														})
-													}
-													placeholder="SKU-1001"
-													className="pr-9 font-mono text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-												/>
+											}
+											rightIcon={
 												<button
 													type="button"
 													onClick={() => {
-														const sku = generateVariantSku(selectedVariant.name);
+														const sku = generateVariantSku(
+															selectedVariant.name,
+														);
 														setSelectedVariant({ ...selectedVariant, sku });
 														toast.info(`Generated SKU: ${sku}`);
 													}}
-													className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
+													className="text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
 													title={t("products.generate")}
 												>
 													<Sparkles className="h-3.5 w-3.5" />
 												</button>
-											</div>
-										</div>
+											}
+										/>
 
 										{/* Barcode with Generator */}
-										<div>
-											<div className="flex items-center justify-between mb-1.5">
-												<Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-													{t("products.barcode")}
-												</Label>
+										<ModernInput
+											inputSize="sm"
+											label={t("products.barcode")}
+											value={selectedVariant.barcode || ""}
+											onChange={(e) =>
+												setSelectedVariant({
+													...selectedVariant,
+													barcode: e.target.value,
+												})
+											}
+											placeholder="e.g. 8901234567890"
+											className="font-mono text-xs"
+											labelAction={
 												<button
 													type="button"
 													onClick={() => {
@@ -5674,19 +5869,8 @@ function ProductsTab() {
 													<Sparkles className="h-3 w-3" />
 													{t("products.generate")}
 												</button>
-											</div>
-											<div className="relative">
-												<Input
-													value={selectedVariant.barcode || ""}
-													onChange={(e) =>
-														setSelectedVariant({
-															...selectedVariant,
-															barcode: e.target.value,
-														})
-													}
-													placeholder="BAR-1001"
-													className="pr-9 font-mono text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-												/>
+											}
+											rightIcon={
 												<button
 													type="button"
 													onClick={() => {
@@ -5697,61 +5881,362 @@ function ProductsTab() {
 														});
 														toast.info(`Generated Barcode: ${code}`);
 													}}
-													className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
+													className="text-slate-400 hover:text-purple-600 p-1 cursor-pointer transition-colors"
 													title={t("products.generate")}
 												>
 													<Sparkles className="h-3.5 w-3.5" />
 												</button>
-											</div>
-										</div>
-									</div>
-
-									{/* Retail Sell Price & Base Unit */}
-									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-										<div>
-											<Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 block">
-												{t("products.retailSellPrice")}
-											</Label>
-											<div className="relative">
-												<span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-slate-400">
-													$
-												</span>
-												<Input
-													type="number"
-													step="0.01"
-													value={selectedVariant.price || "0"}
-													onChange={(e) =>
-														setSelectedVariant({
-															...selectedVariant,
-															price: e.target.value,
-														})
-													}
-													placeholder="0.00"
-													className="pl-7 font-mono font-bold text-xs rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-												/>
-											</div>
-										</div>
-										<div>
-											<ModernSelect
-												label={t("products.unit")}
-												value={
-													selectedVariant.unitId
-														? String(selectedVariant.unitId)
-														: ""
-												}
-												onChange={(val) =>
-													setSelectedVariant({
-														...selectedVariant,
-														unitId: val,
-													})
-												}
-												options={productSpecificUnitOptions}
-											/>
-										</div>
+											}
+										/>
 									</div>
 								</div>
 
-								{/* CARD 2: CUSTOM THUMBNAIL UPLOAD */}
+								{/* CARD 2: PACKAGING UNIT PRICING SECTION (ALWAYS CUSTOM PRICE PER UNIT) */}
+								{effectiveProductUnits.length > 0 && (
+									<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-2xs">
+										<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200/60 dark:border-slate-800/60">
+											<div className="flex items-center gap-2.5">
+												<div className="h-8 w-8 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+													<Boxes className="h-4 w-4" />
+												</div>
+												<div>
+													<div className="flex items-center gap-2">
+														<h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+															{t("products.packagingPricing")}
+														</h4>
+														<Badge
+															variant="secondary"
+															className="text-[10px] font-mono px-2 py-0 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800/50"
+														>
+															{effectiveProductUnits.length}{" "}
+															{effectiveProductUnits.length === 1
+																? "Unit"
+																: "Units"}
+														</Badge>
+													</div>
+													<p className="text-[11px] text-slate-500 dark:text-slate-400">
+														{t("products.customUnitPricingDesc")}
+													</p>
+												</div>
+											</div>
+
+											{effectiveProductUnits.length > 1 && (
+												<ModernButton
+													type="button"
+													variant="ghost"
+													size="xs"
+													leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+													onClick={() => {
+														const baseUnitObj =
+															effectiveProductUnits.find(
+																(b: any) => b.isBase,
+															) || effectiveProductUnits[0];
+														const baseUId =
+															baseUnitObj?.unitId ?? baseUnitObj?.id;
+														const baseEntry =
+															baseUId !== undefined
+																? editVarUnitPrices[baseUId]
+																: undefined;
+														const baseNum = Math.max(
+															0,
+															parseFloat(baseEntry?.unitPrice || "0") || 0,
+														);
+														if (baseNum <= 0) {
+															toast.info(
+																"Enter a Base Price for the Base Unit (1x) first to scale child units.",
+															);
+															return;
+														}
+														const updated: Record<string | number, any> = {
+															...editVarUnitPrices,
+														};
+														effectiveProductUnits.forEach((u: any) => {
+															const uId = u.unitId ?? u.id;
+															const qty = u.baseQuantity || 1;
+															const scaledBase = calculateUnitListPrice(
+																baseNum,
+																qty,
+															);
+															const existing = updated[uId];
+															const uDisc =
+																existing?.discount !== undefined
+																	? existing.discount
+																	: String(
+																			parseFloat(String(u.discount ?? 0)) || 0,
+																		);
+															const discType =
+																existing?.discountType ||
+																normalizeDiscountType(u.discountType);
+															updated[uId] = {
+																unitPrice: String(
+																	u.isBase ? baseNum : scaledBase,
+																),
+																discount: uDisc,
+																discountType: discType,
+															};
+														});
+														setEditVarUnitPrices(updated);
+														toast.info(
+															"Scaled packaging unit base prices from 1x Base Unit",
+														);
+													}}
+													className="text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40"
+												>
+													{t("products.recalculateFromBase")}
+												</ModernButton>
+											)}
+										</div>
+
+										<div className="space-y-3">
+											{effectiveProductUnits.map((u: any) => {
+												const uId = u.unitId ?? u.id;
+												const qty = u.baseQuantity || 1;
+												const defaultDisc =
+													parseFloat(String(u.discount ?? 0)) || 0;
+												const current = editVarUnitPrices[uId] || {
+													unitPrice: "",
+													discount: String(defaultDisc),
+													discountType: normalizeDiscountType(u.discountType),
+												};
+
+												const basePriceVal = Math.max(
+													0,
+													parseFloat(current.unitPrice) || 0,
+												);
+												const currDisc = Math.max(
+													0,
+													parseFloat(current.discount) || 0,
+												);
+												const sellPriceVal =
+													currDisc > 0
+														? calculateUnitFinalPrice(
+																basePriceVal,
+																currDisc,
+																current.discountType,
+															)
+														: basePriceVal;
+
+												const baseUnitObj =
+													effectiveProductUnits.find((b: any) => b.isBase) ||
+													effectiveProductUnits[0];
+												const baseUnitName =
+													baseUnitObj?.unitName || baseUnitObj?.name || "Unit";
+												const unitLabel =
+													u.symbol || u.unitName || u.name || "unit";
+
+												return (
+													<div
+														key={uId}
+														className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-3 hover:border-purple-300/60 dark:hover:border-purple-800/60 transition-colors"
+													>
+														{/* Unit Header */}
+														<div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+															<div className="flex items-center gap-2">
+																<div className="flex items-center justify-center h-7 w-7 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold text-xs">
+																	{u.isBase ? "1x" : `${qty}x`}
+																</div>
+																<div className="flex items-center gap-1.5">
+																	<span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+																		{u.unitName || u.name}
+																	</span>
+																	{u.symbol && (
+																		<span className="text-[11px] text-slate-400">
+																			({u.symbol})
+																		</span>
+																	)}
+																	{u.isBase ? (
+																		<Badge
+																			variant="outline"
+																			className="text-[9px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold"
+																		>
+																			Base (1x)
+																		</Badge>
+																	) : (
+																		<Badge
+																			variant="secondary"
+																			className="text-[9px] px-1.5 py-0 font-mono"
+																		>
+																			{u.parentUnitName && u.parentQuantity
+																				? `${u.parentQuantity}x ${u.parentUnitName} (${qty}x)`
+																				: `${qty}x Base`}
+																		</Badge>
+																	)}
+																</div>
+															</div>
+
+															{/* Economics & Reference */}
+															<div className="flex items-center gap-2">
+																{qty > 1 && sellPriceVal > 0 && (
+																	<span className="text-[10px] font-mono text-purple-600 dark:text-purple-400">
+																		≈ ${(sellPriceVal / qty).toFixed(2)}/
+																		{baseUnitName}
+																	</span>
+																)}
+																{basePriceVal > 0 &&
+																	sellPriceVal < basePriceVal && (
+																		<Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/40 text-[9px] px-1.5 py-0 font-mono">
+																			Save $
+																			{(basePriceVal - sellPriceVal).toFixed(2)}
+																		</Badge>
+																	)}
+															</div>
+														</div>
+
+														{/* 3-Column Pricing Grid: Base Price, Discount, Sell Price (Read-Only) */}
+														<div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 items-start">
+															{/* 1. Base Price (stored as unitPrice in DB) */}
+															<ModernInput
+																inputSize="sm"
+																label={t("products.unitBasePrice", "Base Price")}
+																required
+																type="number"
+																step="0.01"
+																min="0"
+																prefixAddon="$"
+																suffixAddon={`/${unitLabel}`}
+																value={current.unitPrice}
+																onFocus={(e) => e.currentTarget.select()}
+																onChange={(e) => {
+																	const val = e.target.value;
+																	setEditVarUnitPrices((prev) => ({
+																		...prev,
+																		[uId]: {
+																			...current,
+																			unitPrice: val,
+																		},
+																	}));
+																}}
+																placeholder="0.00"
+																className="font-mono font-bold text-xs"
+															/>
+
+															{/* 2. Discount with % / $ Toggle */}
+															<ModernInput
+																inputSize="sm"
+																label={t("products.unitDiscount", "Discount")}
+																labelAction={
+																	<span className="text-[10px] text-slate-400 font-mono">
+																		{current.discountType === "PERCENTAGE"
+																			? "Percentage (%)"
+																			: "Fixed ($)"}
+																	</span>
+																}
+																type="number"
+																step="0.01"
+																min="0"
+																max={
+																	current.discountType === "PERCENTAGE"
+																		? "99.99"
+																		: undefined
+																}
+																value={current.discount}
+																onFocus={(e) => e.currentTarget.select()}
+																onChange={(e) => {
+																	const val = e.target.value;
+																	setEditVarUnitPrices((prev) => ({
+																		...prev,
+																		[uId]: {
+																			...current,
+																			discount: val,
+																		},
+																	}));
+																}}
+																placeholder="0"
+																className="font-mono text-xs"
+																suffixAddonClassName="p-1 bg-slate-100/80 dark:bg-slate-800/80"
+																suffixAddon={
+																	<div className="flex items-center bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200/80 dark:border-slate-700/80">
+																		<button
+																			type="button"
+																			onClick={() => {
+																				if (
+																					current.discountType === "PERCENTAGE"
+																				)
+																					return;
+																				setEditVarUnitPrices((prev) => ({
+																					...prev,
+																					[uId]: {
+																						...current,
+																						discountType: "PERCENTAGE",
+																					},
+																				}));
+																			}}
+																			className={cn(
+																				"px-2 py-0.5 text-[10px] font-bold rounded-md cursor-pointer transition-colors",
+																				current.discountType === "PERCENTAGE"
+																					? "bg-purple-600 text-white shadow-2xs"
+																					: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
+																			)}
+																			title="Percentage Discount (%)"
+																		>
+																			%
+																		</button>
+																		<button
+																			type="button"
+																			onClick={() => {
+																				if (current.discountType === "FLAT")
+																					return;
+																				setEditVarUnitPrices((prev) => ({
+																					...prev,
+																					[uId]: {
+																						...current,
+																						discountType: "FLAT",
+																					},
+																				}));
+																			}}
+																			className={cn(
+																				"px-2 py-0.5 text-[10px] font-bold rounded-md cursor-pointer transition-colors",
+																				current.discountType === "FLAT"
+																					? "bg-purple-600 text-white shadow-2xs"
+																					: "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
+																			)}
+																			title="Fixed Amount Discount ($)"
+																		>
+																			$
+																		</button>
+																	</div>
+																}
+															/>
+
+															{/* 3. Sell Price (Read-only, calculated from Base Price & Discount) */}
+															<ModernInput
+																inputSize="sm"
+																label={t("products.unitSellPrice", "Sell Price")}
+																labelAction={
+																	<span className="text-[10px] font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+																		Auto-calculated
+																	</span>
+																}
+																type="text"
+																readOnly
+																tabIndex={-1}
+																prefixAddon="$"
+																suffixAddon={
+																	currDisc > 0 ? (
+																		<span className="text-[10px] font-mono font-bold text-rose-600 dark:text-rose-400">
+																			-
+																			{formatUnitDiscountNote(
+																				currDisc,
+																				current.discountType,
+																			)}
+																		</span>
+																	) : (
+																		`/${unitLabel}`
+																	)
+																}
+																value={sellPriceVal.toFixed(2)}
+																wrapperClassName="bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200/80 dark:border-emerald-900/50"
+																className="font-mono font-bold text-xs text-emerald-700 dark:text-emerald-300 cursor-not-allowed select-none"
+															/>
+														</div>
+													</div>
+												);
+											})}
+										</div>
+									</div>
+								)}
+
+								{/* CARD 3: CUSTOM THUMBNAIL UPLOAD */}
 								<div className="bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-2xs">
 									<div className="flex items-center justify-between pb-2.5 border-b border-slate-200/60 dark:border-slate-800/60">
 										<div className="flex items-center gap-2.5">
@@ -5807,75 +6292,57 @@ function ProductsTab() {
 
 										<div className="flex-1 w-full space-y-2.5">
 											<div className="flex flex-wrap items-center gap-2">
-												<Button
+												<ModernButton
 													type="button"
 													variant="outline"
 													size="sm"
-													disabled={uploadingVariantThumbnail}
+													isLoading={uploadingVariantThumbnail}
+													loadingText={t("common.loading")}
+													leftIcon={
+														<Upload className="h-3.5 w-3.5 text-purple-600" />
+													}
 													onClick={() =>
 														editVarThumbnailInputRef.current?.click()
 													}
-													className="rounded-xl h-8 text-xs font-semibold cursor-pointer border-slate-200 dark:border-slate-700"
 												>
-													{uploadingVariantThumbnail ? (
-														<>
-															<Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin text-purple-600" />
-															{t("common.loading")}
-														</>
-													) : (
-														<>
-															<Upload className="h-3.5 w-3.5 mr-1.5 text-purple-600" />
-															{t("products.uploadFromComputer")}
-														</>
-													)}
-												</Button>
+													{t("products.uploadFromComputer")}
+												</ModernButton>
 
-												<Button
+												<ModernButton
 													type="button"
 													variant="ghost"
 													size="sm"
+													leftIcon={<FolderOpen className="h-3.5 w-3.5" />}
 													onClick={() => {
 														setMediaPickerTarget("editVariant");
 														setIsMediaPickerOpen(true);
 													}}
-													className="rounded-xl h-8 text-xs font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer"
+													className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40"
 												>
-													<FolderOpen className="h-3.5 w-3.5 mr-1.5" />
 													{t("products.chooseFromVault")}
-												</Button>
+												</ModernButton>
 											</div>
 
-											<div className="flex items-center gap-2">
-												<Input
-													type="text"
-													value={selectedVariant.thumbnail || ""}
-													onChange={(e) =>
-														setSelectedVariant({
-															...selectedVariant,
-															thumbnail: e.target.value,
-														})
-													}
-													placeholder="Or paste direct image URL (https://...)"
-													className="h-8 text-xs rounded-xl bg-slate-50/70 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-												/>
-												{selectedVariant.thumbnail && (
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														onClick={() =>
-															setSelectedVariant({
-																...selectedVariant,
-																thumbnail: "",
-															})
-														}
-														className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 cursor-pointer shrink-0"
-														title="Clear URL"
-													>
-														<X className="h-3.5 w-3.5" />
-													</Button>
-												)}
-											</div>
+											<ModernInput
+												inputSize="sm"
+												type="text"
+												value={selectedVariant.thumbnail || ""}
+												onChange={(e) =>
+													setSelectedVariant({
+														...selectedVariant,
+														thumbnail: e.target.value,
+													})
+												}
+												clearable
+												onClear={() =>
+													setSelectedVariant({
+														...selectedVariant,
+														thumbnail: "",
+													})
+												}
+												placeholder="Or paste direct image URL (https://...)"
+												className="text-xs"
+											/>
 										</div>
 									</div>
 								</div>
@@ -5905,9 +6372,11 @@ function ProductsTab() {
 
 									<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 										<ModernInput
-											label={`${t("products.netWeight")} (kg)`}
+											inputSize="sm"
+											label={t("products.netWeight")}
 											type="number"
 											step="0.01"
+											suffixAddon="kg"
 											value={
 												selectedVariant.netWeight !== undefined
 													? selectedVariant.netWeight
@@ -5922,9 +6391,11 @@ function ProductsTab() {
 											placeholder="0.12"
 										/>
 										<ModernInput
-											label={`${t("products.grossWeight")} (kg)`}
+											inputSize="sm"
+											label={t("products.grossWeight")}
 											type="number"
 											step="0.01"
+											suffixAddon="kg"
 											value={
 												selectedVariant.grossWeight !== undefined
 													? selectedVariant.grossWeight
@@ -5939,7 +6410,8 @@ function ProductsTab() {
 											placeholder="0.15"
 										/>
 										<ModernInput
-											label={`${t("products.volume")}`}
+											inputSize="sm"
+											label={t("products.volume")}
 											value={
 												selectedVariant.volume !== undefined
 													? selectedVariant.volume
@@ -5954,9 +6426,11 @@ function ProductsTab() {
 											placeholder="e.g. 750ml, 1.5L"
 										/>
 										<ModernInput
-											label={`${t("products.height")} (cm)`}
+											inputSize="sm"
+											label={t("products.height")}
 											type="number"
 											step="0.1"
+											suffixAddon="cm"
 											value={
 												selectedVariant.height !== undefined
 													? selectedVariant.height
@@ -5971,9 +6445,11 @@ function ProductsTab() {
 											placeholder="3.5"
 										/>
 										<ModernInput
-											label={`${t("products.width")} (cm)`}
+											inputSize="sm"
+											label={t("products.width")}
 											type="number"
 											step="0.1"
+											suffixAddon="cm"
 											value={
 												selectedVariant.width !== undefined
 													? selectedVariant.width
@@ -5988,9 +6464,11 @@ function ProductsTab() {
 											placeholder="6.0"
 										/>
 										<ModernInput
-											label={`${t("products.depth")} (cm)`}
+											inputSize="sm"
+											label={t("products.depth")}
 											type="number"
 											step="0.1"
+											suffixAddon="cm"
 											value={
 												selectedVariant.depth !== undefined
 													? selectedVariant.depth
@@ -6095,7 +6573,7 @@ function CategoriesTab() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { can } = usePermissions();
-	const _canCreateProduct = can("PRODUCT", "CREATE");
+	const canCreateProduct = can("PRODUCT", "CREATE");
 	const canUpdateProduct = can("PRODUCT", "UPDATE");
 	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const [search, setSearch] = useState("");
@@ -6105,9 +6583,6 @@ function CategoriesTab() {
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 	const [expandedCategoryIds, setExpandedCategoryIds] = useState<string[]>([]);
-	const [expandedGridCardIds, setExpandedGridCardIds] = useState<
-		Set<string | number>
-	>(new Set());
 	const [uploadingImage, setUploadingImage] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -6213,6 +6688,102 @@ function CategoriesTab() {
 			queryClient.invalidateQueries({ queryKey: ["categories-all"] });
 		},
 		onError: (error) => toast.error(getErrorMessage(error)),
+	});
+
+	const categoriesQueryKey = ["categories", { page, pageSize, search }] as const;
+	const pageOffset = (page - 1) * pageSize;
+
+	const reorderParentsMutation = useMutation({
+		mutationFn: (reordered: Category[]) =>
+			categoriesApi.reorder(
+				reordered.map((item, idx) => ({
+					item,
+					sortOrder: pageOffset + idx + 1,
+					parentIdOverride: item.parentId ?? null,
+				})),
+			),
+		onMutate: async (reordered) => {
+			await queryClient.cancelQueries({ queryKey: categoriesQueryKey });
+			const previous = queryClient.getQueryData<any>(categoriesQueryKey);
+			queryClient.setQueryData<any>(categoriesQueryKey, (old: any) => {
+				if (!old) return old;
+				return {
+					...old,
+					items: reordered.map((item, idx) => ({
+						...item,
+						sortOrder: pageOffset + idx + 1,
+					})),
+				};
+			});
+			return { previous };
+		},
+		onError: (error, _vars, ctx) => {
+			if (ctx?.previous) {
+				queryClient.setQueryData(categoriesQueryKey, ctx.previous);
+			}
+			toast.error(getErrorMessage(error) || "Failed to update category order");
+		},
+		onSuccess: () => {
+			toast.success("Category sort order updated");
+		},
+		onSettled: () => {
+			queryClient.invalidateQueries({ queryKey: ["categories"] });
+			queryClient.invalidateQueries({ queryKey: ["categories-all"] });
+		},
+	});
+
+	const reorderChildrenMutation = useMutation({
+		mutationFn: ({
+			parent,
+			reorderedChildren,
+		}: {
+			parent: Category;
+			reorderedChildren: Category[];
+		}) =>
+			categoriesApi.reorder(
+				reorderedChildren.map((child, idx) => ({
+					item: child,
+					sortOrder: idx + 1,
+					parentIdOverride: parent.id,
+				})),
+			),
+		onMutate: async ({ parent, reorderedChildren }) => {
+			await queryClient.cancelQueries({ queryKey: categoriesQueryKey });
+			const previous = queryClient.getQueryData<any>(categoriesQueryKey);
+			queryClient.setQueryData<any>(categoriesQueryKey, (old: any) => {
+				if (!old || !Array.isArray(old.items)) return old;
+				return {
+					...old,
+					items: old.items.map((cat: Category) =>
+						String(cat.id) === String(parent.id)
+							? {
+									...cat,
+									children: reorderedChildren.map((child, idx) => ({
+										...child,
+										sortOrder: idx + 1,
+									})),
+								}
+							: cat,
+					),
+				};
+			});
+			return { previous };
+		},
+		onError: (error, _vars, ctx) => {
+			if (ctx?.previous) {
+				queryClient.setQueryData(categoriesQueryKey, ctx.previous);
+			}
+			toast.error(
+				getErrorMessage(error) || "Failed to update subcategory order",
+			);
+		},
+		onSuccess: () => {
+			toast.success("Subcategory sort order updated");
+		},
+		onSettled: () => {
+			queryClient.invalidateQueries({ queryKey: ["categories"] });
+			queryClient.invalidateQueries({ queryKey: ["categories-all"] });
+		},
 	});
 
 	const openCreate = (defaultParentId?: string | number) => {
@@ -6415,8 +6986,8 @@ function CategoriesTab() {
 			accessorKey: "sortOrder",
 			sortable: true,
 			cell: ({ value }) => (
-				<Badge variant="secondary" className="text-xs">
-					{value ?? 0}
+				<Badge variant="secondary" className="text-xs font-mono">
+					#{value ?? 0}
 				</Badge>
 			),
 		},
@@ -6567,318 +7138,34 @@ function CategoriesTab() {
 				/>
 			) : (
 				<div className="space-y-4">
-					{/* Cards Grid */}
-					{isLoading ? (
-						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-							{Array.from({ length: 8 }).map((_, i) => (
-								<div
-									key={i}
-									className="h-64 rounded-2xl bg-slate-100 dark:bg-slate-900 animate-pulse"
-								/>
-							))}
-						</div>
-					) : (categoriesData?.items || []).length === 0 ? (
-						<div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-2xs">
-							<Tags className="h-12 w-12 text-slate-300 mx-auto" />
-							<h4 className="text-base font-bold text-slate-900 dark:text-slate-100">
-								{t("products.noCategoriesFound")}
-							</h4>
-							<p className="text-xs text-slate-500">
-								{t("products.createCategoryDesc")}
-							</p>
-							<Button
-								onClick={() => openCreate()}
-								className="gap-2 text-xs font-bold h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl cursor-pointer"
-							>
-								<Plus className="h-3.5 w-3.5" />
-								{t("products.addCategory")}
-							</Button>
-						</div>
-					) : (
-						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-							{(categoriesData?.items || []).map((cat: Category) => {
-								const img = cat.logoUrl || cat.imageUrl;
-								const isCatActive = cat.status
-									? cat.status.toLowerCase() === "active"
-									: (cat.isActive ?? true);
-								const hasChildren =
-									Array.isArray(cat.children) && cat.children.length > 0;
-								const childCount = cat.children?.length || 0;
-								const isGridExpanded = expandedGridCardIds.has(cat.id);
-
-								return (
-									<div
-										key={cat.id}
-										className="group relative rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-3.5 shadow-2xs hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700/80 transition-all flex flex-col justify-between space-y-3.5"
-									>
-										<div className="space-y-3">
-											{/* Image / Logo Container */}
-											<div className="relative h-36 w-full rounded-xl bg-slate-50 dark:bg-slate-950/60 overflow-hidden border border-slate-100 dark:border-slate-800 flex items-center justify-center p-3">
-												{img ? (
-													<img
-														src={safeImageUrl(img)}
-														alt={cat.name}
-														className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-300"
-														onError={(e) => {
-															e.currentTarget.onerror = null;
-															e.currentTarget.src = DEFAULT_IMAGE_URL;
-														}}
-													/>
-												) : (
-													<div
-														className="h-16 w-16 rounded-2xl flex items-center justify-center shadow-xs text-white group-hover:scale-105 transition-transform duration-300"
-														style={{ backgroundColor: cat.color || "#3b82f6" }}
-													>
-														<Tags className="size-8" />
-													</div>
-												)}
-
-												{/* Top-right: Status Badge */}
-												<div className="absolute top-2 right-2">
-													<StatusBadgeCell
-														status={isCatActive ? "Active" : "Inactive"}
-														type="account"
-													/>
-												</div>
-
-												{/* Theme Color Chip */}
-												{cat.color && (
-													<div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs px-2 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-800 text-[10px] font-mono shadow-2xs">
-														<span
-															className="h-2 w-2 rounded-full"
-															style={{ backgroundColor: cat.color }}
-														/>
-														<span className="text-slate-600 dark:text-slate-400 font-bold">
-															{cat.color}
-														</span>
-													</div>
-												)}
-											</div>
-
-											{/* Title & Parent Hierarchy Info */}
-											<div>
-												<div className="flex items-center justify-between gap-2">
-													<h4
-														className="font-extrabold text-sm text-slate-900 dark:text-slate-100 truncate cursor-pointer hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
-														onClick={() => openEdit(cat)}
-														title={cat.name}
-													>
-														{cat.name}
-													</h4>
-													<span className="text-[10px] font-mono font-bold text-slate-400 shrink-0">
-														#{cat.id}
-													</span>
-												</div>
-												<p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
-													{cat.parentId && categoryMap.has(String(cat.parentId))
-														? `${t("products.subcategoryOf")}: ${categoryMap.get(String(cat.parentId))}`
-														: t("products.category")}
-												</p>
-											</div>
-
-											{/* Description */}
-											{cat.description && (
-												<p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-													{cat.description}
-												</p>
-											)}
-
-											{/* Subcategories Collapsible Box (Default Hidden / Collapsed) */}
-											{hasChildren ? (
-												<div className="space-y-2">
-													{/* Toggle Button */}
-													<button
-														type="button"
-														onClick={() => {
-															setExpandedGridCardIds((prev) => {
-																const next = new Set(prev);
-																if (next.has(cat.id)) next.delete(cat.id);
-																else next.add(cat.id);
-																return next;
-															});
-														}}
-														className={cn(
-															"w-full flex items-center justify-between p-2 rounded-xl border text-xs font-semibold transition-all duration-200",
-															isGridExpanded
-																? "bg-purple-50/90 dark:bg-purple-950/60 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 shadow-2xs"
-																: "bg-slate-50/60 dark:bg-slate-950/40 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-purple-50/40 hover:text-purple-600 hover:border-purple-200",
-														)}
-													>
-														<div className="flex items-center gap-1.5">
-															<CornerDownRight className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-															<span>{t("products.subcategories")}</span>
-															<Badge
-																variant="secondary"
-																className="text-[10px] px-1.5 py-0 h-4 bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold"
-															>
-																{childCount}
-															</Badge>
-														</div>
-														<div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
-															<span>{isGridExpanded ? "Hide" : "Show"}</span>
-															<ChevronDown
-																className={cn(
-																	"h-3.5 w-3.5 transition-transform duration-200",
-																	isGridExpanded &&
-																		"rotate-180 text-purple-600",
-																)}
-															/>
-														</div>
-													</button>
-
-													{/* Expanded Children List */}
-													{isGridExpanded && (
-														<div className="rounded-xl border border-purple-100 dark:border-purple-950/60 bg-slate-50/40 dark:bg-slate-950/40 p-2 space-y-1.5 animate-in fade-in-50 duration-200">
-															<div className="flex items-center justify-between pb-1 border-b border-slate-200/60 dark:border-slate-800/60">
-																<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-																	{t("products.subcategories")}
-																</span>
-																<Button
-																	type="button"
-																	variant="ghost"
-																	size="sm"
-																	onClick={() => openCreate(cat.id)}
-																	className="h-5 px-1.5 text-[10px] font-bold text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-md gap-0.5"
-																>
-																	<Plus className="h-3 w-3" />{" "}
-																	{t("products.addCategory")}
-																</Button>
-															</div>
-
-															<div className="space-y-1 max-h-36 overflow-y-auto pr-0.5 custom-scrollbar">
-																{cat.children!.map((child) => {
-																	const isChildActive = child.status
-																		? child.status.toLowerCase() === "active"
-																		: (child.isActive ?? true);
-																	return (
-																		<div
-																			key={child.id}
-																			className="flex items-center justify-between gap-1.5 p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 text-xs hover:border-purple-200 transition-colors"
-																		>
-																			<div className="flex items-center gap-1.5 min-w-0 flex-1">
-																				<span
-																					className="h-2 w-2 rounded-full shrink-0 border border-black/10"
-																					style={{
-																						backgroundColor:
-																							child.color || "#3b82f6",
-																					}}
-																				/>
-																				<span
-																					onClick={() => openEdit(child)}
-																					className="font-medium text-[11px] text-slate-700 dark:text-slate-200 truncate cursor-pointer hover:text-purple-600"
-																					title={child.name}
-																				>
-																					{child.name}
-																				</span>
-																			</div>
-
-																			<div className="flex items-center gap-1 shrink-0">
-																				<span
-																					className={cn(
-																						"text-[9px] font-mono px-1 py-0.2 rounded font-semibold",
-																						isChildActive
-																							? "text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50"
-																							: "text-slate-400 bg-slate-100 dark:bg-slate-800",
-																					)}
-																				>
-																					{isChildActive ? "Act" : "Inact"}
-																				</span>
-																				<button
-																					type="button"
-																					onClick={() => openEdit(child)}
-																					className="h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-purple-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-																					title={t("common.edit")}
-																				>
-																					<Pencil className="h-3 w-3" />
-																				</button>
-																				<button
-																					type="button"
-																					onClick={() =>
-																						deleteMutation.mutate(child.id)
-																					}
-																					className="h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-																					title={t("common.delete")}
-																				>
-																					<Trash2 className="h-3 w-3" />
-																				</button>
-																			</div>
-																		</div>
-																	);
-																})}
-															</div>
-														</div>
-													)}
-												</div>
-											) : (
-												<div className="flex items-center justify-between pt-1">
-													<span className="text-[11px] text-slate-400">
-														{t("products.noCategoriesFound")}
-													</span>
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														onClick={() => openCreate(cat.id)}
-														className="h-6 px-2 text-[10px] font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-md gap-1"
-													>
-														<Plus className="h-3 w-3" />{" "}
-														{t("products.addCategory")}
-													</Button>
-												</div>
-											)}
-										</div>
-
-										{/* Footer with Sort Order and Actions */}
-										<div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-											<span
-												className={cn(
-													"text-[10px] font-mono font-bold px-2 py-0.5 rounded-md",
-													isCatActive
-														? "text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300"
-														: "text-slate-500 bg-slate-100 dark:bg-slate-800",
-												)}
-											>
-												{isCatActive ? "Active" : "Inactive"}
-											</span>
-
-											<div className="flex items-center gap-1">
-												<Button
-													size="sm"
-													variant="ghost"
-													onClick={() => openCreate(cat.id)}
-													className="h-7 px-2 rounded-lg text-slate-500 hover:text-purple-600 text-xs font-semibold gap-1"
-													title="Add child subcategory"
-												>
-													<FolderPlus className="h-3.5 w-3.5" />
-													<span className="hidden sm:inline">
-														{t("products.subcategories")}
-													</span>
-												</Button>
-												<Button
-													size="sm"
-													variant="ghost"
-													onClick={() => openEdit(cat)}
-													className="h-7 w-7 p-0 rounded-lg text-slate-500 hover:text-purple-600"
-													title={t("common.edit")}
-												>
-													<Pencil className="h-3.5 w-3.5" />
-												</Button>
-												<Button
-													size="sm"
-													variant="ghost"
-													onClick={() => deleteMutation.mutate(cat.id)}
-													className="h-7 w-7 p-0 rounded-lg text-slate-500 hover:text-rose-600"
-													title={t("common.delete")}
-												>
-													<Trash2 className="h-3.5 w-3.5" />
-												</Button>
-											</div>
-										</div>
-									</div>
-								);
-							})}
-						</div>
-					)}
+					{/* Redesigned Sortable Cards Grid */}
+					<CategoryGridView
+						categories={categoriesData?.items || []}
+						categoryMap={categoryMap}
+						isLoading={isLoading}
+						isReordering={
+							reorderParentsMutation.isPending ||
+							reorderChildrenMutation.isPending
+						}
+						canCreate={canCreateProduct}
+						canUpdate={canUpdateProduct}
+						canDelete={canDeleteProduct}
+						reorderDisabledReason={
+							search.trim()
+								? "Clear search filter to drag & reorder categories"
+								: undefined
+						}
+						pageOffset={pageOffset}
+						onOpenCreate={openCreate}
+						onOpenEdit={openEdit}
+						onDelete={(id) => deleteMutation.mutate(id)}
+						onReorderParents={(reordered) =>
+							reorderParentsMutation.mutate(reordered)
+						}
+						onReorderChildren={(parent, reorderedChildren) =>
+							reorderChildrenMutation.mutate({ parent, reorderedChildren })
+						}
+					/>
 
 					{/* Pagination */}
 					{totalCount > pageSize && (
@@ -7161,7 +7448,9 @@ function CategoryChildrenAccordionSubRow({
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-							{children.map((child: Category) => {
+							{[...children]
+								.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || Number(a.id) - Number(b.id))
+								.map((child: Category) => {
 								const isChildActive = child.status
 									? child.status.toLowerCase() === "active"
 									: (child.isActive ?? true);
@@ -7232,7 +7521,7 @@ function CategoryChildrenAccordionSubRow({
 												variant="secondary"
 												className="text-[10px] font-mono"
 											>
-												{child.sortOrder ?? 0}
+												#{child.sortOrder ?? 0}
 											</Badge>
 										</td>
 										<td className="p-2.5">
@@ -7292,7 +7581,7 @@ function BrandsTab() {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
 	const { can } = usePermissions();
-	const _canCreateProduct = can("PRODUCT", "CREATE");
+	const canCreateProduct = can("PRODUCT", "CREATE");
 	const canUpdateProduct = can("PRODUCT", "UPDATE");
 	const canDeleteProduct = can("PRODUCT", "DELETE");
 	const [search, setSearch] = useState("");
@@ -7320,6 +7609,7 @@ function BrandsTab() {
 			name: "",
 			description: "",
 			logoUrl: "",
+			sortOrder: 0,
 			isActive: true,
 		},
 	});
@@ -7381,12 +7671,54 @@ function BrandsTab() {
 		onError: (error) => toast.error(getErrorMessage(error)),
 	});
 
+	const brandsQueryKey = ["brands", { page, pageSize, search }] as const;
+	const pageOffset = (page - 1) * pageSize;
+
+	const reorderBrandsMutation = useMutation({
+		mutationFn: (reordered: Brand[]) =>
+			brandsApi.reorder(
+				reordered.map((item, idx) => ({
+					item,
+					sortOrder: pageOffset + idx + 1,
+				})),
+			),
+		onMutate: async (reordered) => {
+			await queryClient.cancelQueries({ queryKey: brandsQueryKey });
+			const previous = queryClient.getQueryData<any>(brandsQueryKey);
+			queryClient.setQueryData<any>(brandsQueryKey, (old: any) => {
+				if (!old) return old;
+				return {
+					...old,
+					items: reordered.map((item, idx) => ({
+						...item,
+						sortOrder: pageOffset + idx + 1,
+					})),
+				};
+			});
+			return { previous };
+		},
+		onError: (error, _vars, ctx) => {
+			if (ctx?.previous) {
+				queryClient.setQueryData(brandsQueryKey, ctx.previous);
+			}
+			toast.error(getErrorMessage(error) || "Failed to update brand order");
+		},
+		onSuccess: () => {
+			toast.success("Brand sort order updated");
+		},
+		onSettled: () => {
+			queryClient.invalidateQueries({ queryKey: ["brands"] });
+			queryClient.invalidateQueries({ queryKey: ["brands-all"] });
+		},
+	});
+
 	const openCreate = () => {
 		setEditingBrand(null);
 		form.reset({
 			name: "",
 			description: "",
 			logoUrl: "",
+			sortOrder: 0,
 			isActive: true,
 		});
 		setIsDialogOpen(true);
@@ -7401,6 +7733,7 @@ function BrandsTab() {
 			name: brand.name || "",
 			description: brand.description || "",
 			logoUrl: brand.logoUrl || (brand as any).imageUrl || "",
+			sortOrder: brand.sortOrder ?? 0,
 			isActive: isBrandActive,
 		});
 		setIsDialogOpen(true);
@@ -7452,6 +7785,17 @@ function BrandsTab() {
 			accessorKey: "description",
 			cell: ({ value }) => (
 				<span className="text-xs text-muted-foreground">{value || "—"}</span>
+			),
+		},
+		{
+			id: "sortOrder",
+			header: t("products.sortOrder"),
+			accessorKey: "sortOrder",
+			sortable: true,
+			cell: ({ value }) => (
+				<Badge variant="secondary" className="text-xs font-mono">
+					#{value ?? 0}
+				</Badge>
 			),
 		},
 		{
@@ -7578,134 +7922,25 @@ function BrandsTab() {
 				/>
 			) : (
 				<div className="space-y-4">
-					{/* Cards Grid */}
-					{isLoading ? (
-						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-							{Array.from({ length: 8 }).map((_, i) => (
-								<div
-									key={i}
-									className="h-56 rounded-2xl bg-slate-100 dark:bg-slate-900 animate-pulse"
-								/>
-							))}
-						</div>
-					) : (brandsData?.items || []).length === 0 ? (
-						<div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-2xs">
-							<Bookmark className="h-12 w-12 text-slate-300 mx-auto" />
-							<h4 className="text-base font-bold text-slate-900 dark:text-slate-100">
-								{t("products.noBrandsFound")}
-							</h4>
-							<p className="text-xs text-slate-500">
-								{t("products.createBrandDesc")}
-							</p>
-							<Button
-								onClick={openCreate}
-								className="gap-2 text-xs font-bold h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl cursor-pointer"
-							>
-								<Plus className="h-3.5 w-3.5" />
-								{t("products.addBrand")}
-							</Button>
-						</div>
-					) : (
-						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-							{(brandsData?.items || []).map((brand: Brand) => {
-								const logo = brand.logoUrl || (brand as any).imageUrl;
-								const isBrandActive = brand.status
-									? brand.status.toLowerCase() === "active"
-									: (brand.isActive ?? true);
-
-								return (
-									<div
-										key={brand.id}
-										className="group relative rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-3.5 shadow-2xs hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700/80 transition-all flex flex-col justify-between space-y-3"
-									>
-										<div className="space-y-3">
-											{/* Logo Container */}
-											<div className="relative h-36 w-full rounded-xl bg-slate-50 dark:bg-slate-950/60 overflow-hidden border border-slate-100 dark:border-slate-800 flex items-center justify-center p-3">
-												{logo ? (
-													<img
-														src={safeImageUrl(logo)}
-														alt={brand.name}
-														className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-300"
-														onError={(e) => {
-															e.currentTarget.onerror = null;
-															e.currentTarget.src = DEFAULT_IMAGE_URL;
-														}}
-													/>
-												) : (
-													<div className="h-16 w-16 rounded-2xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200/60 dark:border-purple-800/60 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform duration-300">
-														<Bookmark className="size-8" />
-													</div>
-												)}
-
-												{/* Top-right: Status Badge */}
-												<div className="absolute top-2 right-2">
-													<StatusBadgeCell
-														status={isBrandActive ? "Active" : "Inactive"}
-														type="account"
-													/>
-												</div>
-											</div>
-
-											{/* Brand Name & ID */}
-											<div>
-												<h4
-													className="font-extrabold text-sm text-slate-900 dark:text-slate-100 truncate cursor-pointer hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
-													onClick={() => openEdit(brand)}
-												>
-													{brand.name}
-												</h4>
-												<p className="text-[11px] text-slate-400 font-mono mt-0.5">
-													ID: #{brand.id}
-												</p>
-											</div>
-
-											{/* Description */}
-											{brand.description && (
-												<p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-													{brand.description}
-												</p>
-											)}
-										</div>
-
-										{/* Footer with Actions */}
-										<div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-											<span
-												className={cn(
-													"text-[10px] font-mono font-bold px-2 py-0.5 rounded-md",
-													isBrandActive
-														? "text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300"
-														: "text-slate-500 bg-slate-100 dark:bg-slate-800",
-												)}
-											>
-												{isBrandActive ? "Active" : "Disabled"}
-											</span>
-
-											<div className="flex items-center gap-1">
-												<Button
-													size="sm"
-													variant="ghost"
-													onClick={() => openEdit(brand)}
-													className="h-7 w-7 p-0 rounded-lg text-slate-500 hover:text-purple-600"
-													title={t("common.edit")}
-												>
-													<Pencil className="h-3.5 w-3.5" />
-												</Button>
-												<Button
-													size="sm"
-													variant="ghost"
-													onClick={() => deleteMutation.mutate(brand.id)}
-													className="h-7 w-7 p-0 rounded-lg text-slate-500 hover:text-rose-600"
-													title={t("common.delete")}
-												>
-													<Trash2 className="h-3.5 w-3.5" />
-												</Button>
-											</div>
-										</div>
-									</div>
-								);
-							})}
-						</div>
-					)}
+					{/* Sortable Brand Cards Grid */}
+					<BrandGridView
+						brands={brandsData?.items || []}
+						isLoading={isLoading}
+						isReordering={reorderBrandsMutation.isPending}
+						canCreate={canCreateProduct}
+						canUpdate={canUpdateProduct}
+						canDelete={canDeleteProduct}
+						reorderDisabledReason={
+							search.trim()
+								? "Clear search filter to drag & reorder brands"
+								: undefined
+						}
+						pageOffset={pageOffset}
+						onOpenCreate={openCreate}
+						onOpenEdit={openEdit}
+						onDelete={(id) => deleteMutation.mutate(id)}
+						onReorder={(reordered) => reorderBrandsMutation.mutate(reordered)}
+					/>
 
 					{/* Pagination */}
 					{totalCount > pageSize && (
@@ -7851,6 +8086,15 @@ function BrandsTab() {
 							</div>
 						</div>
 					</div>
+
+					<ModernInput
+						type="number"
+						min={0}
+						label={t("products.sortOrder")}
+						placeholder="e.g. 1, 2, 3"
+						{...form.register("sortOrder")}
+						error={form.formState.errors.sortOrder?.message}
+					/>
 
 					<ModernTextarea
 						label={t("products.detailedDescription")}

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 export interface ModernInputProps
 	extends React.InputHTMLAttributes<HTMLInputElement> {
 	label?: React.ReactNode;
+	labelAction?: React.ReactNode;
 	labelVariant?: "standard" | "floating" | "inset";
 	helperText?: React.ReactNode;
 	error?: React.ReactNode;
@@ -20,6 +21,9 @@ export interface ModernInputProps
 	variant?: "outline" | "filled" | "glass" | "subtle";
 	prefixAddon?: React.ReactNode;
 	suffixAddon?: React.ReactNode;
+	prefixAddonClassName?: string;
+	suffixAddonClassName?: string;
+	wrapperClassName?: string;
 	showCharCount?: boolean;
 	containerClassName?: string;
 }
@@ -29,8 +33,10 @@ export const ModernInput = React.forwardRef<HTMLInputElement, ModernInputProps>(
 		{
 			className,
 			containerClassName,
+			wrapperClassName,
 			type = "text",
 			label,
+			labelAction,
 			labelVariant = "standard",
 			helperText,
 			error,
@@ -43,6 +49,8 @@ export const ModernInput = React.forwardRef<HTMLInputElement, ModernInputProps>(
 			variant = "outline",
 			prefixAddon,
 			suffixAddon,
+			prefixAddonClassName,
+			suffixAddonClassName,
 			showCharCount = false,
 			maxLength,
 			value,
@@ -124,6 +132,11 @@ export const ModernInput = React.forwardRef<HTMLInputElement, ModernInputProps>(
 
 		const isFloating = labelVariant === "floating" && !!label;
 		const isInset = labelVariant === "inset" && !!label;
+		const hasRightIcons =
+			isLoading ||
+			(clearable && hasValue && !disabled) ||
+			isPassword ||
+			Boolean(rightIcon);
 
 		const inputProps: React.InputHTMLAttributes<HTMLInputElement> = {
 			...props,
@@ -137,38 +150,51 @@ export const ModernInput = React.forwardRef<HTMLInputElement, ModernInputProps>(
 		return (
 			<div className={cn("w-full space-y-1.5", containerClassName)}>
 				{/* Standard Label */}
-				{labelVariant === "standard" && label && (
-					<div className="flex items-center justify-between text-xs">
-						<Label
-							htmlFor={inputId}
-							className="font-semibold text-xs text-foreground tracking-wide flex items-center gap-1"
-						>
-							{label}
-							{required && (
-								<span className="text-destructive font-bold">*</span>
-							)}
-						</Label>
-						{showCharCount && maxLength && (
-							<span className="text-[11px] text-muted-foreground">
-								{currentValueString.length}/{maxLength}
-							</span>
+				{labelVariant === "standard" && (label || labelAction) && (
+					<div className="flex items-center justify-between gap-2 text-xs">
+						{label ? (
+							<Label
+								htmlFor={inputId}
+								className="font-semibold text-xs text-foreground tracking-wide flex items-center gap-1"
+							>
+								{label}
+								{required && (
+									<span className="text-destructive font-bold">*</span>
+								)}
+							</Label>
+						) : (
+							<span />
 						)}
+						<div className="flex items-center gap-2">
+							{labelAction}
+							{showCharCount && maxLength && (
+								<span className="text-[11px] text-muted-foreground">
+									{currentValueString.length}/{maxLength}
+								</span>
+							)}
+						</div>
 					</div>
 				)}
 
 				{/* Input Wrapper Container */}
 				<div
 					className={cn(
-						"group relative flex w-full items-center rounded-lg border transition-all duration-200 shadow-2xs overflow-hidden",
+						"group relative flex w-full items-center rounded-xl border transition-all duration-200 shadow-2xs overflow-hidden",
 						variantStyles[variant],
 						disabled && "pointer-events-none opacity-50 bg-muted/50",
 						error &&
 							"border-destructive ring-2 ring-destructive/20 dark:border-destructive/60 dark:ring-destructive/30",
+						wrapperClassName,
 					)}
 				>
 					{/* Prefix Addon */}
 					{prefixAddon && (
-						<div className="flex items-center justify-center bg-muted/40 border-r border-border/40 px-3 py-1 text-xs font-medium text-muted-foreground select-none shrink-0 dark:bg-slate-800/40">
+						<div
+							className={cn(
+								"flex items-center justify-center bg-muted/40 border-r border-border/40 px-3 py-1 text-xs font-medium text-muted-foreground select-none shrink-0 dark:bg-slate-800/40 self-stretch",
+								prefixAddonClassName,
+							)}
+						>
 							{prefixAddon}
 						</div>
 					)}
@@ -243,13 +269,14 @@ export const ModernInput = React.forwardRef<HTMLInputElement, ModernInputProps>(
 							}}
 							maxLength={maxLength}
 							disabled={disabled}
+							required={required}
 							placeholder={isFloating && !isFocused ? "" : placeholder}
 							className={cn(
 								"w-full bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none text-foreground placeholder:text-muted-foreground/60 transition-colors",
 								sizeStyles[inputSize],
 								isInset && "h-auto py-1 pt-0 text-sm",
 								leftIcon && "pl-1.5",
-								(clearable || isPassword || isLoading || rightIcon) && "pr-2",
+								hasRightIcons && "pr-1.5",
 								className,
 							)}
 							{...inputProps}
@@ -257,61 +284,63 @@ export const ModernInput = React.forwardRef<HTMLInputElement, ModernInputProps>(
 					</div>
 
 					{/* Right Action Icons (Clear, Password Toggle, Loading, Custom RightIcon) */}
-					<div className="pr-3 flex items-center gap-1.5 shrink-0 text-muted-foreground">
-						{/* Loading Spinner */}
-						{isLoading && (
-							<Loader2
-								className={cn(
-									"animate-spin text-primary",
-									iconSizeStyles[inputSize],
-								)}
-							/>
-						)}
+					{hasRightIcons && (
+						<div className="pr-2.5 flex items-center gap-1.5 shrink-0 text-muted-foreground">
+							{/* Loading Spinner */}
+							{isLoading && (
+								<Loader2
+									className={cn(
+										"animate-spin text-primary",
+										iconSizeStyles[inputSize],
+									)}
+								/>
+							)}
 
-						{/* Clear Button */}
-						{!isLoading && clearable && hasValue && !disabled && (
-							<button
-								type="button"
-								onClick={handleClear}
-								className="p-0.5 rounded-full hover:bg-muted hover:text-foreground transition-colors"
-								title="Clear input"
-							>
-								<X className="size-3.5" />
-							</button>
-						)}
+							{/* Clear Button */}
+							{!isLoading && clearable && hasValue && !disabled && (
+								<button
+									type="button"
+									onClick={handleClear}
+									className="p-0.5 rounded-full hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+									title="Clear input"
+								>
+									<X className="size-3.5" />
+								</button>
+							)}
 
-						{/* Password Toggle Button */}
-						{!isLoading && isPassword && (
-							<button
-								type="button"
-								onClick={() => setShowPassword((prev) => !prev)}
-								className="p-0.5 rounded-md hover:bg-muted hover:text-foreground transition-colors focus:outline-none"
-								title={showPassword ? "Hide password" : "Show password"}
-							>
-								{showPassword ? (
-									<EyeOff className={iconSizeStyles[inputSize]} />
-								) : (
-									<Eye className={iconSizeStyles[inputSize]} />
-								)}
-							</button>
-						)}
+							{/* Password Toggle Button */}
+							{!isLoading && isPassword && (
+								<button
+									type="button"
+									onClick={() => setShowPassword((prev) => !prev)}
+									className="p-0.5 rounded-md hover:bg-muted hover:text-foreground transition-colors focus:outline-none cursor-pointer"
+									title={showPassword ? "Hide password" : "Show password"}
+								>
+									{showPassword ? (
+										<EyeOff className={iconSizeStyles[inputSize]} />
+									) : (
+										<Eye className={iconSizeStyles[inputSize]} />
+									)}
+								</button>
+							)}
 
-						{/* Custom Right Icon */}
-						{!isLoading && !isPassword && rightIcon && (
-							<div
-								className={cn(
-									"text-muted-foreground",
-									iconSizeStyles[inputSize],
-								)}
-							>
-								{rightIcon}
-							</div>
-						)}
-					</div>
+							{/* Custom Right Icon */}
+							{!isLoading && !isPassword && rightIcon && (
+								<div className="text-muted-foreground flex items-center justify-center">
+									{rightIcon}
+								</div>
+							)}
+						</div>
+					)}
 
 					{/* Suffix Addon */}
 					{suffixAddon && (
-						<div className="flex items-center justify-center bg-muted/40 border-l border-border/40 px-3 py-1 text-xs font-medium text-muted-foreground select-none shrink-0 dark:bg-slate-800/40">
+						<div
+							className={cn(
+								"flex items-center justify-center bg-muted/40 border-l border-border/40 px-3 py-1 text-xs font-medium text-muted-foreground select-none shrink-0 dark:bg-slate-800/40 self-stretch",
+								suffixAddonClassName,
+							)}
+						>
 							{suffixAddon}
 						</div>
 					)}

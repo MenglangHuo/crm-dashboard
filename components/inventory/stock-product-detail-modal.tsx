@@ -1109,6 +1109,7 @@ export function StockProductDetailModal({
 				sortable: true,
 				minWidth: 100,
 				cell: ({ row }: { row: any }) => {
+					console.log("Row data for inventory cell:", row);
 					const stockData = row.stockData;
 					const qty = stockData?.availableStock ?? row.stockQty ?? 0;
 					const reserved = stockData?.reservedStock ?? 0;

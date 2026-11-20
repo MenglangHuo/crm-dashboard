@@ -298,6 +298,7 @@ export function DataTable<T extends Record<string, any>>({
 	manualSorting: controlledManualSorting,
 	sortState: controlledSortState,
 	onSortChange,
+	sortOptions,
 
 	manualFiltering: controlledManualFiltering,
 	filterState: controlledFilterState,
@@ -609,18 +610,47 @@ export function DataTable<T extends Record<string, any>>({
 		}
 	};
 
-	const handleSortToggle = (columnId: string) => {
+	const handleSortToggle = (columnId: string, forcedDirection?: "asc" | "desc") => {
 		let nextSort: SortState | null = null;
-		if (!sortState || sortState.columnId !== columnId) {
+		if (forcedDirection) {
+			nextSort = { columnId, direction: forcedDirection };
+		} else if (!sortState || sortState.columnId !== columnId) {
+			const prefersDesc = [
+				"createdat",
+				"totalsales",
+				"popularityscore",
+				"maxdiscountpct",
+				"viewcount",
+				"stock",
+			].includes(columnId.toLowerCase());
+			nextSort = { columnId, direction: prefersDesc ? "desc" : "asc" };
+		} else if (sortState.direction === "desc") {
 			nextSort = { columnId, direction: "asc" };
-		} else if (sortState.direction === "asc") {
-			nextSort = { columnId, direction: "desc" };
 		} else {
-			nextSort = null;
+			nextSort = { columnId, direction: "desc" };
 		}
 
 		if (onSortChange) onSortChange(nextSort);
 		else setUncontrolledSort(nextSort);
+
+		if (onSearchFilterChange) {
+			const payload = buildSearchFilterPayload({
+				searchValue: search,
+				searchField: searchField,
+				activeFilters: domainFilters,
+				sortState: nextSort
+					? [
+							{
+								field: nextSort.columnId,
+								direction: nextSort.direction.toUpperCase() as "ASC" | "DESC",
+							},
+						]
+					: undefined,
+				page: 0,
+				size: pageSize,
+			});
+			onSearchFilterChange(payload);
+		}
 	};
 
 	const _handleFilterChange = (colId: string, val: any) => {
@@ -1176,66 +1206,150 @@ export function DataTable<T extends Record<string, any>>({
 					{/* Primary Action Button (placed right near Filter button) */}
 					{primaryAction}
 					{/* Sort By Popover / Menu */}
-					<DropdownMenu>
-						<DropdownMenuTrigger
-							render={
-								<Button
-									variant={sortState ? "secondary" : "outline"}
-									size="sm"
-									className="h-9 px-3 gap-1.5 text-xs font-medium rounded-lg border-border"
-								>
-									<ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-									<span>{t("common.sort", "Sort")}</span>
-									{sortState && (
-										<Badge
-											variant="default"
-											className="ml-1 h-4 px-1 text-[10px] bg-primary"
-										>
-											{sortState.direction.toUpperCase()}
-										</Badge>
-									)}
-								</Button>
-							}
-						/>
-						<DropdownMenuContent align="end" className="w-56 shadow-lg">
-							<DropdownMenuLabel className="text-xs text-muted-foreground font-semibold flex items-center justify-between">
-								<span>Sort By Column</span>
-								{sortState && (
-									<button
-										onClick={() => handleSortToggle(sortState.columnId)}
-										className="text-primary hover:underline text-[10px]"
+					<div className="flex items-center gap-1">
+						<DropdownMenu>
+							<DropdownMenuTrigger
+								render={
+									<Button
+										variant={sortState ? "secondary" : "outline"}
+										size="sm"
+										className="h-9 px-3 gap-1.5 text-xs font-medium rounded-lg border-border"
 									>
-										Clear Sort
-									</button>
+										<ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+										<span>{t("common.sort", "Sort")}</span>
+										{sortState && (
+											<span className="font-semibold text-primary ml-0.5 truncate max-w-[100px]">
+												{(() => {
+													const foundOpt = sortOptions?.find((o) => o.id === sortState.columnId);
+													if (foundOpt) return typeof foundOpt.label === "string" ? foundOpt.label.split("(")[0].trim() : foundOpt.label;
+													const foundCol = columns.find((c) => c.id === sortState.columnId);
+													return typeof foundCol?.header === "string" ? foundCol.header : sortState.columnId;
+												})()}
+											</span>
+										)}
+									</Button>
+								}
+							/>
+							<DropdownMenuContent align="end" className="w-64 shadow-lg p-1.5 max-h-96 overflow-y-auto">
+								<DropdownMenuLabel className="text-xs text-muted-foreground font-semibold flex items-center justify-between px-2 py-1">
+									<span>{sortOptions && sortOptions.length > 0 ? "Sort Options" : "Sort By Column"}</span>
+									{sortState && (
+										<button
+											onClick={() => {
+												if (onSortChange) onSortChange(null);
+												else setUncontrolledSort(null);
+												if (onSearchFilterChange) {
+													const payload = buildSearchFilterPayload({
+														searchValue: search,
+														searchField: searchField,
+														activeFilters: domainFilters,
+														sortState: undefined,
+														page: 0,
+														size: pageSize,
+													});
+													onSearchFilterChange(payload);
+												}
+											}}
+											className="text-primary hover:underline text-[10px]"
+										>
+											Clear Sort
+										</button>
+									)}
+								</DropdownMenuLabel>
+								{sortState && (
+									<div className="flex items-center justify-between px-2 py-1.5 mb-1 bg-muted/60 rounded-md">
+										<span className="text-[11px] font-medium text-muted-foreground">Direction</span>
+										<div className="flex items-center gap-1">
+											<Button
+												type="button"
+												size="sm"
+												variant={sortState.direction === "asc" ? "default" : "outline"}
+												onClick={() => handleSortToggle(sortState.columnId, "asc")}
+												className={cn(
+													"h-6 px-2 text-[10px] font-bold rounded cursor-pointer",
+													sortState.direction === "asc" ? "bg-primary text-primary-foreground" : "bg-background"
+												)}
+											>
+												↑ ASC
+											</Button>
+											<Button
+												type="button"
+												size="sm"
+												variant={sortState.direction === "desc" ? "default" : "outline"}
+												onClick={() => handleSortToggle(sortState.columnId, "desc")}
+												className={cn(
+													"h-6 px-2 text-[10px] font-bold rounded cursor-pointer",
+													sortState.direction === "desc" ? "bg-primary text-primary-foreground" : "bg-background"
+												)}
+											>
+												↓ DESC
+											</Button>
+										</div>
+									</div>
 								)}
-							</DropdownMenuLabel>
-							<DropdownMenuSeparator />
-							{columns
-								.filter((col) => col.sortable !== false)
-								.map((col) => {
-									const isSorted = sortState?.columnId === col.id;
+								<DropdownMenuSeparator />
+								{(sortOptions && sortOptions.length > 0
+									? sortOptions
+									: columns
+											.filter((col) => col.sortable !== false)
+											.map((col) => ({
+												id: col.id,
+												label: typeof col.header === "string" ? col.header : col.id,
+												icon: col.headerIcon,
+											}))
+								).map((opt) => {
+									const isSorted = sortState?.columnId === opt.id;
 									return (
 										<DropdownMenuItem
-											key={col.id}
-											onClick={() => handleSortToggle(col.id)}
-											className="flex items-center justify-between cursor-pointer text-xs"
+											key={opt.id}
+											onClick={() => handleSortToggle(opt.id)}
+											className={cn(
+												"flex items-center justify-between cursor-pointer text-xs px-2.5 py-1.5 rounded-md",
+												isSorted && "bg-primary/10 text-primary font-semibold",
+											)}
 										>
-											<span className="flex items-center gap-1.5">
-												{col.headerIcon}
-												<span>
-													{typeof col.header === "string" ? col.header : col.id}
-												</span>
+											<span className="flex items-center gap-2 min-w-0 truncate">
+												{opt.icon}
+												<span className="truncate">{opt.label}</span>
 											</span>
 											{isSorted && (
-												<span className="text-primary font-bold">
+												<span className="text-primary font-bold text-[11px] shrink-0 ml-2">
 													{sortState.direction === "asc" ? "↑ ASC" : "↓ DESC"}
 												</span>
 											)}
 										</DropdownMenuItem>
 									);
 								})}
-						</DropdownMenuContent>
-					</DropdownMenu>
+							</DropdownMenuContent>
+						</DropdownMenu>
+
+						{/* Quick Direction Toggle Pill (shown whenever a sort field is active) */}
+						{sortState && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									const nextDir = sortState.direction === "asc" ? "desc" : "asc";
+									handleSortToggle(sortState.columnId, nextDir);
+								}}
+								className="h-9 px-2 gap-1 text-xs font-bold rounded-lg border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer transition-colors shadow-2xs"
+								title={`Currently sorted ${sortState.direction.toUpperCase()}. Click to switch to ${sortState.direction === "asc" ? "DESC" : "ASC"}`}
+							>
+								{sortState.direction === "asc" ? (
+									<>
+										<ArrowUp className="h-3.5 w-3.5 text-primary" />
+										<span>ASC</span>
+									</>
+								) : (
+									<>
+										<ArrowDown className="h-3.5 w-3.5 text-primary" />
+										<span>DESC</span>
+									</>
+								)}
+							</Button>
+						)}
+					</div>
 
 					{/* Column Visibility Menu */}
 					<DropdownMenu>

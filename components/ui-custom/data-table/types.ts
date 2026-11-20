@@ -7,6 +7,13 @@ export interface SortState {
 	direction: SortDirection;
 }
 
+export interface DataTableSortOption {
+	id: string;
+	label: string;
+	icon?: React.ReactNode;
+	group?: string;
+}
+
 export type FilterValue = string | number | boolean | (string | number)[];
 
 export interface FilterState {
@@ -153,6 +160,8 @@ export interface DataTableProps<T> {
 	manualSorting?: boolean;
 	sortState?: SortState | null;
 	onSortChange?: (sortState: SortState | null) => void;
+	/** Custom or extra sort options for Discovery, Merchandising, or advanced sorting */
+	sortOptions?: DataTableSortOption[];
 
 	manualFiltering?: boolean;
 	filterState?: FilterState;
