@@ -832,6 +832,7 @@ export interface Brand {
 	name: string;
 	description?: string;
 	logoUrl?: string;
+	sortOrder?: number;
 	status?: string;
 	isActive?: boolean;
 	createdAt?: string;

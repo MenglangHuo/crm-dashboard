@@ -16,6 +16,9 @@ import {
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -44,18 +47,27 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	AlertTriangle,
+	ArrowDown,
 	ArrowLeftRight,
 	ArrowRight,
+	ArrowUp,
+	ArrowUpDown,
 	Boxes,
+	Check,
 	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
+	ChevronsLeft,
+	ChevronsRight,
 	Clock,
+	DollarSign,
 	Eye,
+	Flame,
 	History,
 	Info,
 	Layers,
 	Loader2,
+	MoreHorizontal,
 	Package,
 	PackagePlus,
 	Receipt,
@@ -64,6 +76,7 @@ import {
 	Search,
 	ShoppingBag,
 	SlidersHorizontal,
+	Sparkles,
 	Tag,
 	Truck,
 	Warehouse as WarehouseIcon,
@@ -80,6 +93,7 @@ import {
 	FilterCriterion,
 	buildSearchFilterPayload,
 } from "@/components/ui-custom/data-table/search-filter-types";
+import { DataTableSortOption } from "@/components/ui-custom/data-table/types";
 import { ModernSelect } from "@/components/ui-custom/form-controls";
 import {
 	ModernModal,
@@ -97,6 +111,52 @@ import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
+
+// Pagination configuration & helpers for table footer
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+type PaginationItemType = number | "ellipsis-prev" | "ellipsis-next";
+
+function generatePaginationItems(
+  currentPage: number, // 0-indexed
+  totalPages: number,
+): PaginationItemType[] {
+  if (totalPages <= 1) return [1];
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const current = currentPage + 1; // 1-indexed
+
+  // Case 1: Near beginning (pages 1 to 4)
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, "ellipsis-next", totalPages];
+  }
+
+  // Case 2: Near end (last 4 pages)
+  if (current >= totalPages - 3) {
+    return [
+      1,
+      "ellipsis-prev",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  // Case 3: In the middle
+  return [
+    1,
+    "ellipsis-prev",
+    current - 1,
+    current,
+    current + 1,
+    "ellipsis-next",
+    totalPages,
+  ];
+}
 
 // Reusable Safe Product/Variant Image with Automatic Fallback Handling
 function StockProductImage({
@@ -1132,7 +1192,83 @@ function StockPageContent() {
   const [activeFilters, setActiveFilters] = useState<FilterCriterion[]>([]);
   const [isFilterStudioOpen, setIsFilterStudioOpen] = useState(false);
   const [searchPage, setSearchPage] = useState(0); // 0-indexed for backend API
-  const [searchSize, _setSearchSize] = useState(10);
+  const [searchSize, setSearchSize] = useState(10);
+  const [stockSortField, setStockSortField] = useState("createdAt");
+  const [stockSortDirection, setStockSortDirection] = useState<"ASC" | "DESC">("DESC");
+
+  const stockSortOptions: DataTableSortOption[] = useMemo(
+    () => [
+      {
+        id: "createdAt",
+        label: "Created Date (Newest)",
+        icon: <Clock className="h-3.5 w-3.5 text-slate-500" />,
+      },
+      {
+        id: "totalSales",
+        label: "Best Selling (Sales Volume)",
+        icon: <Flame className="h-3.5 w-3.5 text-amber-500" />,
+      },
+      {
+        id: "popularityScore",
+        label: "Most Popular (Score)",
+        icon: <Sparkles className="h-3.5 w-3.5 text-purple-500" />,
+      },
+      {
+        id: "maxDiscountPct",
+        label: "Biggest Discount %",
+        icon: <Tag className="h-3.5 w-3.5 text-emerald-500" />,
+      },
+      {
+        id: "viewCount",
+        label: "Most Viewed",
+        icon: <Eye className="h-3.5 w-3.5 text-sky-500" />,
+      },
+      {
+        id: "name",
+        label: "Product Name (A-Z)",
+        icon: <Package className="h-3.5 w-3.5 text-slate-500" />,
+      },
+      {
+        id: "price",
+        label: "Selling Price",
+        icon: <DollarSign className="h-3.5 w-3.5 text-emerald-600" />,
+      },
+      {
+        id: "stock",
+        label: "Stock Quantity",
+        icon: <Boxes className="h-3.5 w-3.5 text-blue-500" />,
+      },
+      {
+        id: "category",
+        label: "Category",
+        icon: <Layers className="h-3.5 w-3.5 text-purple-500" />,
+      },
+      {
+        id: "brand",
+        label: "Brand",
+        icon: <Tag className="h-3.5 w-3.5 text-sky-500" />,
+      },
+    ],
+    [],
+  );
+
+  const handleToggleColumnSort = (field: string) => {
+    if (stockSortField === field) {
+      setStockSortDirection((prev) => (prev === "ASC" ? "DESC" : "ASC"));
+    } else {
+      const prefersDesc = [
+        "createdat",
+        "totalsales",
+        "popularityscore",
+        "maxdiscountpct",
+        "viewcount",
+        "stock",
+      ].includes(field.toLowerCase());
+      setStockSortField(field);
+      setStockSortDirection(prefersDesc ? "DESC" : "ASC");
+    }
+    setSearchPage(0);
+  };
 
   // Low Stock & Out of Stock Pagination
   const [lowStockPage, _setLowStockPage] = useState(0);
@@ -1366,11 +1502,11 @@ function StockPageContent() {
     return buildSearchFilterPayload({
       searchValue: search,
       activeFilters,
-      sortState: [{ field: "createdAt", direction: "DESC" }],
+      sortState: [{ field: stockSortField, direction: stockSortDirection }],
       page: searchPage,
       size: searchSize,
     });
-  }, [search, activeFilters, searchPage, searchSize]);
+  }, [search, activeFilters, stockSortField, stockSortDirection, searchPage, searchSize]);
 
   const {
     data: searchStockResponse,
@@ -1379,6 +1515,7 @@ function StockPageContent() {
   } = useQuery({
     queryKey: ["stocks-search-v1", searchPayload],
     queryFn: () => stocksApi.search(searchPayload),
+    staleTime: 0,
   });
 
   // Extract products content from response
@@ -1393,7 +1530,19 @@ function StockPageContent() {
   const searchTotalPages =
     searchStockResponse?.totalPages ??
     searchStockResponse?.data?.totalPages ??
-    1;
+    Math.max(1, Math.ceil(searchTotalElements / searchSize));
+
+  const paginationItems = useMemo(
+    () => generatePaginationItems(searchPage, searchTotalPages),
+    [searchPage, searchTotalPages],
+  );
+
+  // Guard against out-of-bounds page if total pages decreases (e.g. after changing page size)
+  React.useEffect(() => {
+    if (searchTotalPages > 0 && searchPage >= searchTotalPages) {
+      setSearchPage(Math.max(0, searchTotalPages - 1));
+    }
+  }, [searchTotalPages, searchPage]);
 
   // ------------------------------------------------------------
   // Low Stock Query (GET /api/v1/stocks/low-stock)
@@ -1672,6 +1821,150 @@ function StockPageContent() {
                   </Badge>
                 )}
               </Button>
+
+              {/* Product Sort Dropdown & Quick Direction Button */}
+              <div className="flex items-center gap-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant={stockSortField ? "secondary" : "outline"}
+                        size="sm"
+                        className="h-10 px-3 gap-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 cursor-pointer"
+                      >
+                        <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>{t("common.sort", "Sort")}</span>
+                        {stockSortField && (
+                          <span className="font-semibold text-primary ml-0.5 truncate max-w-[100px]">
+                            {stockSortOptions.find((o) => o.id === stockSortField)?.label.split("(")[0].trim() || stockSortField}
+                          </span>
+                        )}
+                      </Button>
+                    }
+                  />
+                  <DropdownMenuContent align="end" className="w-64 shadow-lg p-1.5 max-h-96 overflow-y-auto">
+                    <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold flex items-center justify-between px-2 py-1">
+                      <span>Sort Options</span>
+                      {stockSortField && (
+                        <button
+                          onClick={() => {
+                            setStockSortField("createdAt");
+                            setStockSortDirection("DESC");
+                            setSearchPage(0);
+                          }}
+                          className="text-primary hover:underline text-[10px] cursor-pointer"
+                        >
+                          Clear Sort
+                        </button>
+                      )}
+                    </DropdownMenuLabel>
+                    {stockSortField && (
+                      <div className="flex items-center justify-between px-2 py-1.5 mb-1 bg-muted/60 rounded-md">
+                        <span className="text-[11px] font-medium text-muted-foreground">Direction</span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={stockSortDirection === "ASC" ? "default" : "outline"}
+                            onClick={() => {
+                              setStockSortDirection("ASC");
+                              setSearchPage(0);
+                            }}
+                            className={cn(
+                              "h-6 px-2 text-[10px] font-bold rounded cursor-pointer",
+                              stockSortDirection === "ASC" ? "bg-primary text-primary-foreground" : "bg-background"
+                            )}
+                          >
+                            ↑ ASC
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={stockSortDirection === "DESC" ? "default" : "outline"}
+                            onClick={() => {
+                              setStockSortDirection("DESC");
+                              setSearchPage(0);
+                            }}
+                            className={cn(
+                              "h-6 px-2 text-[10px] font-bold rounded cursor-pointer",
+                              stockSortDirection === "DESC" ? "bg-primary text-primary-foreground" : "bg-background"
+                            )}
+                          >
+                            ↓ DESC
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    <DropdownMenuSeparator />
+                    {stockSortOptions.map((opt) => {
+                      const isSorted = stockSortField === opt.id;
+                      return (
+                        <DropdownMenuItem
+                          key={opt.id}
+                          onClick={() => {
+                            if (stockSortField === opt.id) {
+                              setStockSortDirection(stockSortDirection === "DESC" ? "ASC" : "DESC");
+                            } else {
+                              const prefersDesc = [
+                                "createdat",
+                                "totalsales",
+                                "popularityscore",
+                                "maxdiscountpct",
+                                "viewcount",
+                                "stock",
+                              ].includes(opt.id.toLowerCase());
+                              setStockSortField(opt.id);
+                              setStockSortDirection(prefersDesc ? "DESC" : "ASC");
+                            }
+                            setSearchPage(0);
+                          }}
+                          className={cn(
+                            "flex items-center justify-between cursor-pointer text-xs px-2.5 py-1.5 rounded-md",
+                            isSorted && "bg-primary/10 text-primary font-semibold",
+                          )}
+                        >
+                          <span className="flex items-center gap-2 min-w-0 truncate">
+                            {opt.icon}
+                            <span className="truncate">{opt.label}</span>
+                          </span>
+                          {isSorted && (
+                            <span className="text-primary font-bold text-[11px] shrink-0 ml-2">
+                              {stockSortDirection === "ASC" ? "↑ ASC" : "↓ DESC"}
+                            </span>
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Quick Direction Toggle Pill */}
+                {stockSortField && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setStockSortDirection((prev) => (prev === "ASC" ? "DESC" : "ASC"));
+                      setSearchPage(0);
+                    }}
+                    className="h-10 px-2 gap-1 text-xs font-bold rounded-xl border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer transition-colors shadow-2xs"
+                    title={`Currently sorted ${stockSortDirection}. Click to switch to ${stockSortDirection === "ASC" ? "DESC" : "ASC"}`}
+                  >
+                    {stockSortDirection === "ASC" ? (
+                      <>
+                        <ArrowUp className="h-3.5 w-3.5 text-primary" />
+                        <span>ASC</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowDown className="h-3.5 w-3.5 text-primary" />
+                        <span>DESC</span>
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
 
               <PermissionGate resource="STOCK" action="UPDATE">
                 <Button
@@ -2092,31 +2385,116 @@ function StockPageContent() {
                     </section>
                   );
                 })}
-                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
-                  <span className="text-xs text-muted-foreground">
-                    Page {searchPage + 1} of {searchTotalPages} ·{" "}
-                    {searchTotalElements} products
-                  </span>
-                  <div className="flex gap-1.5">
+                <div className="flex flex-col gap-2.5 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 shadow-2xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                        {t("common.rowsPerPage", "Rows:")}
+                      </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs font-semibold rounded-lg border-slate-200 dark:border-slate-800 bg-background text-foreground gap-1"
+                            >
+                              <span>{searchSize}</span>
+                              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenuContent
+                          align="start"
+                          side="top"
+                          className="min-w-[80px] p-1 rounded-xl shadow-lg border-slate-200 dark:border-slate-800 bg-popover"
+                        >
+                          {PAGE_SIZE_OPTIONS.map((opt) => (
+                            <DropdownMenuItem
+                              key={opt}
+                              onClick={() => {
+                                setSearchSize(opt);
+                                setSearchPage(0);
+                              }}
+                              className={cn(
+                                "flex items-center justify-between px-2.5 py-1 text-xs rounded-lg cursor-pointer",
+                                searchSize === opt &&
+                                  "font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40",
+                              )}
+                            >
+                              <span>{opt}</span>
+                              {searchSize === opt && (
+                                <Check className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                              )}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <span className="text-xs text-muted-foreground">
+                      {searchTotalElements === 0
+                        ? "0 products"
+                        : `${searchPage * searchSize + 1}–${Math.min(
+                            (searchPage + 1) * searchSize,
+                            searchTotalElements,
+                          )} of ${searchTotalElements}`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-slate-100 dark:border-slate-800/60">
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={searchPage === 0}
-                      onClick={() =>
-                        setSearchPage((prev) => Math.max(0, prev - 1))
-                      }
-                      className="h-8 px-2.5 text-xs"
+                      disabled={searchPage === 0 || isLoadingSearchStock}
+                      onClick={() => setSearchPage(0)}
+                      className="h-8 w-8 p-0"
+                      title={t("common.first", "First Page")}
                     >
-                      Previous
+                      <ChevronsLeft className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={searchPage >= searchTotalPages - 1}
-                      onClick={() => setSearchPage((prev) => prev + 1)}
-                      className="h-8 px-2.5 text-xs"
+                      disabled={searchPage === 0 || isLoadingSearchStock}
+                      onClick={() =>
+                        setSearchPage((prev) => Math.max(0, prev - 1))
+                      }
+                      className="h-8 px-2 text-xs gap-1"
                     >
-                      Next
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                      <span>{t("common.previous", "Prev")}</span>
+                    </Button>
+
+                    <span className="text-xs font-semibold px-2 text-foreground">
+                      {searchPage + 1} / {searchTotalPages}
+                    </span>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        searchPage >= searchTotalPages - 1 ||
+                        isLoadingSearchStock
+                      }
+                      onClick={() => setSearchPage((prev) => prev + 1)}
+                      className="h-8 px-2 text-xs gap-1"
+                    >
+                      <span>{t("common.next", "Next")}</span>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        searchPage >= searchTotalPages - 1 ||
+                        isLoadingSearchStock
+                      }
+                      onClick={() => setSearchPage(searchTotalPages - 1)}
+                      className="h-8 w-8 p-0"
+                      title={t("common.last", "Last Page")}
+                    >
+                      <ChevronsRight className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
@@ -2126,8 +2504,22 @@ function StockPageContent() {
                   <TableHeader className="bg-slate-50/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-9 min-w-9 p-1 text-center sticky left-0 z-20 bg-slate-50 dark:bg-slate-900"></TableHead>
-                      <TableHead className="font-bold text-xs text-foreground min-w-[170px] max-w-[220px] sticky left-9 z-20 bg-slate-50 dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)]">
-                        {t("stocks.productName", "Product / Variant")}
+                      <TableHead
+                        onClick={() => handleToggleColumnSort("name")}
+                        className="font-bold text-xs text-foreground min-w-[170px] max-w-[220px] sticky left-9 z-20 bg-slate-50 dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>{t("stocks.productName", "Product / Variant")}</span>
+                          {stockSortField === "name" ? (
+                            stockSortDirection === "ASC" ? (
+                              <ArrowUp className="h-3 w-3 text-primary" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3 text-primary" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />
+                          )}
+                        </div>
                       </TableHead>
                       <TableHead className="font-bold text-xs text-left min-w-[110px]">
                         {t("products.barcode", "Barcode")}
@@ -2135,17 +2527,59 @@ function StockPageContent() {
                       <TableHead className="font-bold text-xs text-left min-w-[100px]">
                         {t("products.sku", "SKU")}
                       </TableHead>
-                      <TableHead className="font-bold text-xs text-right min-w-[75px]">
-                        {t("stocks.quantityOnHand", "On Hand")}
+                      <TableHead
+                        onClick={() => handleToggleColumnSort("stock")}
+                        className="font-bold text-xs text-right min-w-[75px] cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>{t("stocks.quantityOnHand", "On Hand")}</span>
+                          {stockSortField === "stock" ? (
+                            stockSortDirection === "ASC" ? (
+                              <ArrowUp className="h-3 w-3 text-primary" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3 text-primary" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />
+                          )}
+                        </div>
                       </TableHead>
                       <TableHead className="font-bold text-xs text-right min-w-[65px]">
                         {t("stocks.reservedQuantity", "Reserved")}
                       </TableHead>
-                      <TableHead className="font-bold text-xs text-right min-w-[85px]">
-                        {t("stocks.availableQuantity", "Available")}
+                      <TableHead
+                        onClick={() => handleToggleColumnSort("stock")}
+                        className="font-bold text-xs text-right min-w-[85px] cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>{t("stocks.availableQuantity", "Available")}</span>
+                          {stockSortField === "stock" ? (
+                            stockSortDirection === "ASC" ? (
+                              <ArrowUp className="h-3 w-3 text-primary" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3 text-primary" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />
+                          )}
+                        </div>
                       </TableHead>
-                      <TableHead className="font-bold text-xs text-left min-w-[60px]">
-                        {t("stocks.soldQuantity", "Sold")}
+                      <TableHead
+                        onClick={() => handleToggleColumnSort("totalSales")}
+                        className="font-bold text-xs text-left min-w-[60px] cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>{t("stocks.soldQuantity", "Sold")}</span>
+                          {stockSortField === "totalSales" ? (
+                            stockSortDirection === "ASC" ? (
+                              <ArrowUp className="h-3 w-3 text-primary" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3 text-primary" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />
+                          )}
+                        </div>
                       </TableHead>
                       <TableHead className="font-bold text-xs text-left min-w-[95px]">
                         {t("stocks.stockStatus", "Status")}
@@ -3108,31 +3542,236 @@ function StockPageContent() {
                 </Table>
 
                 {/* Table Pagination Controls */}
-                <div className="flex items-center justify-between p-4 border-t bg-slate-50/50 dark:bg-slate-900/30">
-                  <p className="text-xs text-muted-foreground">
-                    Showing page {searchPage + 1} of {searchTotalPages} (
-                    {searchTotalElements} total products)
-                  </p>
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
+                  {/* Left: Per-page dropdown & showing count */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground w-full sm:w-auto justify-between sm:justify-start">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                        {t("common.rowsPerPage", "Rows per page:")}
+                      </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 min-w-[64px] px-2.5 text-xs font-semibold rounded-lg border-slate-200 dark:border-slate-800 bg-background hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground gap-1.5 shadow-2xs transition-all cursor-pointer focus-visible:ring-1 focus-visible:ring-purple-600"
+                            >
+                              <span>{searchSize}</span>
+                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200" />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenuContent
+                          align="start"
+                          side="top"
+                          className="min-w-[84px] p-1 shadow-lg rounded-xl border-slate-200 dark:border-slate-800 bg-popover"
+                        >
+                          {PAGE_SIZE_OPTIONS.map((opt) => {
+                            const isSelected = searchSize === opt;
+                            return (
+                              <DropdownMenuItem
+                                key={opt}
+                                onClick={() => {
+                                  setSearchSize(opt);
+                                  setSearchPage(0);
+                                }}
+                                className={cn(
+                                  "flex items-center justify-between px-2.5 py-1.5 text-xs font-medium rounded-lg cursor-pointer transition-colors",
+                                  isSelected
+                                    ? "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-bold"
+                                    : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-800",
+                                )}
+                              >
+                                <span>{opt}</span>
+                                {isSelected && (
+                                  <Check className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                )}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {searchTotalElements === 0 ? (
+                        "No products found"
+                      ) : (
+                        <>
+                          Showing{" "}
+                          <span className="font-semibold text-foreground">
+                            {searchPage * searchSize + 1}
+                          </span>
+                          –
+                          <span className="font-semibold text-foreground">
+                            {Math.min(
+                              (searchPage + 1) * searchSize,
+                              searchTotalElements,
+                            )}
+                          </span>{" "}
+                          of{" "}
+                          <span className="font-semibold text-foreground">
+                            {searchTotalElements}
+                          </span>{" "}
+                          products
+                          {searchTotalPages > 1 && (
+                            <span className="text-muted-foreground/80 ml-1.5 font-normal">
+                              (Page {searchPage + 1} of {searchTotalPages})
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Right: Clean pagination controls with First, Prev, Numbers + Ellipses, Next, Last */}
+                  <div className="flex items-center gap-1.5 flex-wrap justify-center sm:justify-end">
+                    {/* First Page */}
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={searchPage === 0}
+                      disabled={searchPage === 0 || isLoadingSearchStock}
+                      onClick={() => setSearchPage(0)}
+                      className="h-8 px-2.5 text-xs font-medium rounded-lg gap-1 border-slate-200 dark:border-slate-800 text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+                      title={t("common.first", "First Page")}
+                      aria-label="First Page"
+                    >
+                      <ChevronsLeft className="h-3.5 w-3.5" />
+                      <span className="hidden xl:inline">
+                        {t("common.first", "First")}
+                      </span>
+                    </Button>
+
+                    {/* Previous Page */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={searchPage === 0 || isLoadingSearchStock}
                       onClick={() =>
                         setSearchPage((prev) => Math.max(0, prev - 1))
                       }
-                      className="h-8 text-xs"
+                      className="h-8 px-2.5 text-xs font-medium rounded-lg gap-1 border-slate-200 dark:border-slate-800 text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+                      title={t("common.previous", "Previous Page")}
+                      aria-label="Previous Page"
                     >
-                      Previous
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">
+                        {t("common.previous", "Previous")}
+                      </span>
                     </Button>
+
+                    {/* Page Numbers */}
+                    <div className="flex items-center gap-1">
+                      {paginationItems.map((item, idx) => {
+                        if (typeof item === "number") {
+                          const isCurrent = searchPage === item - 1;
+                          return (
+                            <Button
+                              key={`page-${item}`}
+                              size="sm"
+                              variant={isCurrent ? "default" : "outline"}
+                              disabled={isLoadingSearchStock}
+                              onClick={() => setSearchPage(item - 1)}
+                              className={cn(
+                                "h-8 min-w-[32px] px-2 text-xs rounded-lg transition-colors font-medium",
+                                isCurrent
+                                  ? "bg-purple-600 hover:bg-purple-700 text-white font-bold border-purple-600 shadow-2xs dark:bg-purple-600 dark:hover:bg-purple-700"
+                                  : "border-slate-200 dark:border-slate-800 text-foreground hover:bg-slate-100 dark:hover:bg-slate-800",
+                              )}
+                              aria-current={isCurrent ? "page" : undefined}
+                            >
+                              {item}
+                            </Button>
+                          );
+                        }
+
+                        if (item === "ellipsis-prev") {
+                          return (
+                            <Button
+                              key={`ellipsis-prev-${idx}`}
+                              size="sm"
+                              variant="ghost"
+                              disabled={isLoadingSearchStock}
+                              onClick={() =>
+                                setSearchPage((prev) => Math.max(0, prev - 5))
+                              }
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg group"
+                              title="Jump back 5 pages"
+                              aria-label="Jump back 5 pages"
+                            >
+                              <MoreHorizontal className="h-4 w-4 group-hover:hidden" />
+                              <ChevronsLeft className="h-4 w-4 hidden group-hover:block text-purple-600" />
+                            </Button>
+                          );
+                        }
+
+                        if (item === "ellipsis-next") {
+                          return (
+                            <Button
+                              key={`ellipsis-next-${idx}`}
+                              size="sm"
+                              variant="ghost"
+                              disabled={isLoadingSearchStock}
+                              onClick={() =>
+                                setSearchPage((prev) =>
+                                  Math.min(searchTotalPages - 1, prev + 5),
+                                )
+                              }
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg group"
+                              title="Jump forward 5 pages"
+                              aria-label="Jump forward 5 pages"
+                            >
+                              <MoreHorizontal className="h-4 w-4 group-hover:hidden" />
+                              <ChevronsRight className="h-4 w-4 hidden group-hover:block text-purple-600" />
+                            </Button>
+                          );
+                        }
+
+                        return null;
+                      })}
+                    </div>
+
+                    {/* Next Page */}
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={searchPage >= searchTotalPages - 1}
-                      onClick={() => setSearchPage((prev) => prev + 1)}
-                      className="h-8 text-xs"
+                      disabled={
+                        searchPage >= searchTotalPages - 1 ||
+                        isLoadingSearchStock
+                      }
+                      onClick={() =>
+                        setSearchPage((prev) =>
+                          Math.min(searchTotalPages - 1, prev + 1),
+                        )
+                      }
+                      className="h-8 px-2.5 text-xs font-medium rounded-lg gap-1 border-slate-200 dark:border-slate-800 text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+                      title={t("common.next", "Next Page")}
+                      aria-label="Next Page"
                     >
-                      Next
+                      <span className="hidden sm:inline">
+                        {t("common.next", "Next")}
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+
+                    {/* Last Page */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        searchPage >= searchTotalPages - 1 ||
+                        isLoadingSearchStock
+                      }
+                      onClick={() => setSearchPage(searchTotalPages - 1)}
+                      className="h-8 px-2.5 text-xs font-medium rounded-lg gap-1 border-slate-200 dark:border-slate-800 text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+                      title={t("common.last", "Last Page")}
+                      aria-label="Last Page"
+                    >
+                      <span className="hidden xl:inline">
+                        {t("common.last", "Last")}
+                      </span>
+                      <ChevronsRight className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>

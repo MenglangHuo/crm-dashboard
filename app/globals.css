@@ -341,3 +341,45 @@
     transform: none;
   }
 }
+
+/* Sortable grid cards & drag handles */
+.sortable-card {
+  container-type: inline-size;
+  scroll-margin: 1rem;
+}
+
+.sortable-card:has(> .sortable-card-inner .sortable-drag-handle:focus-visible),
+.sortable-card:has(.sortable-drag-handle:focus-visible) {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.sortable-drag-handle {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.sortable-drag-handle:active,
+.sortable-drag-handle[aria-pressed="true"] {
+  cursor: grabbing;
+}
+
+html.is-dragging-sortable,
+html.is-dragging-sortable * {
+  cursor: grabbing !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sortable-card,
+  .sortable-card *,
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

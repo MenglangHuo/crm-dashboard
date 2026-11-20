@@ -91,7 +91,10 @@ export function UserDetailCell({
 				</Avatar>
 			)}
 			<div className="flex flex-col min-w-0">
-				<span className="font-semibold text-foreground text-sm tracking-tight truncate leading-tight group-hover:text-primary transition-colors">
+				<span
+					className="font-semibold text-foreground text-sm tracking-tight truncate leading-tight group-hover:text-primary transition-colors"
+					title={name}
+				>
 					{name}
 				</span>
 				{subtitle && (
