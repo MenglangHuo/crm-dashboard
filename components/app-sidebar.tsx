@@ -220,8 +220,13 @@ function SidebarCollapsibleGroup({
 				</SidebarMenuButton>
 
 				{/* Tree Structure Submenu */}
-				<CollapsibleContent className="pt-1 pb-1">
-					<div className="ml-5.5 pl-3.5 border-l border-slate-200 dark:border-slate-800 my-1.5 space-y-1.5 relative">
+				<CollapsibleContent className="pb-1">
+					<div className="ml-5.5 pl-4 pt-2 space-y-1.5 relative">
+						{/* Vertical trunk line from parent bottom to last submenu node */}
+						<span
+							aria-hidden="true"
+							className="pointer-events-none absolute left-0 top-0 bottom-4.5 w-[1.5px] bg-slate-300 dark:bg-slate-700"
+						/>
 						{item.subItems?.map((subItem) => {
 							const isSubActive =
 								pathname === subItem.url ||
@@ -230,12 +235,22 @@ function SidebarCollapsibleGroup({
 
 							return (
 								<div key={subItem.title} className="relative flex items-center">
+									{/* Tree Branch Node Circle */}
+									<span
+										aria-hidden="true"
+										className={`pointer-events-none absolute -left-[15.25px] top-1/2 -translate-x-1/2 -translate-y-1/2 size-2 rounded-full border-[1.5px] bg-sidebar z-10 transition-colors ${
+											isSubActive
+												? "border-primary"
+												: "border-slate-300 dark:border-slate-600"
+										}`}
+									/>
 									{/* Tree Branch Horizontal Line Connector */}
 									<span
-										className={`absolute -left-[15px] top-1/2 -translate-y-1/2 transition-all ${
+										aria-hidden="true"
+										className={`pointer-events-none absolute -left-3 top-1/2 -translate-y-1/2 w-3 h-[1.5px] transition-colors ${
 											isSubActive
-												? "w-4 h-[2px] bg-primary"
-												: "w-3 h-[1px] bg-slate-300 dark:bg-slate-700"
+												? "bg-primary"
+												: "bg-slate-300 dark:bg-slate-700"
 										}`}
 									/>
 
