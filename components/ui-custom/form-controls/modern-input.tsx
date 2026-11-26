@@ -107,9 +107,15 @@ export const ModernInput = React.forwardRef<HTMLInputElement, ModernInputProps>(
 
 		// Size variants mapping
 		const sizeStyles = {
-			sm: "h-9 text-xs px-3 py-1.5",
-			md: "h-11 text-sm px-4 py-2.5",
-			lg: "h-12 text-base px-4 py-3",
+			sm: "h-full text-xs px-3 py-1",
+			md: "h-full text-sm px-4 py-2",
+			lg: "h-full text-base px-4 py-2.5",
+		};
+
+		const wrapperSizeStyles = {
+			sm: "h-9",
+			md: "h-11",
+			lg: "h-12",
 		};
 
 		const iconSizeStyles = {
@@ -180,6 +186,7 @@ export const ModernInput = React.forwardRef<HTMLInputElement, ModernInputProps>(
 				<div
 					className={cn(
 						"group relative flex w-full items-center rounded-xl border transition-all duration-200 shadow-2xs overflow-hidden",
+						!isFloating && !isInset && wrapperSizeStyles[inputSize],
 						variantStyles[variant],
 						disabled && "pointer-events-none opacity-50 bg-muted/50",
 						error &&

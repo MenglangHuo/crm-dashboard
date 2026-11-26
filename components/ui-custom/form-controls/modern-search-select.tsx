@@ -88,7 +88,8 @@ export function ModernSearchSelect({
 	const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
 	const [popoverCoords, setPopoverCoords] = useState<{
-		top: number;
+		top?: number;
+		bottom?: number;
 		left: number;
 		width: number;
 	} | null>(null);
@@ -99,12 +100,11 @@ export function ModernSearchSelect({
 		const rect = el.getBoundingClientRect();
 		const dropdownHeight = 300;
 		const spaceBelow = window.innerHeight - rect.bottom;
-		let top = rect.bottom + 4;
-		if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
-			top = Math.max(10, rect.top - dropdownHeight - 4);
-		}
+		const openAbove = spaceBelow < dropdownHeight && rect.top > spaceBelow;
 		return {
-			top,
+			...(openAbove
+				? { bottom: window.innerHeight - rect.top + 4 }
+				: { top: rect.bottom + 4 }),
 			left: rect.left,
 			width: Math.max(rect.width, 240),
 		};
@@ -504,7 +504,12 @@ export function ModernSearchSelect({
 							portal && popoverCoords
 								? {
 										position: "fixed",
-										top: `${popoverCoords.top}px`,
+										...(popoverCoords.top !== undefined
+											? { top: `${popoverCoords.top}px` }
+											: {}),
+										...(popoverCoords.bottom !== undefined
+											? { bottom: `${popoverCoords.bottom}px` }
+											: {}),
 										left: `${popoverCoords.left}px`,
 										width: `${popoverCoords.width}px`,
 										zIndex: 99999,

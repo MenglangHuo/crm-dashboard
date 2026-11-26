@@ -80,7 +80,8 @@ export function ModernSelect({
 	const popoverRef = React.useRef<HTMLDivElement>(null);
 
 	const [popoverCoords, setPopoverCoords] = React.useState<{
-		top: number;
+		top?: number;
+		bottom?: number;
 		left: number;
 		width: number;
 	} | null>(null);
@@ -88,18 +89,17 @@ export function ModernSelect({
 	const calculatePopoverCoords = React.useCallback(() => {
 		if (!triggerRef.current) return null;
 		const rect = triggerRef.current.getBoundingClientRect();
-		const dropdownHeight = 280;
+		const estimatedHeight = Math.min(280, Math.max(options.length * 42 + 24, 120));
 		const spaceBelow = window.innerHeight - rect.bottom;
-		let top = rect.bottom + 4;
-		if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
-			top = Math.max(10, rect.top - dropdownHeight - 4);
-		}
+		const openAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
 		return {
-			top,
+			...(openAbove
+				? { bottom: window.innerHeight - rect.top + 4 }
+				: { top: rect.bottom + 4 }),
 			left: rect.left,
 			width: Math.max(rect.width, 220),
 		};
-	}, []);
+	}, [options.length]);
 
 	const updatePopoverCoords = React.useCallback(() => {
 		const coords = calculatePopoverCoords();
@@ -395,7 +395,12 @@ export function ModernSelect({
 								portal && popoverCoords
 									? {
 											position: "fixed",
-											top: `${popoverCoords.top}px`,
+											...(popoverCoords.top !== undefined
+												? { top: `${popoverCoords.top}px` }
+												: {}),
+											...(popoverCoords.bottom !== undefined
+												? { bottom: `${popoverCoords.bottom}px` }
+												: {}),
 											left: `${popoverCoords.left}px`,
 											width: `${popoverCoords.width}px`,
 											zIndex: 99999,
