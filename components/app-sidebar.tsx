@@ -73,16 +73,14 @@ import { useTranslation } from "@/lib/i18n/context";
 
 function SidebarLogo() {
 	return (
-		<div className="flex size-9 shrink-0 items-center justify-center rounded-xl overflow-hidden shadow-sm shadow-primary/20 ring-2 ring-primary/20 bg-slate-100 dark:bg-slate-900 transition-colors">
+		<div className="flex size-9 shrink-0 items-center justify-center rounded-xl overflow-hidden shadow-sm shadow-primary/20 ring-2 ring-primary/20 bg-[#345FAD] transition-colors">
 			<img
-				src="/images/logo-light.jpeg"
+				src="/sakda-assets/sakda-app-icon-fullbleed.svg"
 				alt="CRM Logo"
-				className="size-full object-cover dark:hidden"
-			/>
-			<img
-				src="/images/logo-dark.jpeg"
-				alt="CRM Logo"
-				className="size-full object-cover hidden dark:block"
+				className="size-full object-cover"
+				onError={(e) => {
+					(e.target as HTMLImageElement).src = "/sakda-assets/sakda-icon-128.png";
+				}}
 			/>
 		</div>
 	);

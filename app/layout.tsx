@@ -23,12 +23,26 @@ export const metadata: Metadata = {
 	icons: {
 		icon: [
 			{
-				url: "/crm-web.png",
+				url: "/sakda-assets/favicon.ico",
+				sizes: "any",
+			},
+			{
+				url: "/sakda-assets/sakda-icon-32.png",
+				sizes: "32x32",
 				type: "image/png",
 			},
+			{
+				url: "/sakda-assets/sakda-icon-192.png",
+				sizes: "192x192",
+				type: "image/png",
+			},
+			{
+				url: "/sakda-assets/sakda-app-icon-fullbleed.svg",
+				type: "image/svg+xml",
+			},
 		],
-		shortcut: "/crm-web.png",
-		apple: "/crm-web.png",
+		shortcut: "/sakda-assets/favicon.ico",
+		apple: "/sakda-assets/sakda-fullbleed-180.png",
 	},
 };
 
