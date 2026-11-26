@@ -7,7 +7,6 @@ import {
 	Check,
 	X,
 	SlidersHorizontal,
-	Tag,
 	CheckSquare,
 } from "lucide-react";
 
@@ -439,6 +438,35 @@ export function DynamicFilterModal({
 		return Object.values(draftFilters).filter(isValidFilter).length;
 	}, [draftFilters]);
 
+	const formatOperatorBadge = (op?: string) => {
+		switch (op) {
+			case "EQ":
+			case "EQUAL":
+				return "Equals";
+			case "NE":
+			case "NOT_EQUAL":
+				return "Not Equal";
+			case "BETWEEN":
+				return "Range";
+			case "GREATER_THAN_OR_EQUAL":
+				return "≥ Min";
+			case "GREATER_THAN":
+				return "> Greater";
+			case "LESS_THAN_OR_EQUAL":
+				return "≤ Max";
+			case "LESS_THAN":
+				return "< Less";
+			case "LIKE":
+				return "Contains";
+			case "IN":
+				return "In";
+			case "NOT_IN":
+				return "Not In";
+			default:
+				return op || "Equals";
+		}
+	};
+
 	return (
 		<ModernModal
 			isOpen={open}
@@ -446,22 +474,22 @@ export function DynamicFilterModal({
 			title={
 				<div className="flex items-center gap-2.5">
 					<div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground">
-						<SlidersHorizontal className="h-5 w-5" />
+						<SlidersHorizontal className="h-4 w-4" />
 					</div>
 					<div>
-						<h3 className="font-extrabold text-sm text-foreground">
+						<h3 className="font-bold text-sm text-foreground">
 							{domainTitle}
 						</h3>
 						<p className="text-[11px] text-muted-foreground">
-							Dynamic domain filter builder & payload generator
+							Select criteria below and apply to refine results
 						</p>
 					</div>
 				</div>
 			}
 			size="xl"
-			defaultHeight={760}
-			minHeight={600}
-			className="h-[88vh] max-h-[840px] min-h-[640px]"
+			defaultHeight={540}
+			minHeight={400}
+			className="max-h-[85vh]"
 			footerClassName="relative z-10"
 			footer={
 				<ModernModalFooter>
@@ -469,10 +497,10 @@ export function DynamicFilterModal({
 						type="button"
 						variant="outline"
 						onClick={handleResetAll}
-						className="h-10 px-4 rounded-xl text-sm font-semibold border-border hover:bg-muted cursor-pointer gap-2"
+						className="h-9 px-3.5 rounded-xl text-xs font-semibold border-border hover:bg-muted cursor-pointer gap-1.5"
 					>
-						<RotateCcw className="h-4 w-4 shrink-0" />
-						<span>Reset Filters</span>
+						<RotateCcw className="h-3.5 w-3.5 shrink-0" />
+						<span>Reset</span>
 					</Button>
 
 					<ModernModalCancelButton onClick={() => onOpenChange(false)} />
@@ -486,11 +514,11 @@ export function DynamicFilterModal({
 				</ModernModalFooter>
 			}
 		>
-			<div className="space-y-4 py-1">
+			<div className="space-y-3.5 py-1">
 				{/* Active Filter Chips Bar */}
 				{activeCount > 0 && (
-					<div className="flex flex-wrap items-center gap-2 bg-primary/5 p-3 rounded-2xl border border-primary/20">
-						<span className="text-[11px] font-bold text-primary uppercase tracking-wider flex items-center gap-1">
+					<div className="flex flex-wrap items-center gap-1.5 bg-primary/5 px-3 py-2.5 rounded-xl border border-primary/20">
+						<span className="text-[11px] font-semibold text-primary flex items-center gap-1 mr-1">
 							<Filter className="h-3 w-3" /> Active ({activeCount}):
 						</span>
 						{Object.values(draftFilters).map((f) => {
@@ -525,16 +553,16 @@ export function DynamicFilterModal({
 								<Badge
 									key={f.field}
 									variant="secondary"
-									className="text-xs font-semibold gap-1.5 px-3 py-1 bg-background border border-primary/30 text-foreground rounded-xl shadow-2xs"
+									className="text-xs font-medium gap-1.5 px-2.5 py-0.5 bg-background border border-primary/25 text-foreground rounded-lg shadow-2xs"
 								>
 									<span className="text-muted-foreground font-normal">
 										{label}:
 									</span>
-									<span className="font-bold text-primary">{displayVal}</span>
+									<span className="font-semibold text-primary">{displayVal}</span>
 									<button
 										type="button"
 										onClick={() => clearField(f.field)}
-										className="ml-1 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+										className="ml-0.5 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
 									>
 										<X className="h-3 w-3" />
 									</button>
@@ -545,9 +573,10 @@ export function DynamicFilterModal({
 				)}
 
 				{/* Dynamic Fields Grid */}
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-28">
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-2">
 					{fields.map((fieldDef) => {
 						const criterion = getFieldCriterion(fieldDef);
+						const isActive = isValidFilter(criterion);
 						const isStatus = isStatusField(fieldDef);
 						const asyncEntity = resolveAsyncEntity(fieldDef);
 						const isCategoryField =
@@ -556,47 +585,49 @@ export function DynamicFilterModal({
 							(fieldDef.type as string) === "category-tree";
 						const isSearchSelect =
 							fieldDef.type === "search-select" || !!asyncEntity;
+						const displayedOp = isStatus || fieldDef.lockOperator
+							? fieldDef.defaultOperator || "EQUAL"
+							: criterion.operator;
 
 						return (
 							<div
 								key={fieldDef.field}
-								className="bg-card p-4 rounded-2xl border border-border/80 space-y-2.5 shadow-2xs transition-all hover:border-primary/40 hover:shadow-xs"
+								className={cn(
+									"p-3.5 rounded-xl border space-y-2 transition-colors",
+									isActive
+										? "bg-primary/[0.02] border-primary/40"
+										: "bg-card/80 border-border/70 hover:border-border",
+								)}
 							>
 								{/* Field Header */}
-								<div className="flex items-center justify-between">
-									<label className="text-xs font-bold text-foreground flex items-center gap-1.5">
-										{fieldDef.icon || (
-											<Tag className="h-3.5 w-3.5 text-primary" />
-										)}
+								<div className="flex items-center justify-between gap-2">
+									<label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+										{fieldDef.icon}
 										<span>{fieldDef.label}</span>
 									</label>
-									<Badge
-										variant="outline"
+									<span
 										className={cn(
-											"text-[9px] font-mono uppercase font-bold rounded-md px-1.5 py-0.5",
-											isStatus || fieldDef.lockOperator
-												? "bg-primary/10 text-primary border-primary/20"
-												: "text-muted-foreground",
+											"text-[10px] font-medium px-2 py-0.5 rounded-md",
+											isActive
+												? "bg-primary/10 text-primary"
+												: "bg-muted/70 text-muted-foreground",
 										)}
 									>
-										{isStatus
-											? fieldDef.defaultOperator || "EQUAL"
-											: fieldDef.lockOperator
-												? fieldDef.defaultOperator || "EQUAL"
-												: criterion.operator}
-									</Badge>
+										{formatOperatorBadge(displayedOp)}
+									</span>
 								</div>
 
 								{/* Field Controls by Type */}
 
-								{/* 1. STATUS FIELD (Locked operator 'EQ', full-width ModernSelect) */}
+								{/* 1. STATUS FIELD (Locked operator, full-width ModernSelect) */}
 								{isStatus && !isSearchSelect && (
 									<div className="w-full">
 										<ModernSelect
 											selectSize="sm"
 											portal={true}
 											placeholder={
-												fieldDef.placeholder || `All ${fieldDef.label}s`
+												fieldDef.placeholder ||
+												`Select ${fieldDef.label.toLowerCase()}...`
 											}
 											clearable={true}
 											searchable={
@@ -627,7 +658,6 @@ export function DynamicFilterModal({
 												fieldDef.options?.map((opt) => ({
 													label: opt.label,
 													value: String(opt.value),
-													badge: opt.badgeColor ? opt.label : undefined,
 												})) || []
 											}
 										/>
@@ -766,7 +796,8 @@ export function DynamicFilterModal({
 														selectSize="sm"
 														portal={true}
 														placeholder={
-															fieldDef.placeholder || `All ${fieldDef.label}s`
+															fieldDef.placeholder ||
+															`Select ${fieldDef.label.toLowerCase()}...`
 														}
 														clearable={true}
 														searchable={
@@ -1071,6 +1102,7 @@ export function DynamicFilterModal({
 										<div className="w-32 shrink-0">
 											<ModernSelect
 												selectSize="sm"
+												portal={true}
 												value={criterion.operator || "GREATER_THAN"}
 												onChange={(op) => {
 													const opVal = op as FilterOperator;
@@ -1098,34 +1130,35 @@ export function DynamicFilterModal({
 
 										{criterion.operator !== "IS_NULL" &&
 											criterion.operator !== "IS_NOT_NULL" && (
-												<ModernInput
-													type="number"
-													placeholder={fieldDef.placeholder || "e.g. 10"}
-													value={
-														criterion.value !== undefined &&
-														criterion.value !== null
-															? criterion.value
-															: ""
-													}
-													onChange={(e) => {
-														const rawVal = e.target.value;
-														if (rawVal === "" || rawVal === undefined) {
-															clearField(fieldDef.field);
-														} else {
-															updateFieldCriterion(fieldDef.field, {
-																field: fieldDef.field,
-																operator:
-																	criterion.operator ||
-																	fieldDef.defaultOperator ||
-																	"GREATER_THAN",
-																value: Number(rawVal),
-															});
+												<div className="flex-1 min-w-0">
+													<ModernInput
+														type="number"
+														placeholder={fieldDef.placeholder || "e.g. 10"}
+														value={
+															criterion.value !== undefined &&
+															criterion.value !== null
+																? criterion.value
+																: ""
 														}
-													}}
-													clearable={true}
-													inputSize="sm"
-													className="flex-1"
-												/>
+														onChange={(e) => {
+															const rawVal = e.target.value;
+															if (rawVal === "" || rawVal === undefined) {
+																clearField(fieldDef.field);
+															} else {
+																updateFieldCriterion(fieldDef.field, {
+																	field: fieldDef.field,
+																	operator:
+																		criterion.operator ||
+																		fieldDef.defaultOperator ||
+																		"GREATER_THAN",
+																	value: Number(rawVal),
+																});
+															}
+														}}
+														clearable={true}
+														inputSize="sm"
+													/>
+												</div>
 											)}
 									</div>
 								)}

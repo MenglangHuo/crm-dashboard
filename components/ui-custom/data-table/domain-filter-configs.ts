@@ -59,6 +59,8 @@ export const PRODUCT_DOMAIN_FILTERS: DomainFilterField[] = [
 		type: "select",
 		isStatus: true,
 		defaultOperator: "EQUAL",
+		lockOperator: true,
+		placeholder: "Select availability status...",
 		options: [
 			{
 				label: "In Stock",
@@ -123,6 +125,8 @@ export const STOCK_DOMAIN_FILTERS: DomainFilterField[] = [
 		type: "select",
 		isStatus: true,
 		defaultOperator: "EQUAL",
+		lockOperator: true,
+		placeholder: "Select availability status...",
 		options: [
 			{
 				label: "In Stock",
