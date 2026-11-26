@@ -1133,9 +1133,9 @@ export function StockProductDetailModal({
 				minWidth: 90,
 				cell: ({ row }: { row: any }) => {
 					const isActive =
-						row.status === "Active" ||
-						row.status === "AVAILABLE" ||
-						row.isActive !== false;
+						row.status !== undefined && row.status !== null && row.status !== ""
+							? String(row.status).toLowerCase() === "active" || String(row.status).toUpperCase() === "AVAILABLE"
+							: row.isActive !== false;
 					return (
 						<Badge
 							className={

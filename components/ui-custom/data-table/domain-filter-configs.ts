@@ -18,6 +18,27 @@ export const PRODUCT_DOMAIN_FILTERS: DomainFilterField[] = [
 		placeholder: "Select brand...",
 	},
 	{
+		field: "status",
+		label: "Product Status",
+		type: "select",
+		isStatus: true,
+		defaultOperator: "EQ",
+		lockOperator: true,
+		placeholder: "Filter by status...",
+		options: [
+			{
+				label: "Active",
+				value: "Active",
+				badgeColor: "bg-emerald-500/10 text-emerald-600",
+			},
+			{
+				label: "Inactive",
+				value: "Inactive",
+				badgeColor: "bg-rose-500/10 text-rose-600",
+			},
+		],
+	},
+	{
 		field: "price",
 		label: "Retail Price ($)",
 		type: "number-range",
@@ -74,6 +95,27 @@ export const STOCK_DOMAIN_FILTERS: DomainFilterField[] = [
 		asyncEntity: "brand",
 		defaultOperator: "EQUAL",
 		placeholder: "Select brand...",
+	},
+	{
+		field: "status",
+		label: "Product Status",
+		type: "select",
+		isStatus: true,
+		defaultOperator: "EQ",
+		lockOperator: true,
+		placeholder: "Filter by status...",
+		options: [
+			{
+				label: "Active",
+				value: "Active",
+				badgeColor: "bg-emerald-500/10 text-emerald-600",
+			},
+			{
+				label: "Inactive",
+				value: "Inactive",
+				badgeColor: "bg-rose-500/10 text-rose-600",
+			},
+		],
 	},
 	{
 		field: "stockStatus",

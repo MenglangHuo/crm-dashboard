@@ -360,10 +360,15 @@ export function DynamicFilterModal({
 	// Get or initialize criterion for field
 	const getFieldCriterion = (fieldDef: DomainFilterField): FilterCriterion => {
 		const isStatus = isStatusField(fieldDef);
+		const targetStatusOp = fieldDef.defaultOperator || "EQUAL";
 		const existing = draftFilters[fieldDef.field];
 		if (existing) {
-			if (isStatus && existing.operator !== "EQUAL") {
-				return { ...existing, operator: "EQUAL" };
+			if (
+				isStatus &&
+				fieldDef.lockOperator &&
+				existing.operator !== targetStatusOp
+			) {
+				return { ...existing, operator: targetStatusOp };
 			}
 			if (
 				fieldDef.lockOperator &&
@@ -376,7 +381,7 @@ export function DynamicFilterModal({
 		}
 		return {
 			field: fieldDef.field,
-			operator: isStatus ? "EQUAL" : fieldDef.defaultOperator || "EQUAL",
+			operator: isStatus ? targetStatusOp : fieldDef.defaultOperator || "EQUAL",
 		};
 	};
 
@@ -575,7 +580,7 @@ export function DynamicFilterModal({
 										)}
 									>
 										{isStatus
-											? "EQUAL"
+											? fieldDef.defaultOperator || "EQUAL"
 											: fieldDef.lockOperator
 												? fieldDef.defaultOperator || "EQUAL"
 												: criterion.operator}
@@ -613,7 +618,7 @@ export function DynamicFilterModal({
 													const finalVal = matchedOpt ? matchedOpt.value : val;
 													updateFieldCriterion(fieldDef.field, {
 														field: fieldDef.field,
-														operator: "EQUAL",
+														operator: fieldDef.defaultOperator || "EQUAL",
 														value: finalVal,
 													});
 												}
@@ -661,7 +666,7 @@ export function DynamicFilterModal({
 													updateFieldCriterion(fieldDef.field, {
 														field: fieldDef.field,
 														operator: isStatus
-															? "EQUAL"
+															? fieldDef.defaultOperator || "EQUAL"
 															: criterion.operator ||
 																fieldDef.defaultOperator ||
 																"EQUAL",
@@ -715,7 +720,7 @@ export function DynamicFilterModal({
 													updateFieldCriterion(fieldDef.field, {
 														field: fieldDef.field,
 														operator: isStatus
-															? "EQUAL"
+															? fieldDef.defaultOperator || "EQUAL"
 															: criterion.operator ||
 																fieldDef.defaultOperator ||
 																"EQUAL",

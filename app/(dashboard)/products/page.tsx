@@ -31,6 +31,7 @@ import {
 	brandsApi,
 	categoriesApi,
 	fileUrl,
+	mapProductFromBackend,
 	priceHistoryApi,
 	productsApi,
 	safeImageUrl,
@@ -528,6 +529,7 @@ function ProductsTab() {
 		onSuccess: () => {
 			toast.success("Product restored and reactivated!");
 			queryClient.invalidateQueries({ queryKey: ["products"] });
+			queryClient.invalidateQueries({ queryKey: ["products-search"] });
 		},
 		onError: (err) => toast.error(getErrorMessage(err)),
 	});
@@ -732,22 +734,30 @@ function ProductsTab() {
 						res.items ||
 						(Array.isArray(res) ? res : []);
 					return {
-						items: items.map((item: any) => ({
-							...item,
-							id: item.id,
-							name: item.name,
-							categoryName: item.categoryName,
-							brandName: item.brandName,
-							sellPrice: getProductBasePrice(item),
-							basePrice: getProductBaseCost(item),
-							status: item.status || "AVAILABLE",
-							isActive: item.isActive !== false,
-							imageUrl: item.imageUrl,
-							variants: item.variants || [],
-							baseSku: item.baseSku || item.sku || item.variants?.[0]?.sku || "",
-							baseBarcode: item.baseBarcode || item.barcode || item.variants?.[0]?.barcode || "",
-							units: item.units || [],
-						})),
+						items: items.map((item: any) => {
+							const mapped = mapProductFromBackend(item);
+							const isItemActive =
+								item.status !== undefined && item.status !== null && item.status !== ""
+									? String(item.status).toLowerCase() === "active" || String(item.status).toUpperCase() === "AVAILABLE"
+									: item.isActive !== false;
+							return {
+								...mapped,
+								...item,
+								id: item.id,
+								name: item.name,
+								categoryName: item.categoryName,
+								brandName: item.brandName,
+								sellPrice: getProductBasePrice(item),
+								basePrice: getProductBaseCost(item),
+								status: item.status || (isItemActive ? "Active" : "Inactive"),
+								isActive: isItemActive,
+								imageUrl: item.imageUrl,
+								variants: item.variants || [],
+								baseSku: item.baseSku || item.sku || item.variants?.[0]?.sku || "",
+								baseBarcode: item.baseBarcode || item.barcode || item.variants?.[0]?.barcode || "",
+								units: item.units || [],
+							};
+						}),
 						total: (res as any).totalElements || res.total || items.length,
 						totalPages: res.totalPages || 1,
 					};
@@ -1387,6 +1397,11 @@ function ProductsTab() {
 						.filter(Boolean)
 				: [];
 
+		const isFullActive =
+			full.status !== undefined && full.status !== null && full.status !== ""
+				? String(full.status).toLowerCase() === "active" || String(full.status).toUpperCase() === "AVAILABLE"
+				: full.isActive !== false;
+
 		form.reset({
 			name: full.name || "",
 			brandId: resolvedBrandId,
@@ -1410,8 +1425,8 @@ function ProductsTab() {
 			tags: tagsList,
 			featured: full.featured || "NORMAL",
 			isSamePrice: false,
-			status: full.status || "AVAILABLE",
-			isActive: full.isActive !== false,
+			status: full.status || (isFullActive ? "Active" : "Inactive"),
+			isActive: isFullActive,
 			notes: full.notes || "",
 		});
 
@@ -2164,18 +2179,24 @@ function ProductsTab() {
 			width: "55px",
 			minWidth: 50,
 			maxWidth: 65,
-			cell: ({ row }: { row: any }) => (
-				<Switch
-					checked={row.isActive !== false}
-					onCheckedChange={(checked) => {
-						if (checked) {
-							restoreMutation.mutate(row.id);
-						} else {
-							deleteMutation.mutate(row.id);
-						}
-					}}
-				/>
-			),
+			cell: ({ row }: { row: any }) => {
+				const isRowActive =
+					row.status !== undefined && row.status !== null && row.status !== ""
+						? String(row.status).toLowerCase() === "active" || String(row.status).toUpperCase() === "AVAILABLE"
+						: row.isActive !== false;
+				return (
+					<Switch
+						checked={isRowActive}
+						onCheckedChange={(checked) => {
+							if (checked) {
+								restoreMutation.mutate(row.id);
+							} else {
+								deleteMutation.mutate(row.id);
+							}
+						}}
+					/>
+				);
+			},
 		},
 	];
 
@@ -3773,7 +3794,11 @@ function ProductsTab() {
 							height="h-11"
 							width="min-w-[110px]"
 						/>
-						{selectedProductDetails && !selectedProductDetails.isActive && (
+						{selectedProductDetails && !(
+							selectedProductDetails.status !== undefined && selectedProductDetails.status !== null && selectedProductDetails.status !== ""
+								? String(selectedProductDetails.status).toLowerCase() === "active" || String(selectedProductDetails.status).toUpperCase() === "AVAILABLE"
+								: selectedProductDetails.isActive !== false
+						) && (
 							<Button
 								type="button"
 								variant="outline"
@@ -3901,15 +3926,18 @@ function ProductsTab() {
 											)}
 											<Badge
 												className={
-													(fullProduct?.status ||
-														selectedProductDetails.status) === "Active" ||
-													selectedProductDetails.isActive
+													(fullProduct?.status
+														? String(fullProduct.status).toLowerCase() === "active" || String(fullProduct.status).toUpperCase() === "AVAILABLE"
+														: selectedProductDetails.status
+															? String(selectedProductDetails.status).toLowerCase() === "active" || String(selectedProductDetails.status).toUpperCase() === "AVAILABLE"
+															: selectedProductDetails.isActive !== false)
 														? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
 														: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300"
 												}
 											>
 												{fullProduct?.status ||
-													(selectedProductDetails.isActive
+													selectedProductDetails.status ||
+													(selectedProductDetails.isActive !== false
 														? t("common.active")
 														: t("common.inactive"))}
 											</Badge>
