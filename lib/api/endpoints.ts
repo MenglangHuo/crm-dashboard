@@ -2853,8 +2853,15 @@ export function mapProductFromBackend(raw: any): Product {
 		firstVariant?.baseBarcode ||
 		"";
 
+	const isProductActive =
+		p.status !== undefined && p.status !== null && p.status !== ""
+			? String(p.status).toLowerCase() === "active" || String(p.status).toUpperCase() === "AVAILABLE"
+			: p.isActive !== false;
+
 	return {
 		...p,
+		status: p.status || (isProductActive ? "Active" : "Inactive"),
+		isActive: isProductActive,
 		variants: mappedVariants,
 		baseSku: baseSku || p.baseSku || "",
 		baseBarcode: baseBarcode || p.baseBarcode || "",
