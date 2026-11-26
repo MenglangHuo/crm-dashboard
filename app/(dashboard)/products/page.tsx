@@ -391,6 +391,7 @@ function ProductsTab() {
 
 	// Forms states for variant additions
 	const [newVarName, setNewVarName] = useState("");
+	const [newVarIsDefault, setNewVarIsDefault] = useState(false);
 	const [newVarSku, setNewVarSku] = useState("");
 	const [newVarBarcode, setNewVarBarcode] = useState("");
 	const [_newVarPrice, setNewVarPrice] = useState("0");
@@ -1561,6 +1562,7 @@ function ProductsTab() {
 						sku: v.sku,
 						barcode: v.barcode || v.sku,
 						name: v.name || Object.values(v.attributes).join(" "),
+						isDefault: Boolean(v.isDefault) || undefined,
 					})),
 					discountNote: values.discountNote || undefined,
 				};
@@ -1630,6 +1632,7 @@ function ProductsTab() {
 	const resetAddVariantForm = () => {
 		setAddVarTab("general");
 		setNewVarName("");
+		setNewVarIsDefault(false);
 		setNewVarSku("");
 		setNewVarBarcode("");
 		setNewVarPrice("0");
@@ -1761,6 +1764,7 @@ function ProductsTab() {
 			price: 0,
 			stockQty: 0,
 			unitId: Number(resolvedUnitId),
+			isDefault: newVarIsDefault || undefined,
 			unitPrices: customUnitPricesPayload,
 		});
 	};
@@ -1880,6 +1884,7 @@ function ProductsTab() {
 			price: 0,
 			stockQty: 0,
 			unitId: Number(resolvedUnitId),
+			isDefault: selectedVariant.isDefault ? true : undefined,
 			unitPrices: customUnitPricesPayload,
 		});
 	};
@@ -3491,6 +3496,9 @@ function ProductsTab() {
 																	<TableHead>
 																		{t("products.retailSellPrice")}
 																	</TableHead>
+																	<TableHead className="text-center">
+																		Default
+																	</TableHead>
 																	<TableHead className="text-right">
 																		{t("common.actions")}
 																	</TableHead>
@@ -3579,6 +3587,24 @@ function ProductsTab() {
 																						setPreviewedVariants(copy);
 																					}}
 																					className="h-7 text-[11px] rounded w-20"
+																				/>
+																			</TableCell>
+																			<TableCell className="text-center">
+																				<input
+																					type="radio"
+																					name="defaultPreviewVariant"
+																					disabled={isExcluded}
+																					checked={Boolean(item.isDefault)}
+																					onChange={() => {
+																						setPreviewedVariants(
+																							previewedVariants.map((r) => ({
+																								...r,
+																								isDefault: r.id === item.id,
+																							})),
+																						);
+																					}}
+																					className="h-3.5 w-3.5 accent-amber-500 cursor-pointer disabled:cursor-not-allowed"
+																					title="Set as default variant"
 																				/>
 																			</TableCell>
 																			<TableCell className="text-right">
@@ -5165,6 +5191,22 @@ function ProductsTab() {
 										}
 									/>
 								</div>
+
+								{/* Default Variant Toggle */}
+								<div className="flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-slate-800/60">
+									<div>
+										<p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+											Set as Default Variant
+										</p>
+										<p className="text-[11px] text-slate-500 dark:text-slate-400">
+											Used as the canonical variant for product price sorting and discovery
+										</p>
+									</div>
+									<Switch
+										checked={newVarIsDefault}
+										onCheckedChange={setNewVarIsDefault}
+									/>
+								</div>
 							</div>
 
 							{/* CARD 2: PACKAGING UNIT PRICING SECTION (ALWAYS CUSTOM PRICE PER UNIT) */}
@@ -5886,6 +5928,27 @@ function ProductsTab() {
 												>
 													<Sparkles className="h-3.5 w-3.5" />
 												</button>
+											}
+										/>
+									</div>
+
+									{/* Default Variant Toggle */}
+									<div className="flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-slate-800/60">
+										<div>
+											<p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+												Set as Default Variant
+											</p>
+											<p className="text-[11px] text-slate-500 dark:text-slate-400">
+												Used as the canonical variant for product price sorting and discovery
+											</p>
+										</div>
+										<Switch
+											checked={Boolean(selectedVariant.isDefault)}
+											onCheckedChange={(checked) =>
+												setSelectedVariant({
+													...selectedVariant,
+													isDefault: checked,
+												})
 											}
 										/>
 									</div>
@@ -8631,9 +8694,10 @@ function getProductBaseUnit(
 		if (baseUnit) return baseUnit;
 	}
 
-	// 4. Check first variant's units
+	// 4. Check default variant's units (fallback to first variant)
 	if (Array.isArray(product?.variants) && product.variants.length > 0) {
-		const firstVar = product.variants[0];
+		const firstVar =
+			product.variants.find((v: any) => v?.isDefault) || product.variants[0];
 		if (Array.isArray(firstVar?.units) && firstVar.units.length > 0) {
 			const baseUnit = firstVar.units.find(
 				(u: any) =>
@@ -8688,7 +8752,7 @@ function getProductBasePrice(
 	const baseUnit = getProductBaseUnit(product, fallbackUnits);
 	const firstVar =
 		Array.isArray(product?.variants) && product.variants.length > 0
-			? product.variants[0]
+			? product.variants.find((v: any) => v?.isDefault) || product.variants[0]
 			: null;
 	const firstVarBaseUnit = firstVar
 		? getVariantBaseUnit(firstVar, product, fallbackUnits)
@@ -9483,12 +9547,19 @@ function ProductVariantTableRow({
 						}}
 					/>
 					<div className="min-w-0 flex-1 space-y-0.5">
-						<p
-							className="font-bold text-xs text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors truncate"
-							title={v.name || v.variantName || v.sku}
-						>
-							{v.name || v.variantName || v.sku}
-						</p>
+						<div className="flex items-center gap-1.5 min-w-0">
+							<p
+								className="font-bold text-xs text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors truncate"
+								title={v.name || v.variantName || v.sku}
+							>
+								{v.name || v.variantName || v.sku}
+							</p>
+							{v.isDefault && (
+								<span className="shrink-0 inline-flex items-center px-1.5 py-0 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-300/60 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60">
+									Default
+								</span>
+							)}
+						</div>
 						<div className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground flex-wrap">
 							<span>{v.sku || "—"}</span>
 					

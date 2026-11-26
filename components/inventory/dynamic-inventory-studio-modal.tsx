@@ -624,7 +624,9 @@ export function DynamicInventoryStudioModal({
 					String(v.id) === String(variantIdStr) ||
 					String(v.variantId) === String(variantIdStr) ||
 					String(v._id) === String(variantIdStr),
-			) || variants[0];
+			) ||
+			variants.find((v: any) => v?.isDefault) ||
+			variants[0];
 
 		// 1. Get Variant Base Price (for 1 base unit of this specific variant)
 		let variantBasePrice = 0;
@@ -1042,7 +1044,8 @@ export function DynamicInventoryStudioModal({
 	const handleProductCardClick = (product: Product) => {
 		const variants =
 			product.variants && product.variants.length > 0 ? product.variants : [];
-		const firstVariant = variants[0];
+		const firstVariant =
+			variants.find((v: any) => v?.isDefault) || variants[0];
 		const defaultVariantId = firstVariant
 			? String(firstVariant.id)
 			: String(product.id);
@@ -1133,6 +1136,7 @@ export function DynamicInventoryStudioModal({
 		const variants = targetProduct.variants || [];
 		const selectedVariant =
 			variants.find((v: any) => String(v.id) === String(configVariantId)) ||
+			variants.find((v: any) => v?.isDefault) ||
 			variants[0];
 		const selectedUnit = effectiveConfigUnits.find(
 			(u: any) =>

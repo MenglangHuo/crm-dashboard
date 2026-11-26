@@ -344,6 +344,7 @@ export function PosOrderStudioModal({
 			variants.find(
 				(v: any) => String(v.id || v.variantId) === String(configVariantId),
 			) ||
+			variants.find((v: any) => v?.isDefault) ||
 			variants[0] ||
 			null
 		);
@@ -493,7 +494,9 @@ export function PosOrderStudioModal({
 		const selectedVariantObj =
 			variants.find(
 				(v: any) => String(v.id || v.variantId) === String(variantIdStr),
-			) || variants[0];
+			) ||
+			variants.find((v: any) => v?.isDefault) ||
+			variants[0];
 
 		// Find matching unit object in unitsList (by unitId or id)
 		const selectedUnitObj = unitsList.find(
@@ -936,7 +939,8 @@ export function PosOrderStudioModal({
 		existingItem?: CartLineItem,
 	) => {
 		const variants = prod.variants || [];
-		const firstVariant = variants[0];
+		const firstVariant =
+			variants.find((v: any) => v?.isDefault) || variants[0];
 		const defaultVariantId = existingItem
 			? String(existingItem.variantId)
 			: firstVariant
@@ -2797,7 +2801,7 @@ export function PosOrderStudioModal({
 															: 0;
 									return {
 										value: String(v.id || v.variantId),
-										label: `${varName} — $${Number(varPrice).toFixed(2)}`,
+										label: `${varName}${v.isDefault ? " • [Default]" : ""} — $${Number(varPrice).toFixed(2)}`,
 										description: `SKU: ${v.sku || "—"} | Price: $${Number(varPrice).toFixed(2)} | Stock: ${v.stockQty ?? v.inventory?.availableQty ?? "—"}`,
 									};
 								})}

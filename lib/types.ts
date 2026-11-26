@@ -2526,6 +2526,7 @@ export interface MultiVariantItemInput {
 	sku: string;
 	barcode?: string;
 	name: string;
+	isDefault?: boolean;
 }
 
 export interface MultiVariantProductInput {
@@ -2575,6 +2576,8 @@ export interface UpdateVariantInput {
 	cost?: number;
 	stockQty?: number;
 	unitId?: number | string;
+	isActive?: boolean;
+	isDefault?: boolean;
 	unitPrices?: VariantUnitPriceConfigInput[];
 }
 
@@ -2658,6 +2661,7 @@ export interface StockVariantItem {
 	variantName: string;
 	sku: string;
 	barcode?: string;
+	isDefault?: boolean;
 	stockQty?: number;
 	imageUrl?: string | null;
 	thumbnail?: string | null;

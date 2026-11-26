@@ -3118,16 +3118,23 @@ function StockPageContent() {
                                                                   className="size-7 rounded-lg border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center transition-transform group-hover:scale-105"
                                                                 />
                                                                 <div className="min-w-0 flex-1 space-y-0.5">
-                                                                  <p
-                                                                    className="font-bold text-xs text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors truncate"
-                                                                    title={
-                                                                      v.variantName
-                                                                    }
-                                                                  >
-                                                                    {
-                                                                      v.variantName
-                                                                    }
-                                                                  </p>
+                                                                  <div className="flex items-center gap-1.5 min-w-0">
+                                                                    <p
+                                                                      className="font-bold text-xs text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors truncate"
+                                                                      title={
+                                                                        v.variantName
+                                                                      }
+                                                                    >
+                                                                      {
+                                                                        v.variantName
+                                                                      }
+                                                                    </p>
+                                                                    {v.isDefault && (
+                                                                      <span className="shrink-0 inline-flex items-center px-1.5 py-0 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-300/60 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60">
+                                                                        Default
+                                                                      </span>
+                                                                    )}
+                                                                  </div>
                                                                   <div className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground flex-wrap">
                                                                     <span>
                                                                       {v.sku || "—"}
