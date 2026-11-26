@@ -577,7 +577,7 @@ export default function RegisterCompanyPage() {
 								}}
 								className="h-12 px-8 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 gap-2 cursor-pointer"
 							>
-								<span>Launch CRM Workspace</span>
+								<span>Launch SAKDA Workspace</span>
 								<ArrowRight className="h-4 w-4" />
 							</Button>
 						</div>

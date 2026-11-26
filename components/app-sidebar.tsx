@@ -1,7 +1,6 @@
 "use client";
 
 import { clearClientSession } from "@/lib/api/client";
-import { useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowLeftRight,
 	Boxes,
@@ -76,7 +75,7 @@ function SidebarLogo() {
 		<div className="flex size-9 shrink-0 items-center justify-center rounded-xl overflow-hidden shadow-sm shadow-primary/20 ring-2 ring-primary/20 bg-[#345FAD] transition-colors">
 			<img
 				src="/sakda-assets/sakda-app-icon-fullbleed.svg"
-				alt="CRM Logo"
+				alt="SAKDA Logo"
 				className="size-full object-cover"
 				onError={(e) => {
 					(e.target as HTMLImageElement).src = "/sakda-assets/sakda-icon-128.png";
@@ -283,18 +282,14 @@ export function AppSidebar() {
 		can,
 	} = usePermissions();
 
-	const queryClient = useQueryClient();
-
 	const _handleSignOut = async () => {
 		try {
 			await authApi.signOut().catch(() => {});
-		} catch {
-			// ignore
+			await clearAuthCookies().catch(() => {});
+		} finally {
+			clearClientSession();
+			window.location.href = "/sign-in";
 		}
-		clearClientSession();
-		queryClient.clear();
-		await clearAuthCookies();
-		window.location.href = "/sign-in";
 	};
 
 	// Administrator visible ONLY when user login as ROLE_SYSTEM_ADMIN / platform system admin
@@ -448,7 +443,7 @@ export function AppSidebar() {
 							<SidebarLogo />
 							<div className="flex flex-col leading-none group-data-[collapsible=icon]:hidden">
 								<span className="font-bold text-base tracking-tight text-slate-900 dark:text-white">
-									CRM <span className="text-primary">App</span>
+									SAKDA <span className="text-primary">App</span>
 								</span>
 								<div
 									suppressHydrationWarning

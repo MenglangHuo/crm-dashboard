@@ -30,7 +30,7 @@ export function SplashScreen() {
 		<div
 			role="status"
 			aria-live="polite"
-			aria-label="Welcome to CRM Dashboard"
+			aria-label="Welcome to SAKDA Dashboard"
 			aria-busy={!isFadingOut}
 			onClick={hideSplash}
 			className={`fixed inset-0 z-[99999] flex flex-col items-center justify-between p-6 sm:p-10 select-none overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
@@ -185,7 +185,7 @@ export function SplashScreen() {
 
 							<img
 								src="/sakda-assets/sakda-app-icon-fullbleed.svg"
-								alt="CRM Logo"
+								alt="SAKDA Logo"
 								className="size-full object-cover"
 								onError={(e) => {
 									(e.target as HTMLImageElement).src = "/sakda-assets/sakda-fullbleed-512.png";
@@ -226,7 +226,7 @@ export function SplashScreen() {
 				<div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
 					<span className="text-slate-400 dark:text-slate-500">Platform</span>
 					<span className="font-semibold text-slate-700 dark:text-slate-200 tracking-tight">
-						BRONX CRM PLATFORM
+						BRONX SAKDA PLATFORM
 					</span>
 					<span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-800">
 						v{env.appVersion}

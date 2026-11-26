@@ -1,6 +1,6 @@
 export const en = {
 	common: {
-		appName: "CRM Admin Dashboard",
+		appName: "SAKDA Admin Dashboard",
 		save: "Save Changes",
 		saved: "Saved successfully",
 		saving: "Saving...",

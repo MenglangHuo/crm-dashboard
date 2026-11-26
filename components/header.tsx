@@ -22,7 +22,7 @@ import { clearClientSession } from "@/lib/api/client";
 import { authApi, fileUrl, profileApi } from "@/lib/api/endpoints";
 import { getClientAccessToken } from "@/lib/auth-permissions";
 import { useTranslation } from "@/lib/i18n/context";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { env } from "@/lib/config/env";
 import {
 	ChevronDown,
@@ -187,20 +187,13 @@ export function Header() {
 	const displayedCompanyName = isMounted ? companyName : "";
 	const displayedUserRole = isMounted ? userRole : "";
 
-	const queryClient = useQueryClient();
-
 	const handleLogout = async () => {
 		try {
 			await authApi.signOut().catch(() => {});
+			await clearAuthCookies().catch(() => {});
+		} finally {
 			clearClientSession();
-			queryClient.clear();
-			await clearAuthCookies();
 			toast.success(t("header.signedOutSuccess"));
-			window.location.href = "/sign-in";
-		} catch {
-			clearClientSession();
-			queryClient.clear();
-			await clearAuthCookies();
 			window.location.href = "/sign-in";
 		}
 	};
@@ -256,7 +249,7 @@ export function Header() {
 				>
 					<Search className="size-4 shrink-0 text-slate-400 group-hover:text-primary transition-colors" />
 					<span className="flex-1 text-left font-medium truncate">
-						{t("common.globalSearch", "Search CRM...")}
+						{t("common.globalSearch", "Search SAKDA...")}
 					</span>
 					<kbd className="inline-flex h-5 items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 font-mono text-[10px] font-semibold text-slate-500 shadow-2xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
 						<span className="text-[11px]">⌘</span>K

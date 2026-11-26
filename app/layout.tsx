@@ -18,7 +18,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-	title: "Crm App",
+	title: "SAKDA App",
 	description: "Manage your multi-tenant SaaS application",
 	icons: {
 		icon: [
