@@ -300,8 +300,8 @@ export default function SuperAdminMigrationsPage() {
           </ModernButton>
 
           <a
-            href="/sample-catalog-migration.csv"
-            download="sample-catalog-migration.csv"
+            href="/data-product/sample-product.csv"
+            download="sample-product.csv"
             className="inline-flex"
           >
             <ModernButton

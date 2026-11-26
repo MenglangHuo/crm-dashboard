@@ -174,7 +174,7 @@ export function SplashScreen() {
 						/>
 
 						{/* Tactile App Icon Container */}
-						<div className="relative flex size-24 sm:size-26 items-center justify-center rounded-[24px] sm:rounded-[26px] bg-[#F4F8FC] dark:bg-[#111624] border border-slate-200/80 dark:border-white/10 shadow-[0_16px_36px_-6px_rgba(15,23,42,0.15),0_4px_12px_-2px_rgba(15,23,42,0.06)] dark:shadow-[0_20px_48px_-8px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.08)] overflow-hidden transition-all">
+						<div className="relative flex size-24 sm:size-26 items-center justify-center rounded-[24px] sm:rounded-[26px] bg-[#345FAD] border border-white/20 shadow-[0_16px_36px_-6px_rgba(15,23,42,0.15),0_4px_12px_-2px_rgba(15,23,42,0.06)] dark:shadow-[0_20px_48px_-8px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.08)] overflow-hidden transition-all">
 							{/* Specular Curved Highlight */}
 							<div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/40 dark:from-white/10 to-transparent pointer-events-none z-10" />
 
@@ -184,19 +184,11 @@ export function SplashScreen() {
 							</div>
 
 							<img
-								src="/images/logo-light.jpeg"
+								src="/sakda-assets/sakda-app-icon-fullbleed.svg"
 								alt="CRM Logo"
-								className="size-full object-cover dark:hidden scale-115"
+								className="size-full object-cover"
 								onError={(e) => {
-									(e.target as HTMLImageElement).src = "/crm-web.png";
-								}}
-							/>
-							<img
-								src="/images/logo-dark.jpeg"
-								alt="CRM Logo"
-								className="size-full object-cover hidden dark:block scale-115"
-								onError={(e) => {
-									(e.target as HTMLImageElement).src = "/crm-web.png";
+									(e.target as HTMLImageElement).src = "/sakda-assets/sakda-fullbleed-512.png";
 								}}
 							/>
 						</div>

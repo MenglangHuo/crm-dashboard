@@ -9,6 +9,7 @@ import { Company } from "@/lib/types";
 interface CompanyContextType {
 	selectedCompanyId: string | null;
 	setSelectedCompanyId: (id: string | null) => void;
+	selectedCompany: Company | null;
 	companies: Company[];
 	isLoadingCompanies: boolean;
 	isSystemAdmin: boolean;
@@ -17,6 +18,7 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType>({
 	selectedCompanyId: null,
 	setSelectedCompanyId: () => {},
+	selectedCompany: null,
 	companies: [],
 	isLoadingCompanies: false,
 	isSystemAdmin: false,
@@ -208,17 +210,38 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 		return null;
 	});
 
+	const matchedFromList = React.useMemo(
+		() =>
+			companies.find((c) => String(c.id) === String(selectedCompanyId)) ?? null,
+		[companies, selectedCompanyId],
+	);
+
+	const { data: fetchedSelectedCompany, isError: isSelectedCompanyError } =
+		useQuery({
+			queryKey: ["company-detail", selectedCompanyId],
+			queryFn: () => companiesApi.get(selectedCompanyId!),
+			enabled:
+				isSystemAdmin &&
+				Boolean(selectedCompanyId) &&
+				!isLoadingCompanies &&
+				!matchedFromList,
+			staleTime: 5 * 60 * 1000,
+			retry: false,
+		});
+
+	const selectedCompany = matchedFromList ?? fetchedSelectedCompany ?? null;
+
 	// Auto-sync company ID based on user type
 	useEffect(() => {
 		if (isSystemAdmin) {
 			// System admin: pick stored company ID if valid, or default to first company in list
 			if (companies.length > 0) {
 				const currentStored = getStoredCompanyId();
-				const exists = companies.some(
+				const existsInInitial = companies.some(
 					(c) => String(c.id) === String(currentStored),
 				);
 
-				if (!currentStored || !exists) {
+				if (!currentStored || (!existsInInitial && isSelectedCompanyError)) {
 					const firstCompanyId = String(companies[0].id);
 					setSelectedCompanyIdState(firstCompanyId);
 					setStoredCompanyId(firstCompanyId);
@@ -240,7 +263,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 				setStoredCompanyId(userCompanyId);
 			}
 		}
-	}, [companies, isSystemAdmin, userProfile]);
+	}, [companies, isSystemAdmin, userProfile, isSelectedCompanyError]);
 
 	const setSelectedCompanyId = React.useCallback(
 		(id: string | null) => {
@@ -257,7 +280,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 			queryClient.removeQueries({
 				predicate: (query) => {
 					const key = query.queryKey[0];
-					return key !== "profile" && key !== "companies-list-selector";
+					return (
+						key !== "profile" &&
+						key !== "companies-list-selector" &&
+						key !== "company-switcher-list" &&
+						key !== "company-detail"
+					);
 				},
 			});
 		},
@@ -268,6 +296,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 		() => ({
 			selectedCompanyId,
 			setSelectedCompanyId,
+			selectedCompany,
 			companies,
 			isLoadingCompanies,
 			isSystemAdmin,
@@ -275,6 +304,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 		[
 			selectedCompanyId,
 			setSelectedCompanyId,
+			selectedCompany,
 			companies,
 			isLoadingCompanies,
 			isSystemAdmin,
