@@ -6,6 +6,7 @@ import {
 	usePermissions,
 	type PermissionCheckItem,
 } from "@/hooks/use-permissions";
+import { getClientAccessToken } from "@/lib/auth-permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -98,8 +99,11 @@ export function PermissionGuard({
 		return <>{children}</>;
 	}
 
-	// While fetching the user's profile on client, show graceful loading state if not loaded yet
-	if (isLoading && !userProfile) {
+	const hasToken = Boolean(getClientAccessToken());
+
+	// While fetching the user's profile on client, or while signing out/redirecting without a token,
+	// show graceful loading state instead of flashing 403 Access Denied
+	if ((isLoading || !hasToken) && !userProfile) {
 		return (
 			<div
 				suppressHydrationWarning

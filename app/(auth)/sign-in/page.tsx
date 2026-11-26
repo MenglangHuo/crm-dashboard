@@ -292,7 +292,7 @@ function SignInForm() {
 				<div className="flex items-center gap-2">
 					<span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
 					<span className="font-heading font-extrabold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white">
-						Bronx <span className="text-blue-600 dark:text-blue-400">CRM</span>
+						Bronx <span className="text-blue-600 dark:text-blue-400">SAKDA</span>
 					</span>
 				</div>
 
@@ -497,7 +497,7 @@ function SignInForm() {
 
 			{/* Minimalist Bottom Footer */}
 			<footer className="relative z-10 text-center text-xs text-slate-400 dark:text-slate-500 pb-1 shrink-0">
-				<p>© {new Date().getFullYear()} Bronx CRM Platform. {t("auth.allRightsReserved", "All rights reserved.")}</p>
+				<p>© {new Date().getFullYear()} Bronx SAKDA Platform. {t("auth.allRightsReserved", "All rights reserved.")}</p>
 			</footer>
 		</main>
 	);

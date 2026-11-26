@@ -906,7 +906,7 @@ export function CommandPalette() {
 				title: "Toggle Light / Dark Mode",
 				rawTitle: "Toggle Light / Dark Mode",
 				description:
-					"Switch between light and dark theme mode across the CRM dashboard",
+					"Switch between light and dark theme mode across the SAKDA dashboard",
 				badge: "Theme",
 				badgeType: "theme",
 				shortcut: "T",
@@ -1228,14 +1228,14 @@ export function CommandPalette() {
 			open={isCommandPaletteOpen}
 			onOpenChange={setCommandPaletteOpen}
 			shouldFilter={false}
-			title="CRM Global Search & Command Center"
-			description="Search all CRM features, routes, and modal shortcuts"
+			title="SAKDA Global Search & Command Center"
+			description="Search all SAKDA features, routes, and modal shortcuts"
 			className="max-w-[96vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl"
 		>
 			{/* Top Header Search Input */}
 			<div className="relative border-b border-slate-100 dark:border-slate-800/80">
 				<CommandInput
-					placeholder="Search CRM features... (e.g. Profit, Revenue, Orders, Products, ⌘K)"
+					placeholder="Search SAKDA features... (e.g. Profit, Revenue, Orders, Products, ⌘K)"
 					value={search}
 					onValueChange={setSearch}
 					className="h-12 text-sm sm:text-base font-medium"
@@ -1262,7 +1262,7 @@ export function CommandPalette() {
 								<Search className="size-5" />
 							</div>
 							<p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-								No matching CRM features found for &ldquo;{search}&rdquo;
+								No matching SAKDA features found for &ldquo;{search}&rdquo;
 							</p>
 							<p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm">
 								Try searching for &ldquo;Profit&rdquo;, &ldquo;Revenue&rdquo;, &ldquo;Orders&rdquo;, &ldquo;User&rdquo;, or &ldquo;Products&rdquo;.
@@ -1322,7 +1322,7 @@ export function CommandPalette() {
 							heading={
 								<div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
 									<Star className="size-3 text-amber-500 fill-amber-500 inline" />
-									<span>CRM Features & Action Shortcuts</span>
+									<span>SAKDA Features & Action Shortcuts</span>
 								</div>
 							}
 						>
@@ -1370,7 +1370,7 @@ export function CommandPalette() {
 
 				<div className="flex items-center gap-1.5 text-primary font-semibold">
 					<Sparkles className="size-3.5 text-primary" />
-					<span>CRM Global Command Center</span>
+					<span>SAKDA Global Command Center</span>
 				</div>
 			</div>
 		</CommandDialog>

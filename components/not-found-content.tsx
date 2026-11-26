@@ -55,7 +55,7 @@ function LogoShield() {
 		<div className="flex size-9 shrink-0 items-center justify-center rounded-xl overflow-hidden shadow-sm shadow-primary/20 ring-2 ring-primary/20 bg-[#345FAD] transition-transform hover:scale-105">
 			<img
 				src="/sakda-assets/sakda-app-icon-fullbleed.svg"
-				alt="CRM Logo"
+				alt="SAKDA Logo"
 				className="size-full object-cover"
 				onError={(e) => {
 					(e.target as HTMLImageElement).src = "/sakda-assets/sakda-icon-128.png";
@@ -121,7 +121,7 @@ export function NotFoundContent() {
 					<LogoShield />
 					<div className="flex flex-col">
 						<span className="font-heading text-base font-bold tracking-tight text-slate-900 dark:text-white">
-							{t("common.appName", "CRM Admin Dashboard")}
+							{t("common.appName", "SAKDA Admin Dashboard")}
 						</span>
 						<span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
 							SaaS Enterprise Platform
