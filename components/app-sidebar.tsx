@@ -225,7 +225,11 @@ function SidebarCollapsibleGroup({
 						{/* Vertical trunk line from parent bottom to last submenu node */}
 						<span
 							aria-hidden="true"
-							className="pointer-events-none absolute left-0 top-0 bottom-4.5 w-[1.5px] bg-slate-300 dark:bg-slate-700"
+							className={`pointer-events-none absolute left-0 top-0 bottom-4.5 w-[1.5px] transition-colors ${
+								isChildActive
+									? "bg-primary"
+									: "bg-slate-300 dark:bg-slate-700"
+							}`}
 						/>
 						{item.subItems?.map((subItem) => {
 							const isSubActive =
@@ -238,36 +242,38 @@ function SidebarCollapsibleGroup({
 									{/* Tree Branch Node Circle */}
 									<span
 										aria-hidden="true"
-										className={`pointer-events-none absolute -left-[15.25px] top-1/2 -translate-x-1/2 -translate-y-1/2 size-2 rounded-full border-[1.5px] bg-sidebar z-10 transition-colors ${
+										className={`pointer-events-none absolute -left-[15.25px] top-1/2 -translate-x-1/2 -translate-y-1/2 size-2 rounded-full border-[1.5px] z-10 transition-all ${
 											isSubActive
-												? "border-primary"
-												: "border-slate-300 dark:border-slate-600"
+												? "bg-primary border-primary ring-4 ring-primary/20"
+												: isChildActive
+													? "bg-sidebar border-primary"
+													: "bg-sidebar border-slate-300 dark:border-slate-600"
 										}`}
 									/>
 									{/* Tree Branch Horizontal Line Connector */}
 									<span
 										aria-hidden="true"
 										className={`pointer-events-none absolute -left-3 top-1/2 -translate-y-1/2 w-3 h-[1.5px] transition-colors ${
-											isSubActive
+											isSubActive || isChildActive
 												? "bg-primary"
 												: "bg-slate-300 dark:bg-slate-700"
 										}`}
 									/>
 
-									{/* Submenu Item Pill: Matches parent active style when active */}
+									{/* Submenu Item Pill */}
 									<SidebarMenuSubButton
 										render={<Link href={subItem.url} />}
 										isActive={isSubActive}
 										className={`flex items-center gap-2.5 w-full h-9 rounded-xl px-3 text-xs transition-all ${
 											isSubActive
-												? "border-l-[3px] border-primary bg-primary/10 text-primary font-bold shadow-sm shadow-primary/10"
+												? "bg-primary text-primary-foreground font-semibold shadow-md shadow-primary/25 hover:bg-primary/95 hover:text-primary-foreground"
 												: "border-l-2 border-transparent bg-slate-100/70 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-700/60 dark:hover:text-slate-200 font-medium"
 										}`}
 									>
 										<SubIcon
 											className={`size-3.5 shrink-0 transition-colors ${
 												isSubActive
-													? "text-primary"
+													? "text-primary-foreground"
 													: "text-slate-500 dark:text-slate-400"
 											}`}
 										/>
