@@ -753,7 +753,6 @@ export const reportsApi = {
 	refreshReports: () =>
 		api
 			.post<ReportRefreshResponse>("/reports/refresh")
-			.catch(() => api.get<ReportRefreshResponse>("/reports/refresh"))
 			.then((r: any) => (r.data !== undefined ? r.data : r)),
 };
 

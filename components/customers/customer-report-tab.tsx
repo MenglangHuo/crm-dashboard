@@ -103,6 +103,30 @@ export function CustomerReportTab({
 		return `$${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 	};
 
+	const formatDateLabel = (dateStr?: string | number): string => {
+		if (dateStr === undefined || dateStr === null) return "";
+		const str = String(dateStr);
+		if (/^\d{4}-\d{2}$/.test(str)) {
+			const [year, month] = str.split("-");
+			const monthIdx = parseInt(month, 10) - 1;
+			const monthNames = [
+				"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+				"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+			];
+			return `${monthNames[monthIdx] || month} ${year}`;
+		}
+		if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+			const [_year, month, day] = str.split("-");
+			const monthIdx = parseInt(month, 10) - 1;
+			const monthNames = [
+				"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+				"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+			];
+			return `${monthNames[monthIdx] || month} ${parseInt(day, 10)}`;
+		}
+		return str;
+	};
+
 	const { resolvedTheme } = useTheme();
 	const isDark = resolvedTheme === "dark";
 
@@ -163,6 +187,7 @@ export function CustomerReportTab({
 					fontSize: "11px",
 					fontWeight: 500,
 				},
+				formatter: (val) => formatDateLabel(val),
 			},
 			axisBorder: { color: chartTheme.borderColor },
 			axisTicks: { color: chartTheme.borderColor },
@@ -192,6 +217,15 @@ export function CustomerReportTab({
 		},
 		tooltip: {
 			theme: chartTheme.tooltipTheme,
+			x: {
+				formatter: (val: any, opts?: any) => {
+					const rawDate =
+						typeof val === "number" && opts?.w?.globals?.categoryLabels
+							? opts.w.globals.categoryLabels[val - 1] || val
+							: val;
+					return formatDateLabel(String(rawDate));
+				},
+			},
 			y: {
 				formatter: (val) =>
 					`$${Number(val).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
@@ -243,6 +277,7 @@ export function CustomerReportTab({
 					fontSize: "11px",
 					fontWeight: 500,
 				},
+				formatter: (val) => formatDateLabel(val),
 			},
 			axisBorder: { color: chartTheme.borderColor },
 			axisTicks: { color: chartTheme.borderColor },
@@ -272,6 +307,15 @@ export function CustomerReportTab({
 		},
 		tooltip: {
 			theme: chartTheme.tooltipTheme,
+			x: {
+				formatter: (val: any, opts?: any) => {
+					const rawDate =
+						typeof val === "number" && opts?.w?.globals?.categoryLabels
+							? opts.w.globals.categoryLabels[val - 1] || val
+							: val;
+					return formatDateLabel(String(rawDate));
+				},
+			},
 			y: {
 				formatter: (val) => `${val} entries`,
 			},
@@ -338,6 +382,7 @@ export function CustomerReportTab({
 					fontSize: "11px",
 					fontWeight: 500,
 				},
+				formatter: (val) => formatDateLabel(val),
 			},
 			axisBorder: { color: chartTheme.borderColor },
 			axisTicks: { color: chartTheme.borderColor },
@@ -367,6 +412,15 @@ export function CustomerReportTab({
 		},
 		tooltip: {
 			theme: chartTheme.tooltipTheme,
+			x: {
+				formatter: (val: any, opts?: any) => {
+					const rawDate =
+						typeof val === "number" && opts?.w?.globals?.categoryLabels
+							? opts.w.globals.categoryLabels[val - 1] || val
+							: val;
+					return formatDateLabel(String(rawDate));
+				},
+			},
 			y: {
 				formatter: (val) =>
 					`$${Number(val).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
@@ -434,12 +488,24 @@ export function CustomerReportTab({
 
 				{/* Gross Profit */}
 				<div className="rounded-2xl border border-emerald-500/20 dark:border-emerald-500/30 p-3.5 bg-emerald-500/5 shadow-xs">
-					<span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
-						{t("customers.grossProfit")}
-					</span>
+					<div className="flex items-center justify-between">
+						<span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+							{t("customers.grossProfit")}
+						</span>
+						{summary?.grossMarginPct !== undefined && summary?.grossMarginPct !== null && (
+							<span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">
+								{Number(summary.grossMarginPct).toFixed(1)}%
+							</span>
+						)}
+					</div>
 					<div className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1">
 						{isLoadingSummary ? "..." : formatMoney(summary?.grossProfit)}
 					</div>
+					{summary?.totalCogs !== undefined && Number(summary.totalCogs) > 0 && (
+						<span className="text-[10px] text-slate-400 block mt-0.5">
+							COGS: {formatMoney(summary.totalCogs)}
+						</span>
+					)}
 				</div>
 
 				{/* Total Orders */}

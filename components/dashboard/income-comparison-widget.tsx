@@ -64,7 +64,7 @@ export function IncomeComparisonWidget({
 
 	// Default selected period for deep inspection
 	const [selectedPeriod, setSelectedPeriod] = React.useState<string>(() => {
-		return comparisons[0]?.period || "YESTERDAY";
+		return comparisons[0]?.period || "TODAY";
 	});
 
 	React.useEffect(() => {
