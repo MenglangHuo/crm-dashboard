@@ -46,6 +46,7 @@ import { PermissionGuard } from "@/components/auth/permission-guard";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import type {
 	DashboardReportData,
+	DashboardTopProductItem,
 } from "@/lib/types";
 
 // Empty fallback structure for initial unpopulated state
@@ -57,7 +58,9 @@ const EMPTY_DASHBOARD_DATA: DashboardReportData = {
 	outOfStockCount: 0,
 	netRevenue: 0,
 	grossSales: 0,
+	totalCogs: 0,
 	grossProfit: 0,
+	grossMarginPct: 0,
 	totalDiscount: 0,
 	totalTaxAmount: 0,
 	totalShippingAmount: 0,
@@ -232,9 +235,15 @@ export default function DashboardPage() {
 				minute: "2-digit",
 			});
 			setLastRefreshedTime(nowStr);
-			toast.success(res?.message || "Dashboard report generated successfully", {
-				description: `Synced latest transactions at ${nowStr}`,
-			});
+			if (res?.status === "already_running") {
+				toast.info(res?.message || "Dashboard refresh is already in progress", {
+					description: "Background rollup recomputation is actively syncing data.",
+				});
+			} else {
+				toast.success(res?.message || "Dashboard report generated successfully", {
+					description: `Synced latest transactions at ${nowStr}`,
+				});
+			}
 		} catch {
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: ["dashboard-report"] }),
@@ -256,6 +265,22 @@ export default function DashboardPage() {
 			setIsRefreshing(false);
 		}
 	};
+
+	// Authoritative database rollup sync timestamp from backend metadata
+	const formattedLastRefreshed = React.useMemo(() => {
+		if (dashboardData?.lastRefreshedAt) {
+			try {
+				const d = new Date(dashboardData.lastRefreshedAt);
+				if (!isNaN(d.getTime())) {
+					return d.toLocaleTimeString([], {
+						hour: "2-digit",
+						minute: "2-digit",
+					});
+				}
+			} catch {}
+		}
+		return lastRefreshedTime;
+	}, [dashboardData?.lastRefreshedAt, lastRefreshedTime]);
 
 	// Live Customer Feedback evaluations strictly from API
 	const feedbackRows = React.useMemo(() => {
@@ -302,6 +327,107 @@ export default function DashboardPage() {
 		});
 	}, [submissionsData, templatesList]);
 
+	// Export Dashboard KPI and Product Performance Summary to CSV
+	const handleExportDashboard = React.useCallback(() => {
+		const summaryRows = [
+			{ Section: "KPI", Metric: "Gross Sales", Value: finalDashboard.grossSales },
+			{
+				Section: "KPI",
+				Metric: "Total Discounts",
+				Value:
+					finalDashboard.totalDiscount +
+					(finalDashboard.totalPaymentDiscount || 0),
+			},
+			{ Section: "KPI", Metric: "Net Revenue", Value: finalDashboard.netRevenue },
+			{
+				Section: "KPI",
+				Metric: "Cost of Goods Sold (COGS)",
+				Value: finalDashboard.totalCogs || 0,
+			},
+			{ Section: "KPI", Metric: "Gross Profit", Value: finalDashboard.grossProfit },
+			{
+				Section: "KPI",
+				Metric: "Gross Margin %",
+				Value:
+					finalDashboard.grossMarginPct ??
+					(finalDashboard.netRevenue > 0
+						? (
+								(finalDashboard.grossProfit / finalDashboard.netRevenue) *
+								100
+							).toFixed(1)
+						: 0),
+			},
+			{
+				Section: "KPI",
+				Metric: "Total Unpaid Receivables",
+				Value: finalDashboard.totalUnpaid,
+			},
+			{ Section: "KPI", Metric: "Total Orders", Value: finalDashboard.totalOrders },
+			{
+				Section: "KPI",
+				Metric: "Total Invoices",
+				Value: finalDashboard.totalInvoices,
+			},
+			{
+				Section: "KPI",
+				Metric: "Low Stock Items",
+				Value: finalDashboard.lowStockCount,
+			},
+			{
+				Section: "KPI",
+				Metric: "Out of Stock Items",
+				Value: finalDashboard.outOfStockCount,
+			},
+		];
+
+		const topRevenueRows = (finalDashboard.topProductsByRevenue || []).map(
+			(p: DashboardTopProductItem, idx: number) => ({
+				Section: "Top Products by Revenue",
+				Metric: `#${idx + 1} ${p.productName} (${p.sku})`,
+				Value: p.totalRevenue,
+			}),
+		);
+
+		const topQtyRows = (finalDashboard.topProductsByQuantity || []).map(
+			(p: DashboardTopProductItem, idx: number) => ({
+				Section: "Top Products by Quantity",
+				Metric: `#${idx + 1} ${p.productName} (${p.sku})`,
+				Value: p.totalQuantity,
+			}),
+		);
+
+		const allExportRows = [...summaryRows, ...topRevenueRows, ...topQtyRows];
+		const headers = ["Section", "Metric", "Value"];
+		const csvLines = [headers.join(",")];
+		for (const r of allExportRows) {
+			const values = [
+				`"${String(r.Section).replace(/"/g, '""')}"`,
+				`"${String(r.Metric).replace(/"/g, '""')}"`,
+				`"${String(r.Value).replace(/"/g, '""')}"`,
+			];
+			csvLines.push(values.join(","));
+		}
+
+		const blob = new Blob([csvLines.join("\n")], {
+			type: "text/csv;charset=utf-8;",
+		});
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		const dateTag =
+			dateRange.preset ||
+			`${dateRange.startDate || ""}_${dateRange.endDate || ""}`;
+		link.setAttribute("href", url);
+		link.setAttribute(
+			"download",
+			`dashboard-report-${dateTag || "summary"}.csv`,
+		);
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+		toast.success("Dashboard report exported successfully as CSV");
+	}, [finalDashboard, dateRange]);
+
 	return (
 		<PermissionGuard resource="DASHBOARD" action="READ">
 			<div className="space-y-6 pb-12">
@@ -309,7 +435,7 @@ export default function DashboardPage() {
 				<DashboardHeader
 					title={t("dashboard.title")}
 					description={t("dashboard.description")}
-					lastUpdated={lastRefreshedTime}
+					lastUpdated={formattedLastRefreshed}
 					isRefreshing={isRefreshing || isFetchingDashboard}
 					onRefresh={handleRefresh}
 					dateRange={dateRange}
@@ -389,6 +515,7 @@ export default function DashboardPage() {
 									<Button
 										variant="outline"
 										size="sm"
+										onClick={handleExportDashboard}
 										className="h-9 rounded-xl border-slate-200/90 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700/80 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors"
 									>
 										<Download className="mr-1.5 h-3.5 w-3.5 text-slate-400" />{" "}

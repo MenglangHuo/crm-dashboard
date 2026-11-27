@@ -88,6 +88,7 @@ export function FinancialKpiGrid({
 
 	const netRevenue = data?.netRevenue ?? 0;
 	const grossSales = data?.grossSales ?? 0;
+	const totalCogs = data?.totalCogs ?? 0;
 	const grossProfit = data?.grossProfit ?? 0;
 	const totalDiscount = data?.totalDiscount ?? 0;
 	const totalPaymentDiscount = data?.totalPaymentDiscount ?? 0;
@@ -102,7 +103,11 @@ export function FinancialKpiGrid({
 
 	const isProfitPositive = grossProfit >= 0;
 	const profitMarginPercent =
-		grossSales > 0 ? ((grossProfit / grossSales) * 100).toFixed(1) : "0.0";
+		data?.grossMarginPct !== undefined && data?.grossMarginPct !== null
+			? Number(data.grossMarginPct).toFixed(1)
+			: netRevenue > 0
+				? ((grossProfit / netRevenue) * 100).toFixed(1)
+				: "0.0";
 
 	const paymentDiscountPercent =
 		grossSales > 0
@@ -230,11 +235,16 @@ export function FinancialKpiGrid({
 						</div>
 
 						<div className="mt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800/60 pt-3 text-xs text-slate-500 dark:text-slate-400">
-							<span className="text-slate-400">{t("common.status")}</span>
+							<div className="flex items-center gap-1.5 truncate">
+								<span className="text-slate-400">COGS:</span>
+								<span className="font-semibold text-slate-800 dark:text-slate-200">
+									{formatCurrency(totalCogs)}
+								</span>
+							</div>
 							<span
 								className={`font-semibold ${isProfitPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
 							>
-								{isProfitPositive ? t("common.success") : t("common.error")}
+								{isProfitPositive ? t("common.profitable", "Profitable") : t("common.loss", "Loss")}
 							</span>
 						</div>
 					</div>

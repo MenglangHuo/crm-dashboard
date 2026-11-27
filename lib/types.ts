@@ -450,7 +450,9 @@ export interface DashboardReportData {
 	outOfStockCount: number;
 	netRevenue: number;
 	grossSales: number;
+	totalCogs?: number;
 	grossProfit: number;
+	grossMarginPct?: number;
 	totalDiscount: number;
 	totalTaxAmount: number;
 	totalShippingAmount: number;
@@ -458,6 +460,7 @@ export interface DashboardReportData {
 	totalPaymentDiscount?: number;
 	topProductsByRevenue: DashboardTopProductItem[];
 	topProductsByQuantity: DashboardTopProductItem[];
+	lastRefreshedAt?: string;
 }
 
 export interface TimeSeriesRevenuePoint {
@@ -509,8 +512,15 @@ export interface IncomeComparisonData {
 }
 
 export interface ReportRefreshResponse {
-	refreshed?: boolean;
+	status?: "success" | "already_running" | "partial_failure" | string;
 	message?: string;
+	refreshedViews?: string[];
+	failedViews?: string[];
+	durationMs?: number;
+	refreshedAt?: string;
+	lastRefreshedAt?: string;
+	// Backwards compatibility
+	refreshed?: boolean;
 	timestamp?: string;
 }
 
@@ -753,11 +763,14 @@ export interface CustomerReportSummary {
 	totalInvoices: number;
 	netRevenue: number;
 	grossSales: number;
+	totalCogs?: number;
 	grossProfit: number;
+	grossMarginPct?: number;
 	totalDiscount: number;
 	totalTaxAmount: number;
 	totalShippingAmount: number;
 	totalUnpaid: number;
+	totalPaymentDiscount?: number;
 }
 
 export interface CustomerReportRequest {

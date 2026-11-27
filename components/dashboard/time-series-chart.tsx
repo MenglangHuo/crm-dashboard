@@ -34,6 +34,30 @@ function formatMoney(val: number) {
 	return `${isNeg ? "-" : ""}$${abs.toFixed(2)}`;
 }
 
+function formatDateLabel(dateStr?: string | number): string {
+	if (dateStr === undefined || dateStr === null) return "";
+	const str = String(dateStr);
+	if (/^\d{4}-\d{2}$/.test(str)) {
+		const [year, month] = str.split("-");
+		const monthIdx = parseInt(month, 10) - 1;
+		const monthNames = [
+			"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+			"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+		];
+		return `${monthNames[monthIdx] || month} ${year}`;
+	}
+	if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+		const [_year, month, day] = str.split("-");
+		const monthIdx = parseInt(month, 10) - 1;
+		const monthNames = [
+			"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+			"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+		];
+		return `${monthNames[monthIdx] || month} ${parseInt(day, 10)}`;
+	}
+	return str;
+}
+
 function TimeSeriesChartComponent({ data, isLoading }: TimeSeriesChartProps) {
 	const { t } = useTranslation();
 	const { resolvedTheme } = useTheme();
@@ -145,6 +169,7 @@ function TimeSeriesChartComponent({ data, isLoading }: TimeSeriesChartProps) {
 						fontSize: "11px",
 						fontWeight: 500,
 					},
+					formatter: (val) => formatDateLabel(val),
 				},
 				axisBorder: { color: chartTheme.borderColor },
 				axisTicks: { color: chartTheme.borderColor },
@@ -175,6 +200,15 @@ function TimeSeriesChartComponent({ data, isLoading }: TimeSeriesChartProps) {
 			},
 			tooltip: {
 				theme: chartTheme.tooltipTheme,
+				x: {
+					formatter: (val: any, opts?: any) => {
+						const rawDate =
+							typeof val === "number" && opts?.w?.globals?.categoryLabels
+								? opts.w.globals.categoryLabels[val - 1] || val
+								: val;
+						return formatDateLabel(String(rawDate));
+					},
+				},
 				y: {
 					formatter: (val) => {
 						if (typeof val !== "number" || isNaN(val)) return "$0.00";
@@ -253,6 +287,7 @@ function TimeSeriesChartComponent({ data, isLoading }: TimeSeriesChartProps) {
 						fontSize: "11px",
 						fontWeight: 500,
 					},
+					formatter: (val) => formatDateLabel(val),
 				},
 				axisBorder: { color: chartTheme.borderColor },
 				axisTicks: { color: chartTheme.borderColor },
@@ -286,6 +321,15 @@ function TimeSeriesChartComponent({ data, isLoading }: TimeSeriesChartProps) {
 			},
 			tooltip: {
 				theme: chartTheme.tooltipTheme,
+				x: {
+					formatter: (val: any, opts?: any) => {
+						const rawDate =
+							typeof val === "number" && opts?.w?.globals?.categoryLabels
+								? opts.w.globals.categoryLabels[val - 1] || val
+								: val;
+						return formatDateLabel(String(rawDate));
+					},
+				},
 				y: {
 					formatter: (val) =>
 						`${typeof val === "number" && !isNaN(val) ? val : 0} ${t("common.entries")}`,
@@ -361,6 +405,7 @@ function TimeSeriesChartComponent({ data, isLoading }: TimeSeriesChartProps) {
 						fontSize: "11px",
 						fontWeight: 500,
 					},
+					formatter: (val) => formatDateLabel(val),
 				},
 				axisBorder: { color: chartTheme.borderColor },
 				axisTicks: { color: chartTheme.borderColor },
@@ -391,6 +436,15 @@ function TimeSeriesChartComponent({ data, isLoading }: TimeSeriesChartProps) {
 			},
 			tooltip: {
 				theme: chartTheme.tooltipTheme,
+				x: {
+					formatter: (val: any, opts?: any) => {
+						const rawDate =
+							typeof val === "number" && opts?.w?.globals?.categoryLabels
+								? opts.w.globals.categoryLabels[val - 1] || val
+								: val;
+						return formatDateLabel(String(rawDate));
+					},
+				},
 				y: {
 					formatter: (val) => {
 						if (typeof val !== "number" || isNaN(val)) return "$0.00";
